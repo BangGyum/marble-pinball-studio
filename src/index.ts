@@ -47,7 +47,7 @@ const mode = el<HTMLSelectElement>('winner-mode'),
   start = el<HTMLButtonElement>('start');
 const record = el<HTMLInputElement>('record');
 const winnerCount = el<HTMLSelectElement>('winner-count');
-const initialMapIndex = stages.length - 1;
+const initialMapIndex = stages.findIndex((stage) => stage.title === '네온 분기점');
 let currentStage: StageDef = stages[initialMapIndex];
 let initialized = false;
 const gameView = el('game-view'),
