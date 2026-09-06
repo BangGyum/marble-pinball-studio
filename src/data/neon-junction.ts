@@ -138,8 +138,13 @@ export const neonJunction: StageDef = {
     wall([[0, 120], [0, 137], [6, 140], [8, 146], [29, 155], [31.4, 157], [31.4, 159], jarPoint([6, 61.5])]),
     wall([[66, 120], [66, 137], [60, 140], [58, 146], [37, 155], [34.6, 157], [34.6, 159], jarPoint([20, 61.5])], gold),
     rotor(33, 153.5, 2.4, 2, 0.4, mint),
-    jarWall(returnWall),
-    jarWall(returnWall.map(([x, y]) => [26 - x, y])),
+    ...[-1, 1].flatMap((side) => {
+      const points = returnWall.map(([x, y]): [number, number] => [side < 0 ? x : 26 - x, y]);
+      // Back only the exterior so the central exit remains open.
+      const outside = jarWall(points.slice(4));
+      if (outside.shape.type === 'polyline') outside.shape.backing = side < 0 ? 3 : -3;
+      return [jarWall(points.slice(0, 5)), outside];
+    }),
     ...dividers,
     jarWall([
       [9.5, 74.5],

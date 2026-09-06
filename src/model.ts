@@ -113,6 +113,8 @@ export function validateStage(value: unknown): StageDef {
         )
       )
         throw new Error('벽의 좌표가 올바르지 않아요.');
+      if (sh.backing !== undefined && (!finite(sh.backing, -5, 5) || sh.solid || e.type !== 'static'))
+        throw new Error('외벽 충돌 두께가 올바르지 않아요.');
       if (sh.solid !== undefined && typeof sh.solid !== 'boolean') throw new Error('벽 채움 설정이 올바르지 않아요.');
       if (sh.solid) {
         const points = sh.points.slice(0, -1),

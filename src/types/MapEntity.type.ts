@@ -23,6 +23,8 @@ export interface EntityCircleShape extends EntityShapeBase {
 export interface EntityPolylineShape extends EntityShapeBase {
   type: 'polyline';
   solid?: boolean;
+  // Signed collision depth on the right-hand side of the directed wall.
+  backing?: number;
   rotation: number;
   points: [number, number][];
 }

@@ -7,7 +7,7 @@
     "dev": "node ./node_modules/parcel/lib/bin.js index.html --port 43187 --host 127.0.0.1 --dist-dir .dev-dist",
     "build": "node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/parcel/lib/bin.js build index.html --public-url ./ && node scripts/licenses.cjs --dist",
     "check": "node ./node_modules/typescript/bin/tsc --noEmit",
-    "test": "node tests/run.cjs && node tests/recorder.cjs && node tests/interaction.cjs && node tests/junction.cjs && node tests/rankings.cjs && node tests/celebration.cjs && node tests/launch.cjs && node tests/freehand.cjs && node tests/cascade.cjs",
+    "test": "node tests/run.cjs && node tests/recorder.cjs && node tests/interaction.cjs && node tests/junction.cjs && node tests/rankings.cjs && node tests/celebration.cjs && node tests/launch.cjs && node tests/freehand.cjs && node tests/cascade.cjs && node tests/rotor-wall-audit.cjs",
     "predev": "node scripts/licenses.cjs",
     "prebuild": "node scripts/licenses.cjs"
   },

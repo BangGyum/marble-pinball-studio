@@ -11,6 +11,7 @@ export class Box2dPhysics implements IPhysics {
   private marbleMap: Record<number, Box2D.b2Body> = {};
   private entities: ({ body: Box2D.b2Body } & MapEntityState)[] = [];
   private randomizeStart = false;
+  private collisionSubsteps = 4;
   private deleteCandidates: Box2D.b2Body[] = [];
 
   async init() {
@@ -30,6 +31,7 @@ export class Box2dPhysics implements IPhysics {
   }
   createStage(stage: StageDef) {
     this.randomizeStart = stage.randomizeStart === true;
+    this.collisionSubsteps = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.backing) ? 16 : 4;
     this.createEntities(
       (stage.entities ?? []).map((entity) =>
         this.randomizeStart && entity.position.y < 28 && entity.type === 'kinematic' && entity.shape.type === 'box'
@@ -89,6 +91,26 @@ export class Box2dPhysics implements IPhysics {
           shape.SetTwoSided(this.vector, endpoint);
           fixture.set_shape(shape);
           body.CreateFixture(fixture);
+          if (s.backing) {
+            // Solid backing prevents paddles from squeezing a marble through a zero-width edge.
+            const dx = b[0] - a[0],
+              dy = b[1] - a[1],
+              length = Math.hypot(dx, dy);
+            const nx = (dy / length) * s.backing,
+              ny = (-dx / length) * s.backing;
+            const polygon = new B.b2PolygonShape();
+            const pointer = B._malloc(32);
+            const vertices = [a, b, [b[0] + nx, b[1] + ny], [a[0] + nx, a[1] + ny]];
+            vertices.forEach((point, j) => {
+              B.HEAPF32[(pointer >> 2) + j * 2] = point[0];
+              B.HEAPF32[(pointer >> 2) + j * 2 + 1] = point[1];
+            });
+            polygon.Set(pointer, 4);
+            B._free(pointer);
+            fixture.set_shape(polygon);
+            body.CreateFixture(fixture);
+            B.destroy(polygon);
+          }
         }
         B.destroy(shape);
         B.destroy(endpoint);
@@ -159,7 +181,8 @@ export class Box2dPhysics implements IPhysics {
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
     this.deleteCandidates = [];
     // Smaller angular increments keep rotating paddles from pushing marbles through thin walls.
-    for (let i = 0; i < 4; i++) this.world.Step(seconds / 4, 8, 4);
+    for (let i = 0; i < this.collisionSubsteps; i++)
+      this.world.Step(seconds / this.collisionSubsteps, 8, this.collisionSubsteps === 4 ? 4 : 8);
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const e = this.entities[i];
       if (e.life <= 0) continue;
