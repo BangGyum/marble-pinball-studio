@@ -1,5 +1,6 @@
 import { cascade } from './cascade';
 import { neonJunction } from './neon-junction';
+import { pipelineRun } from './pipeline-run';
 import type { MapEntity } from '../types/MapEntity.type';
 
 export type AdBoard = {
@@ -3003,4 +3004,4 @@ const builtInStages: StageDef[] = [
   },
 ];
 
-export const stages: StageDef[] = [builtInStages[2], neonJunction, cascade];
+export const stages: StageDef[] = [builtInStages[2], neonJunction, cascade, pipelineRun];

@@ -6,7 +6,7 @@ import { el, toast, message } from './ui';
 import { Editor } from './editor';
 import { Rankings } from './rankings';
 
-const titles = ['욕망의 항아리', '네온 분기점', '캐스케이드'];
+const titles = ['욕망의 항아리', '네온 분기점', '캐스케이드', '네온 파이프라인'];
 stages.forEach((s, i) => (s.title = titles[i] ?? s.title));
 let saved: SavedMap[] = [];
 try {
