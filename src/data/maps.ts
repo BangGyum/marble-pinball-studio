@@ -1,3 +1,4 @@
+import { cascade } from './cascade';
 import { neonJunction } from './neon-junction';
 import type { MapEntity } from '../types/MapEntity.type';
 
@@ -3002,4 +3003,4 @@ const builtInStages: StageDef[] = [
   },
 ];
 
-export const stages: StageDef[] = [builtInStages[2], neonJunction];
+export const stages: StageDef[] = [builtInStages[2], neonJunction, cascade];
