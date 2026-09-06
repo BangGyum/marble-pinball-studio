@@ -18,14 +18,18 @@ Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 429
   const shake = physics.shakeMarble.bind(physics);
   physics.shakeMarble = id => { shakes++; shake(id); };
   const wins = Array(14).fill(0), last = Array(14).fill(0);
-  let min = Infinity, max = 0;
+  let min = Infinity, max = 0, rebounds = 0;
   for (let round = 0; round < 106; round++) {
     const count = round < 6 ? [1, 4, 8, 12, 30, 49][round] : 14;
     shakes = 0;
     game.prepare(cascade, Array.from({length: count}, (_, i) => '참가자' + i));
     game.start([1, 1], false);
     while (game.state === 'running' && game.elapsed < 65) {
+      const previousY = game.balls.map(b => b.y);
       game.advance();
+      for (const b of game.balls) {
+        if (!b.rank && b.y > 100 && b.y < 111 && b.y < previousY[b.id] - 0.005) rebounds++;
+      }
       for (const b of game.balls) assert.ok(b.x >= 0.5 && b.x <= 25.5, 'escaped side wall');
     }
     assert.equal(game.arrivals.length, count, 'all marbles must finish');
@@ -34,5 +38,6 @@ Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 429
     if (round < 6) console.log('PASS cascade', count, game.elapsed.toFixed(1) + 's');
     else { wins[game.arrivals[0].id]++; last[game.arrivals[count - 1].id]++; }
   }
-  console.log(JSON.stringify({ rounds: 100, count: 14, firstByInput: wins, lastByInput: last, finishSeconds: [min, max] }));
+  assert.ok(rebounds > 0, 'finish bumpers must send marbles upward');
+  console.log(JSON.stringify({ rebounds, rounds: 100, count: 14, firstByInput: wins, lastByInput: last, finishSeconds: [min, max] }));
 })().catch(e => { console.error(e); process.exitCode = 1; });

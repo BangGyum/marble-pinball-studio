@@ -7,10 +7,10 @@ const wall = (points: [number, number][], color = aqua): MapEntity => ({
   shape: { type: 'polyline', points, rotation: 0, color },
   props: { density: 1, restitution: 0.12, angularVelocity: 0 },
 });
-const pin = (x: number, y: number, radius = 0.42): MapEntity => ({
+const pin = (x: number, y: number, radius = 0.42, restitution = 0.75): MapEntity => ({
   position: { x, y }, type: 'static',
   shape: { type: 'circle', radius, color: gold },
-  props: { density: 1, restitution: 0.75, angularVelocity: 0 },
+  props: { density: 1, restitution, angularVelocity: 0 },
 });
 // Original layout: a short peg field, alternating waterfall shelves and an open finish.
 export const cascade: StageDef = {
@@ -28,9 +28,14 @@ export const cascade: StageDef = {
     ).flat(),
     ...Array.from({ length: 4 }, (_, i) => {
       const y = 34 + i * 13;
-      const points: [number, number][] = [[1, y], [6, y + 2], [12, y + 5], [18, y + 9]];
+      // Cubic curve: steep entry gradually flattens into a launch lip.
+      const points: [number, number][] = Array.from({ length: 33 }, (_, step) => {
+        const t = step / 32, u = 1 - t;
+        return [u * u * u + 3 * u * u * t + 3 * u * t * t * 8 + t * t * t * 19,
+          y + 3 * u * u * t * 8 + 3 * u * t * t * 11 + t * t * t * 12];
+      });
       return wall(i % 2 ? points.map(([x, py]) => [26 - x, py]) : points, i % 2 ? coral : aqua);
     }),
-    pin(9, 90, 1), pin(17, 90, 1), pin(13, 97, 1.1),
+    pin(11.3, 102, 0.9, 1.3), pin(14.8, 105, 0.9, 1.3), pin(12.8, 109, 0.85, 1.3),
   ],
 };
