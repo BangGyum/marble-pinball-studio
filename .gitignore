@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.parcel-cache/
+.source/
+.test-build/
+*.tar.gz
+*.tgz
+
+.dev-dist/
+.package-tmp/
+
+fairness-results/
+.openai/
+.env
+.env.*
+!.env.example

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#090c10" />
+  <meta name="description" content="이름을 넣고 구슬을 떨어뜨려 보세요. 나만의 핀볼 맵을 만들고 이 기기에 저장할 수 있습니다." />
+  <title>마블 핀볼</title><link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <main id="game-view">
+    <header class="topbar"><div class="brand"><i></i> 마블 핀볼 <span>MARBLE RUN</span></div><div class="top-actions"><span id="status" role="status">게임 준비 중</span><button id="editor-open">맵 만들기 <span>↗</span></button></div></header>
+    <div class="race-layout">
+      <div class="view-controls"><div class="zoom-controls" role="group" aria-label="화면 배율"><button id="zoom-out" aria-label="축소" title="축소">−</button><button id="zoom-reset" aria-label="기본 배율로 돌아가기" title="기본 배율로 돌아가기 · 마우스 휠로 확대·축소">100%</button><button id="zoom-in" aria-label="확대" title="확대">＋</button></div><button id="follow" title="구슬 따라가기">◎ 따라가기</button><label>배속 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label><button id="pause" disabled>일시정지</button></div>
+      <div class="play-area"><canvas id="game" aria-label="구슬 경주 화면. 왼쪽 미니맵 위에 마우스를 올리면 해당 위치를 따라갑니다. 마우스 휠로 확대하거나 축소할 수 있습니다."></canvas>
+      <ol id="ranking-list" class="rankings" role="list" aria-label="경주 순위. 도착한 구슬은 굵게 표시됩니다." tabindex="0" hidden></ol>
+      </div>
+    </div>
+    <div class="control-dock">
+      <button id="panel-toggle" class="panel-handle" aria-expanded="true" aria-controls="control-panel"><span id="panel-toggle-label">설정 접기</span><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+      <div class="panel-reveal"><div class="panel-clip">
+    <section id="control-panel" class="control-panel" aria-label="게임 설정">
+      <div class="names-panel"><div class="label-row"><label for="names">참가자 이름</label><span id="count">4개의 구슬</span></div><textarea id="names" spellcheck="false" placeholder="하나, 둘, 셋, 넷">하나, 둘, 셋, 넷</textarea><div class="names-footer"><span>콤마로 구분 · 같은 이름을 여러 개 넣으려면 이름*3</span><button id="shuffle">⇄ 섞기</button></div></div>
+      <div class="settings-panel"><div class="setting"><label for="map-select">맵</label><div class="inline"><select id="map-select"></select><button id="edit-current" title="선택한 맵 편집">편집</button></div></div>
+        <div class="setting"><label for="winner-mode">당첨 순위</label><div class="inline"><select id="winner-mode" aria-label="당첨 방향"><option value="asc">ASC(앞)</option><option value="desc">DESC(뒤)</option></select><select id="winner-count" aria-label="뽑을 인원"><option value="1">1명</option></select></div></div>
+        <div class="setting"><label for="record">녹화</label><label class="check"><input id="record" type="checkbox" /> 경기 종료 후 영상 저장</label></div>
+        <div class="play-actions"><button id="reset">다시 준비</button><button id="start" class="primary" disabled>▶ 시작</button></div>
+      </div>
+    </section>
+      </div></div>
+    </div>
+    <footer><span id="map-caption"></span><a href="https://github.com/lazygyu/roulette" target="_blank" rel="noopener noreferrer">Original by lazygyu · MIT</a><a href="./licenses.html" target="_blank" rel="noopener noreferrer">오픈소스 라이선스</a></footer>
+  </main>
+  <dialog id="editor-dialog" aria-labelledby="editor-title">
+    <header class="editor-header"><div><span class="eyebrow">MAP STUDIO</span><h1 id="editor-title">맵 만들기</h1></div><div class="inline"><button id="editor-close">닫기</button><button id="editor-test">미리 플레이</button><button id="editor-save" class="primary">저장하고 적용</button></div></header>
+    <div class="editor-layout"><aside class="editor-tools"><label for="map-name">맵 이름</label><input id="map-name" maxlength="60" placeholder="나만의 맵" /><label for="map-height">결승선 높이</label><input id="map-height" type="number" min="20" max="300" value="70" /><p class="tool-heading">배치 도구</p><div id="tools" class="tool-list"><button data-tool="select" class="selected">↖ 선택 · 이동</button><button data-tool="wall">╱ 벽 그리기</button><button data-tool="freehand">✎ 자유 그리기</button><button data-tool="pin">● 원형 핀</button><button data-tool="bumper">◉ 범퍼</button><button data-tool="ramp">━ 반사판</button><button data-tool="rotor">✣ 회전 장애물</button></div><label class="check"><input id="snap" type="checkbox" checked /> 격자에 맞추기</label><div class="inline"><button id="undo">↶ 되돌리기</button><button id="redo">↷</button></div><p id="tool-help" class="muted">장애물을 선택하고 드래그해서 옮기세요.</p><div class="library"><p class="tool-heading">맵 보관함</p><select id="editor-library" aria-label="불러올 맵"></select><div class="inline"><button id="editor-load">불러오기</button><button id="editor-new">새 맵</button></div><button id="editor-delete-map">저장된 맵 삭제</button><hr /><div class="inline"><button id="editor-export">파일 내보내기</button><button id="editor-import">가져오기</button></div><input id="map-file" type="file" accept="application/json,.json" hidden /><p class="muted">이 브라우저에 저장됩니다. 파일로 내보내면 다른 기기에서도 불러올 수 있어요.</p></div></aside>
+      <div class="editor-workspace"><div class="canvas-caption"><span>출발 영역은 고정 · 위에서 아래로 진행</span><span id="entity-count"></span></div><div id="editor-scroll"><canvas id="editor-canvas" aria-label="맵 편집 영역"></canvas></div></div>
+      <aside class="properties"><p class="tool-heading">선택한 장애물</p><p id="selection-empty" class="muted">장애물을 선택하면 위치와 크기를 바꿀 수 있어요.</p><fieldset id="entity-properties" disabled><label for="prop-x">가로 위치</label><input id="prop-x" type="number" step="0.5" /><label for="prop-y">세로 위치</label><input id="prop-y" type="number" step="0.5" /><div id="box-properties"><label for="prop-width">너비</label><input id="prop-width" type="number" min="0.2" max="30" step="0.2" /><label for="prop-height">두께</label><input id="prop-height" type="number" min="0.1" max="10" step="0.1" /><label for="prop-angle">기울기 (°)</label><input id="prop-angle" type="number" min="-180" max="180" step="5" /></div><div id="circle-properties"><label for="prop-radius">반지름</label><input id="prop-radius" type="number" min="0.1" max="5" step="0.1" /></div><label for="prop-bounce">반발력</label><input id="prop-bounce" type="number" min="0" max="2" step="0.1" /><label for="prop-spin">회전 속도 (°/초)</label><input id="prop-spin" type="number" min="-360" max="360" step="15" /><label for="prop-color">색상</label><input id="prop-color" type="color" value="#64f4e0" /><div class="inline"><button id="duplicate">복제</button><button id="delete-entity" class="danger">삭제</button></div></fieldset><p class="muted">벽은 드래그해서 그립니다.<br />핀·범퍼·반사판은 클릭으로 배치합니다.<br />완전히 막힌 곳이 없는지 미리 플레이해 보세요.</p><p id="editor-status" role="status"></p></aside>
+    </div>
+  </dialog>
+  <div id="toast" role="status" hidden></div><script type="module" src="./src/index.ts"></script>
+</body></html>
