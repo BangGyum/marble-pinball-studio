@@ -18,7 +18,7 @@ export type StageDef = {
   adBoards?: AdBoard[];
 };
 
-export const stages: StageDef[] = [
+const builtInStages: StageDef[] = [
   {
     title: 'Wheel of fortune',
     goalY: 111,
@@ -3000,5 +3000,6 @@ export const stages: StageDef[] = [
       },
     ],
   },
-  neonJunction,
 ];
+
+export const stages: StageDef[] = [builtInStages[2], neonJunction];
