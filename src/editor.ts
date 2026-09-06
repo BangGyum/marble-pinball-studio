@@ -135,7 +135,7 @@ export class Editor {
         if (file.size > 2_000_000) throw new Error('맵 파일은 2MB 이하로 가져와 주세요.');
         const data = JSON.parse(await file.text());
         if (data.format !== 'marble-pinball-map' || data.version !== 1)
-          throw new Error('마블 핀볼에서 내보낸 맵 파일을 선택해 주세요.');
+          throw new Error('바울 핀볼에서 내보낸 맵 파일을 선택해 주세요.');
         const stage = validateStage(data.stage);
         if (this.discardAllowed()) {
           this.load(stage, null);

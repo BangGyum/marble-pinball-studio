@@ -259,7 +259,7 @@ if (modelContext?.registerTool) {
   const tools: AgentTool[] = [
     {
       name: 'get_marble_draw',
-      title: '마블 추첨 상태 읽기',
+      title: '바울 추첨 상태 읽기',
       description: '현재 경기 상태, 결과, 선택 가능한 맵을 읽습니다.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: true, untrustedContentHint: true },
@@ -273,7 +273,7 @@ if (modelContext?.registerTool) {
     },
     {
       name: 'configure_marble_draw',
-      title: '마블 추첨 설정',
+      title: '바울 추첨 설정',
       description: '콤마로 구분한 참가자 이름과 맵을 선택하고 구슬을 준비합니다. 경기를 시작하지 않습니다.',
       inputSchema: {
         type: 'object',
@@ -304,7 +304,7 @@ if (modelContext?.registerTool) {
     },
     {
       name: 'start_marble_draw',
-      title: '마블 추첨 시작',
+      title: '바울 추첨 시작',
       description: '화면에 준비된 이름과 당첨 순위 설정으로 경기를 시작합니다.',
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       annotations: { readOnlyHint: false, untrustedContentHint: false },

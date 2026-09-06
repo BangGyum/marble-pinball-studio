@@ -29,7 +29,7 @@ export class Recorder {
       const url = URL.createObjectURL(new Blob(chunks, { type: actualType }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = `마블핀볼_${new Date().toISOString().replace(/[:.]/g, '-')}.${actualType.includes('mp4') ? 'mp4' : 'webm'}`;
+      a.download = `바울핀볼_${new Date().toISOString().replace(/[:.]/g, '-')}.${actualType.includes('mp4') ? 'mp4' : 'webm'}`;
       document.body.append(a);
       a.click();
       a.remove();
