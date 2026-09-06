@@ -17,7 +17,7 @@ const bumper = (x: number, y: number, radius: number, color: string): MapEntity 
   position: { x, y },
   type: 'static',
   shape: { type: 'circle', radius, color },
-  props: { density: 1, restitution: 1.15, angularVelocity: 0 },
+  props: { density: 1, restitution: 0.9, angularVelocity: 0 },
 });
 
 const rotor = (x: number, y: number, spin: number, color: string): MapEntity => ({
@@ -81,12 +81,13 @@ export const pipelineRun: StageDef = {
     wall(leftWall, cyan, -2.5),
     wall(rightWall, blue, 2.5),
     rotor(centreAt(38), 38, 1.6, pink),
-    bumper(centreAt(58) - 1.6, 58, 0.85, gold),
-    bumper(centreAt(72) + 1.55, 72, 0.8, pink),
+    // Wall-mounted bumpers intercept the outer-wall flow without leaving a trapping slit.
+    bumper(centreAt(43) + halfWidth, 43, 1.1, gold),
+    bumper(centreAt(72) - halfWidth, 72, 0.95, pink),
     rotor(centreAt(84), 84, -1.35, cyan),
-    bumper(centreAt(99), 99, 0.95, gold),
-    bumper(centreAt(112) - 1.65, 112, 0.8, blue),
+    bumper(centreAt(91) - halfWidth, 91, 1.1, gold),
+    bumper(centreAt(116) + halfWidth, 116, 1.1, blue),
     rotor(centreAt(123), 123, 1.5, pink),
-    bumper(centreAt(142) + 1.5, 142, 0.8, gold),
+    bumper(centreAt(142) - halfWidth, 142, 1.1, gold),
   ],
 };

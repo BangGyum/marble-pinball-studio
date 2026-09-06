@@ -25,6 +25,23 @@ Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 429
   await physics.init();
   const game = Object.create(Game.prototype);
   Object.assign(game, { physics, recorder: { stop() {} }, render() {}, onFinish() {} });
+  let bumpers = [],
+    hits = [],
+    bodies = new Map();
+  const step = physics.world.Step.bind(physics.world);
+  physics.world.Step = (...args) => {
+    step(...args);
+    bumpers.forEach((bumper, index) => {
+      let edge = bumper.body.GetContactList();
+      while (physics.Box2D.getPointer(edge)) {
+        if (edge.contact.IsTouching()) {
+          const id = bodies.get(physics.Box2D.getPointer(edge.other));
+          if (id !== undefined) hits[index].add(id);
+        }
+        edge = edge.next;
+      }
+    });
+  };
   let shakes = 0;
   const shake = physics.shakeMarble.bind(physics);
   physics.shakeMarble = (id) => {
@@ -32,21 +49,47 @@ Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 429
     shake(id);
   };
 
-  for (const count of [1, 4, 12, 30, 49]) {
+  const walls = pipelineRun.entities.filter((e) => e.shape.type === 'polyline');
+  const wallX = (points, y) => {
+    const index = points.findIndex((p) => p[1] >= y);
+    if (index <= 0) return points[0][0];
+    const [ax, ay] = points[index - 1],
+      [bx, by] = points[index];
+    return ax + ((bx - ax) * (y - ay)) / (by - ay);
+  };
+  const totalHits = pipelineRun.entities.filter((e) => e.shape.type === 'circle').map(() => 0);
+  let totalMarbles = 0;
+  for (const count of [1, 4, 12, 30, 49, ...Array(12).fill(14), 49, 49, 49]) {
     shakes = 0;
     game.prepare(
       pipelineRun,
       Array.from({ length: count }, (_, index) => '참가자' + index)
     );
     const initialOrder = game.balls.map((ball) => ball.id);
+    bumpers = physics.entities.filter((entity) => entity.shape.type === 'circle');
+    hits = bumpers.map(() => new Set());
+    bodies = new Map(
+      Object.entries(physics.marbleMap).map(([id, body]) => [physics.Box2D.getPointer(body), Number(id)])
+    );
     game.start([1, 1], false);
     while (game.state === 'running' && game.elapsed < 65) {
       game.advance();
       for (const ball of game.balls) {
-        if (!ball.rank) assert.ok(ball.x >= 0 && ball.x <= pipelineRun.width, 'marble escaped the pipe');
+        if (!ball.rank) {
+          assert.ok(
+            ball.x >= wallX(walls[0].shape.points, ball.y) - 0.02 &&
+              ball.x <= wallX(walls[1].shape.points, ball.y) + 0.02,
+            'marble escaped the actual pipe walls'
+          );
+        }
       }
     }
     assert.equal(game.arrivals.length, count, 'all marbles must finish');
+    hits.forEach((hit, i) => {
+      totalHits[i] += hit.size;
+      if (count >= 12) assert.ok(hit.size >= Math.ceil(count * 0.1), 'every bumper must contact passing marbles');
+    });
+    totalMarbles += count;
     assert.equal(shakes, 0, 'the pipe must drain without automatic unsticking');
     assert.ok(game.elapsed < 65, 'the pipe race must stay short');
     if (count >= 12)
@@ -56,9 +99,20 @@ Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 429
         'the obstacles must change the running order'
       );
     console.log(
-      'PASS neon pipeline: ' + count + ' marbles, all ' + game.elapsed.toFixed(1) + 's, no escapes or stalls'
+      'PASS neon pipeline: ' +
+        count +
+        ' marbles, all ' +
+        game.elapsed.toFixed(1) +
+        's, bumper contacts ' +
+        hits.map((hit) => hit.size).join('/') +
+        ', no escapes or stalls'
     );
   }
+  totalHits.forEach((hit) =>
+    assert.ok(hit / totalMarbles >= 0.25, 'each bumper must affect a meaningful share of marbles')
+  );
+  physics.clearMarbles();
+  physics.clear();
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
