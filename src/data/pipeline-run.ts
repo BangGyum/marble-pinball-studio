@@ -43,6 +43,13 @@ const anchors: [number, number][] = [
   [8, 139],
   [12, 149],
   [18, 157],
+  [25, 169],
+  [28, 182],
+  [21, 195],
+  [10, 207],
+  [7, 220],
+  [13, 232],
+  [20, 235],
 ];
 
 const centerLine: [number, number][] = anchors.flatMap(([x, y], index) => {
@@ -68,15 +75,25 @@ const centreAt = (y: number) => {
 };
 
 const halfWidth = 3.35;
-const leftWall = centerLine.map(([x, y]): [number, number] => [x - halfWidth, y]);
+// A pointed guide turns back outward below its tip at the busiest extended-wall bend.
+const leftGuide = { startY: 220, tipY: 224, endY: 226, depth: 2.5 };
+const leftWall: [number, number][] = [
+  ...centerLine
+    .filter(([, y]) => y < leftGuide.startY || y > leftGuide.endY)
+    .map(([x, y]): [number, number] => [x - halfWidth, y]),
+  [centreAt(leftGuide.startY) - halfWidth, leftGuide.startY],
+  [centreAt(leftGuide.tipY) - halfWidth + leftGuide.depth, leftGuide.tipY],
+  [centreAt(leftGuide.endY) - halfWidth, leftGuide.endY],
+];
+leftWall.sort(([, aY], [, bY]) => aY - bY);
 const rightWall = centerLine.map(([x, y]): [number, number] => [x + halfWidth, y]);
 
 export const pipelineRun: StageDef = {
   title: '네온 파이프라인',
   width: 36,
   randomizeStart: true,
-  goalY: 154,
-  zoomY: 150,
+  goalY: 231,
+  zoomY: 227,
   entities: [
     wall(leftWall, cyan, -2.5),
     wall(rightWall, blue, 2.5),

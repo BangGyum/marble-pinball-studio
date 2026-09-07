@@ -21,6 +21,24 @@ Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 429
 
 (async () => {
   validateStage(JSON.parse(JSON.stringify(pipelineRun)));
+  assert.equal(pipelineRun.goalY, 231, 'the pipeline finish must be 1.5 times the original 154-unit length');
+  assert.ok(
+    pipelineRun.entities
+      .filter((entity) => entity.shape.type !== 'polyline')
+      .every((entity) => entity.position.y < 157),
+    'the extended pipeline must contain only curved pipe walls, without bouncers or rotors'
+  );
+  const leftWallPoints = pipelineRun.entities[0].shape.points;
+  const guide = leftWallPoints.filter(([, y]) => y >= 220 && y <= 226);
+  assert.deepEqual(
+    guide.map(([, y]) => y),
+    [220, 224, 226],
+    'the busiest extended-wall section must have one short pointed guide'
+  );
+  assert.ok(
+    guide[1][0] > Math.max(guide[0][0], guide[2][0]) + 1,
+    'the guide must form a visible inward point with an outward-facing exit'
+  );
   const physics = new Box2dPhysics();
   await physics.init();
   const game = Object.create(Game.prototype);
