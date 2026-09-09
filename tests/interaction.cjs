@@ -14,6 +14,7 @@ const { Game } = require('../src/game.ts');
 const events = new Map();
 const windowEvents = new Map();
 global.window = { addEventListener: (type, handler) => windowEvents.set(type, handler) };
+global.devicePixelRatio = 1;
 let capturedPointer;
 global.requestAnimationFrame = () => 1;
 global.ResizeObserver = class {
@@ -102,6 +103,56 @@ hover.speed = 1;
 hover.state = 'ready';
 hover.balls = [];
 console.log('PASS held mouse acceleration, release, cancel, blur and unchanged base speed');
+
+// A delayed frame must not turn into an unbounded physics catch-up workload.
+const realPerformance = global.performance;
+let workTime = 0;
+global.performance = { now: () => workTime };
+hover.render = () => {};
+hover.advance = () => { steps++; };
+hover.state = 'running';
+hover.speed = 1;
+hover.balls = [{ y: 0 }];
+hover.last = 1000;
+hover.accumulator = 0;
+steps = 0;
+hover.frame(1100);
+assert.equal(steps, 2, 'a 100ms stall at 1x must not trigger six physics updates');
+assert.ok(hover.accumulator < 1 / 60, 'overdue time must not accumulate across frames');
+hover.speed = 4;
+hover.last = 1000;
+hover.accumulator = 0;
+steps = 0;
+hover.advance = () => { steps++; workTime += 8; };
+hover.frame(1100);
+assert.equal(steps, 1, 'an expensive physics update must yield to rendering before starting another');
+assert.ok(hover.accumulator < 1 / 60);
+global.performance = realPerformance;
+hover.render = savedRender;
+hover.advance = savedAdvance;
+hover.speed = 1;
+hover.state = 'ready';
+hover.balls = [];
+console.log('PASS stalled-frame catch-up limit and physics time budget');
+
+const { drawEntities } = require('../src/draw.ts');
+const segments = [];
+const drawing = new Proxy({}, {
+  get: (_, key) => (...args) => { if (key === 'moveTo' || key === 'lineTo') segments.push([key, ...args]); },
+});
+const line = (points, x = 0, y = 0, angle = 0) => ({ x, y, angle, shape: { type: 'polyline', points } });
+const viewport = { left: 0, right: 10, top: 0, bottom: 10 };
+drawEntities(drawing, [line([[-100, 5], [100, 5]])], 10, -1, true, viewport);
+assert.deepEqual(segments, [['moveTo', -100, 5], ['lineTo', 100, 5]], 'a crossing segment stays visible even with both endpoints offscreen');
+segments.length = 0;
+drawEntities(drawing, [line([[0, 0], [0, 5]], 100, 100)], 10, -1, true, viewport);
+assert.equal(segments.length, 0, 'offscreen translated walls must not issue path commands');
+drawEntities(drawing, [line([[0, 50], [0, 60]], 55, 5, Math.PI / 2)], 10, -1, true, viewport);
+assert.equal(segments.length, 2, 'rotated walls must be culled in local coordinates');
+segments.length = 0;
+drawEntities(drawing, [line([[0, 0], [0, 5]], 100, 100)], 10, -1, false);
+assert.equal(segments.length, 2, 'the minimap and editor still draw the complete map');
+console.log('PASS viewport culling, crossing segments, transforms and full-map drawing');
 
 // Zoom changes only the camera; it must not change minimap picking or physics state.
 let reportedZoom = 0,
@@ -329,3 +380,74 @@ for (const range of [
 }
 global.setTimeout = nativeTimeout;
 console.log('PASS selected remaining count triggers celebration, with live ranks and continued physics/recording');
+
+// Cached bitmaps must follow zoom/DPR/labels, while moving and breakable map entities stay live.
+const { RenderCache } = require('../src/render-cache.ts');
+const bitmaps = [];
+const canvasCalls = [];
+global.OffscreenCanvas = class {
+  constructor(width, height) {
+    this.width = width;
+    this.height = height;
+    this.calls = [];
+    this.context = new Proxy({}, {
+      get: (_, key) => (...args) => {
+        this.calls.push([key, ...args]);
+        if (key === 'measureText') return { width: args[0].length * 17 };
+      },
+    });
+    bitmaps.push(this);
+  }
+  getContext() { return this.context; }
+};
+const cacheCtx = new Proxy({}, { get: (_, key) => (...args) => canvasCalls.push([key, ...args]) });
+const cache = new RenderCache();
+const cachedBall = { name: '한글 이름', color: '#aaffff', x: 2, y: 3 };
+assert.equal(cache.drawBall(cacheCtx, cachedBall, 40, 1.75), true);
+const firstBitmap = bitmaps.at(-1), firstCall = canvasCalls.at(-1);
+cachedBall.x += 2;
+cachedBall.y += 4;
+cache.drawBall(cacheCtx, cachedBall, 40, 1.75);
+assert.equal(bitmaps.length, 1, 'moving a marble reuses its bitmap');
+assert.equal(canvasCalls.at(-1)[2] - firstCall[2], 2);
+assert.equal(canvasCalls.at(-1)[3] - firstCall[3], 4);
+assert.equal(firstBitmap.calls.filter(c => c[0] === 'fillText').length, 1, 'text rasterizes only once');
+for (const [scale, dpr, name, color] of [
+  [80, 1.75, '한글 이름', '#aaffff'], [80, 2, '한글 이름', '#aaffff'],
+  [80, 2, '새 이름', '#aaffff'], [80, 2, '새 이름', '#ffaaaa'],
+]) {
+  const oldCount = bitmaps.length;
+  Object.assign(cachedBall, { name, color });
+  cache.drawBall(cacheCtx, cachedBall, scale, dpr);
+  assert.equal(bitmaps.length, oldCount + 1, 'zoom/DPR/name/color invalidate the sprite');
+}
+const fixedShape = { type: 'circle', radius: 1 };
+const movingShape = { type: 'box', width: 2, height: 0.2, rotation: 0 };
+const fragileShape = { type: 'circle', radius: 0.5 };
+const cacheStage = { goalY: 100, entities: [
+  { type: 'static', props: {}, shape: fixedShape },
+  { type: 'kinematic', props: {}, shape: movingShape },
+  { type: 'static', props: { life: 2 }, shape: fragileShape },
+] };
+const cacheEntities = [fixedShape, movingShape, fragileShape].map(shape => ({ x: 0, y: 10, angle: 0, shape, life: -1 }));
+cache.drawMinimap(cacheCtx, cacheStage, cacheEntities, 2, 1.75);
+const mapBitmap = bitmaps.at(-1), mapCount = bitmaps.length;
+assert.equal(mapBitmap.calls.filter(c => c[0] === 'arc').length, 1, 'only the permanent static obstacle is cached');
+canvasCalls.length = 0;
+cacheEntities[1].angle = 0.7;
+cache.drawMinimap(cacheCtx, cacheStage, cacheEntities.slice(0, 2), 2, 1.75);
+assert.equal(bitmaps.length, mapCount);
+assert.ok(canvasCalls.some(c => c[0] === 'rotate' && c[1] === 0.7), 'rotor angle stays live');
+assert.ok(!canvasCalls.some(c => c[0] === 'arc'), 'removed breakable obstacle is not left in the bitmap');
+for (const [stage, scale, dpr] of [[cacheStage, 3, 1.75], [cacheStage, 3, 2], [{ ...cacheStage }, 3, 2]]) {
+  const count = bitmaps.length;
+  cache.drawMinimap(cacheCtx, stage, cacheEntities, scale, dpr);
+  assert.equal(bitmaps.length, count + 1, 'map/size/DPR changes rebuild the map');
+}
+const oldCache = resizing.renderCache;
+Object.assign(resizing.physics, { clearMarbles() {}, clear() {}, createStage() {}, createMarble() {} });
+resizing.prepare({ title: 'Reset', goalY: 100, zoomY: 95, entities: [] }, []);
+assert.notEqual(resizing.renderCache, oldCache, 'preparing the same or edited stage clears stale sprites and map');
+delete global.OffscreenCanvas;
+assert.equal(cache.drawBall(cacheCtx, cachedBall, 40, 1), false, 'unsupported browsers use vector fallback');
+console.log('PASS render cache reuse, movement, zoom/DPR/name/color invalidation, map reset and live obstacles');

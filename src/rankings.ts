@@ -28,15 +28,24 @@ export class Rankings {
         item.append(color, name);
         this.rows.set(ball, item);
       }
-      item.value = ball.rank ?? i + 1;
-      item.dataset.finished = String(!!ball.rank);
-      item.setAttribute('aria-label', item.value + '등 ' + ball.name + (ball.rank ? ' · 도착' : ''));
+      const rank = ball.rank ?? i + 1, finished = String(!!ball.rank);
+      if (item.value !== rank || item.dataset.finished !== finished) {
+        if (item.value !== rank) item.value = rank;
+        if (item.dataset.finished !== finished) item.dataset.finished = finished;
+        item.setAttribute('aria-label', rank + '등 ' + ball.name + (ball.rank ? ' · 도착' : ''));
+      }
       return item;
     });
-    // Keep the same rows and scroll position when only arrival status changes.
-    if (this.list.children.length !== items.length || items.some((item, i) => this.list.children[i] !== item)) {
+    if (this.list.children.length !== items.length) {
       this.list.replaceChildren(...items);
+    } else {
+      // Move only displaced rows; don't detach the entire list at every overtake.
+      let next = this.list.firstElementChild;
+      for (const item of items) {
+        if (item !== next) this.list.insertBefore(item, next);
+        else next = next.nextElementSibling;
+      }
     }
-    this.list.hidden = !items.length;
+    if (this.list.hidden !== !items.length) this.list.hidden = !items.length;
   }
 }

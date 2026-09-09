@@ -17,14 +17,34 @@ class Element {
   dataset = {};
   attributes = {};
   replacements = 0;
+  moves = 0;
+  attributeWrites = 0;
+  parentElement = null;
+  get firstElementChild() { return this.children[0] ?? null; }
+  get nextElementSibling() {
+    const siblings = this.parentElement?.children ?? [];
+    return siblings[siblings.indexOf(this) + 1] ?? null;
+  }
   append(...children) {
+    children.forEach(child => { child.parentElement = this; });
     this.children.push(...children);
   }
   replaceChildren(...children) {
+    this.children.forEach(child => { child.parentElement = null; });
+    children.forEach(child => { child.parentElement = this; });
     this.children = children;
     this.replacements++;
   }
+  insertBefore(item, next) {
+    if (item.parentElement) item.parentElement.children.splice(item.parentElement.children.indexOf(item), 1);
+    const index = next ? this.children.indexOf(next) : this.children.length;
+    assert.ok(index >= 0);
+    this.children.splice(index, 0, item);
+    item.parentElement = this;
+    this.moves++;
+  }
   setAttribute(key, value) {
+    this.attributeWrites++;
     this.attributes[key] = value;
   }
 }
@@ -78,14 +98,21 @@ assert.equal(list.children[3].children[1].children.length, 0);
 assert.ok(list.children.every((item) => item.dataset.finished === 'false'));
 const leader = list.children[0],
   overtaker = list.children[3];
+const initialReplacements = list.replacements;
 race.balls[0].y = 33;
 panel.update(race);
 assert.equal(list.children[0], overtaker, 'overtakes reorder existing colored rows');
 assert.equal(overtaker.value, 1);
+assert.equal(list.replacements, initialReplacements, 'an overtake must not detach the whole list');
+assert.equal(list.moves, 1, 'a single overtake moves only the displaced row');
 const replacements = list.replacements;
+const unchangedWrites = list.children.map(item => item.attributeWrites);
+const unchangedMoves = list.moves;
 race.state = 'paused';
 panel.update(race);
 assert.equal(list.replacements, replacements, 'unchanged standings preserve the scrollable list');
+assert.equal(list.moves, unchangedMoves, 'unchanged order performs no DOM moves');
+assert.deepEqual(list.children.map(item => item.attributeWrites), unchangedWrites, 'unchanged ranks/status perform no attribute writes');
 
 race.balls[1].rank = 1;
 race.arrivals.push(race.balls[1]);
@@ -136,8 +163,14 @@ race.state = 'running';
 panel.update(race);
 assert.equal(list.children[0].children[1].textContent, '새 참가자', 'a reused id must not keep an old name');
 assert.equal(list.children[0].dataset.finished, 'false', 'reset clears finished styling');
-race.balls = Array.from({ length: 300 }, (_, id) => ball(id, id));
+race.balls = Array.from({ length: 300 }, (_, id) => ball(id, id, '참가자 ' + id));
 panel.update(race);
 assert.equal(list.children.length, 300, 'all participants remain in the scrollable list');
 assert.equal(list.children[299].value, 300);
+for (let round = 0; round < 12; round++) {
+  race.balls.forEach((b, i) => { b.y = (i * 137 + round * 31) % 307; });
+  panel.update(race);
+  assert.deepEqual(list.children.map(item => item.children[1].textContent), getStandings(race).map(b => b.name));
+  assert.deepEqual(list.children.map(item => item.value), Array.from({ length: 300 }, (_, i) => i + 1));
+}
 console.log('PASS unified rankings, fixed arrivals, finished styling, colors, safe names, reset and 300 marbles');

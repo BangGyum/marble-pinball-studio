@@ -4,6 +4,8 @@ import { drawEntities } from './draw';
 import { shuffled, type WinnerOrder } from './model';
 import { drawCelebration } from './celebration';
 import { Recorder } from './recorder';
+import { RenderCache } from './render-cache';
+import type { MapEntityState } from './types/MapEntity.type';
 export type Ball = {
   id: number;
   name: string;
@@ -44,6 +46,7 @@ export class Game {
   private height = 600;
   private minimap = { x: 18, y: 20, w: 115, h: 400, scale: 4 };
   private frameId = 0;
+  private renderCache = new RenderCache();
   constructor(readonly canvas: HTMLCanvasElement) {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     new ResizeObserver(() => this.resize()).observe(canvas);
@@ -102,6 +105,7 @@ export class Game {
     this.state = 'ready';
     this.fastForward = false;
     this.stage = stage;
+    this.renderCache = new RenderCache();
     this.arrivals = [];
     this.winners = [];
     this.winnerAt = 0;
@@ -179,10 +183,22 @@ export class Game {
       const target = candidates[Math.min(candidates.length - 1, Math.max(0, this.range[1] - this.arrivals.length - 1))];
       const slow = !this.winners.length && target && target.y > this.stage.goalY - 4 ? 0.45 : 1;
       this.accumulator += delta * this.speed * (this.fastForward ? 2 : 1) * slow;
-      while (this.accumulator >= 1 / 60 && this.state === 'running') {
+      const physicsStart = performance.now();
+      const maxSteps = Math.max(1, Math.ceil(this.speed * (this.fastForward ? 2 : 1) * 2));
+      let steps = 0;
+      while (
+        this.accumulator >= 1 / 60 &&
+        this.state === 'running' &&
+        steps < maxSteps &&
+        (steps === 0 || performance.now() - physicsStart < 6)
+      ) {
         this.advance();
         this.accumulator -= 1 / 60;
+        steps++;
       }
+      // Drop overdue wall-clock time, never physics steps: collisions still advance at 1/60.
+      // Under load the race slows down instead of creating a catch-up workload next frame.
+      if (this.accumulator >= 1 / 60) this.accumulator %= 1 / 60;
     }
     this.render();
     this.frameId = requestAnimationFrame((t) => this.frame(t));
@@ -252,10 +268,17 @@ export class Game {
       this.camera.y += (target.y - this.camera.y) * 0.13;
     }
     const cam = this.manual ?? this.camera;
+    const view = {
+      left: cam.x - (w * 0.56) / scale,
+      right: cam.x + (w * 0.44) / scale,
+      top: cam.y - (h * 0.43) / scale,
+      bottom: cam.y + (h * 0.57) / scale,
+    };
+    const entities = this.physics.getEntities();
     ctx.save();
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
-    drawEntities(ctx, this.physics.getEntities(), scale);
+    drawEntities(ctx, entities, scale, -1, true, view);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = '#65efda';
     ctx.lineWidth = 2 / scale;
@@ -269,6 +292,12 @@ export class Game {
     ctx.fillStyle = '#65efda';
     ctx.fillText('FINISH', 1, this.stage.goalY - 0.4);
     for (const b of active) {
+      const labelMargin = Math.max(1, (b.name.length * 17) / scale);
+      if (
+        b.y < view.top - 1 || b.y > view.bottom + 1 ||
+        b.x < view.left - labelMargin || b.x > view.right + labelMargin
+      ) continue;
+      if (this.renderCache.drawBall(ctx, b, scale, d)) continue;
       ctx.beginPath();
       ctx.fillStyle = b.color;
       ctx.shadowColor = b.color;
@@ -287,7 +316,7 @@ export class Game {
       ctx.fillText(b.name, b.x, b.y + 0.55);
     }
     ctx.restore();
-    this.renderMinimap();
+    this.renderMinimap(entities);
     ctx.textAlign = 'right';
     ctx.font = '12px sans-serif';
     ctx.fillStyle = '#728393';
@@ -319,7 +348,7 @@ export class Game {
     }
   }
 
-  private renderMinimap() {
+  private renderMinimap(entities: MapEntityState[] = this.physics.getEntities()) {
     const ctx = this.ctx;
     const mapWidth = this.stage.width ?? 26;
     const scale = Math.min((this.width < 600 ? 75 : 125) / mapWidth, (this.height - 65) / this.stage.goalY);
@@ -332,7 +361,7 @@ export class Game {
     ctx.scale(scale, scale);
     ctx.fillStyle = '#142027';
     ctx.fillRect(0, 0, mapWidth, this.stage.goalY);
-    drawEntities(ctx, this.physics.getEntities(), scale, -1, false);
+    this.renderCache.drawMinimap(ctx, this.stage, entities, scale, Math.min(devicePixelRatio, 2));
     for (const b of this.balls) {
       if (b.rank) continue;
       ctx.fillStyle = b.color;
