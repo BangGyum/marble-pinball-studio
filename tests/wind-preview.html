@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>바람 맵 실제 구조 미리보기</title>
+<style>
+  * { box-sizing: border-box } body { margin: 0; padding: 18px; background: #070a0e; color: #b5edeb; font: 15px system-ui; }
+  main { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  article { min-width: 0; text-align: center; border: 1px solid #24413f; border-radius: 12px; padding: 14px 8px; }
+  h2 { margin: 0 0 12px; font-size: 21px; } canvas { display: block; width: 100%; height: calc(100vh - 160px); min-height: 430px; }
+  button { background: #23453f; border: 1px solid #65efda; color: white; border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+  output { display: block; min-height: 28px; margin-top: 8px; }
+</style></head><body><main id="maps"></main><script type="module" src="./wind-preview.ts"></script></body></html>

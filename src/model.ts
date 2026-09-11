@@ -84,6 +84,29 @@ export function validateStage(value: unknown): StageDef {
     !finite(s.vortex.radius, 1, 100) || !finite(s.vortex.speed, -30, 30) ||
     (s.vortex.gust !== undefined && !finite(s.vortex.gust, 0, 1))))
     throw new Error('회전 바람 설정이 올바르지 않아요.');
+  if (s.windZones !== undefined && (!Array.isArray(s.windZones) || s.windZones.length > 30))
+    throw new Error('바람 영역 설정이 올바르지 않아요.');
+  for (const wind of s.windZones ?? []) {
+    if (!wind || !finite(wind.x, -1000, 1000) || !finite(wind.y, -1000, 1000) ||
+      (wind.phase !== undefined && !finite(wind.phase, -100, 100)) ||
+      (wind.pulse !== undefined && !finite(wind.pulse, 0, 1)) ||
+      (wind.period !== undefined && !finite(wind.period, 1, 60)) ||
+      (wind.fan !== undefined && (!wind.fan || !finite(wind.fan.x, -1000, 1000) ||
+        !finite(wind.fan.y, -1000, 1000) || !finite(wind.fan.radius, 0.3, 15))))
+      throw new Error('바람 영역 설정이 올바르지 않아요.');
+    if (wind.type === 'directional') {
+      if (!finite(wind.width, 0.5, 200) || !finite(wind.height, 0.5, 300) ||
+        !finite(wind.velocityX, -50, 50) || !finite(wind.velocityY, -50, 50) ||
+        (wind.strength !== undefined && !finite(wind.strength, 0.1, 20)) ||
+        (wind.turbulence !== undefined && !finite(wind.turbulence, 0, 20)))
+        throw new Error('직선 바람 설정이 올바르지 않아요.');
+    } else if (wind.type === 'vortex') {
+      if (!finite(wind.radius, 1, 100) || !finite(wind.speed, -30, 30) ||
+        (wind.radial !== undefined && !finite(wind.radial, -30, 30)) ||
+        (wind.gust !== undefined && !finite(wind.gust, 0, 1)))
+        throw new Error('회전 바람 설정이 올바르지 않아요.');
+    } else throw new Error('알 수 없는 바람 종류예요.');
+  }
   for (const e of s.entities) {
     if (
       !e ||

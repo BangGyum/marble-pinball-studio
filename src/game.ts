@@ -1,6 +1,7 @@
 import { Box2dPhysics } from './physics-box2d';
 import type { StageDef } from './data/maps';
 import { drawEntities } from './draw';
+import { drawWind } from './wind-render';
 import { shuffled, type WinnerOrder } from './model';
 import { drawCelebration } from './celebration';
 import { Recorder } from './recorder';
@@ -293,6 +294,7 @@ export class Game {
         ctx.stroke();
       }
     }
+    drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = '#65efda';
     ctx.lineWidth = 2 / scale;
@@ -376,6 +378,7 @@ export class Game {
     ctx.fillStyle = '#142027';
     ctx.fillRect(0, 0, mapWidth, this.stage.goalY);
     this.renderCache.drawMinimap(ctx, this.stage, entities, scale, Math.min(devicePixelRatio, 2));
+    drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
     for (const b of this.balls) {
       if (b.rank) continue;
       ctx.fillStyle = b.color;

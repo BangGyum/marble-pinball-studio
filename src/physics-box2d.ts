@@ -1,6 +1,6 @@
 // Adapted from lazygyu/roulette (MIT). See LICENSE and THIRD_PARTY.md.
 import Box2DFactory from 'box2d-wasm';
-import type { StageDef } from './data/maps';
+import type { StageDef, WindZone } from './data/maps';
 import type { IPhysics } from './IPhysics';
 import type { MapEntity, MapEntityState } from './types/MapEntity.type';
 
@@ -12,6 +12,7 @@ export class Box2dPhysics implements IPhysics {
   private entities: ({ body: Box2D.b2Body } & MapEntityState)[] = [];
   private randomizeStart = false;
   private vortex: StageDef['vortex'];
+  private windZones: WindZone[] = [];
   private windTime = 0;
   private collisionSubsteps = 4;
   private deleteCandidates: Box2D.b2Body[] = [];
@@ -23,6 +24,7 @@ export class Box2dPhysics implements IPhysics {
   }
   clear() {
     this.vortex = undefined;
+    this.windZones = [];
     for (const entity of this.entities) this.world.DestroyBody(entity.body);
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
     this.entities = [];
@@ -34,6 +36,7 @@ export class Box2dPhysics implements IPhysics {
   }
   createStage(stage: StageDef) {
     this.vortex = stage.vortex;
+    this.windZones = stage.windZones ?? [];
     this.windTime = 0;
     this.randomizeStart = stage.randomizeStart === true;
     this.collisionSubsteps = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.backing) ? 16 : 4;
@@ -183,21 +186,47 @@ export class Box2dPhysics implements IPhysics {
     }
   }
   step(seconds: number) {
-    if (this.vortex) {
-      const wind = this.vortex;
+    const winds: WindZone[] = [
+      ...(this.vortex ? [{ type: 'vortex' as const, ...this.vortex }] : []),
+      ...this.windZones,
+    ];
+    if (winds.length) {
       this.windTime += seconds;
-      const gust = wind.gust ?? 0;
-      const speed = wind.speed * (1 + gust * Math.sin(this.windTime * 1.7));
-      const radial = 2 - gust * (12 + 12 * Math.sin(this.windTime * 1.1));
-      const blend = 1 - Math.exp(-2 * seconds);
       for (const body of Object.values(this.marbleMap)) {
-        const p = body.GetPosition(), dx = p.x - wind.x, dy = p.y - wind.y;
-        const distance = Math.hypot(dx, dy);
-        if (distance < 0.1 || distance >= wind.radius) continue;
+        const p = body.GetPosition();
+        let vx = 0, vy = 0, totalBlend = 0, gravityCompensation = 0;
+        for (const wind of winds) {
+          const phase = this.windTime * (wind.period ? Math.PI * 2 / wind.period : 1.7) + (wind.phase ?? 0);
+          const pulse = 1 - (wind.pulse ?? 0) * (0.5 - 0.5 * Math.sin(phase));
+          if (wind.type === 'directional') {
+            if (Math.abs(p.x - wind.x) > wind.width / 2 || Math.abs(p.y - wind.y) > wind.height / 2) continue;
+            const turbulence = wind.turbulence ?? 0;
+            const wobble = turbulence * Math.sin(this.windTime * 3.1 + p.x * 1.7 + p.y * 0.37);
+            const zoneBlend = 1 - Math.exp(-(wind.strength ?? 2.4) * pulse * seconds);
+            vx += (wind.velocityX * pulse + wobble) * zoneBlend;
+            vy += (wind.velocityY * pulse + turbulence * 0.35 * Math.cos(this.windTime * 2.3 + p.x)) * zoneBlend;
+            totalBlend += zoneBlend;
+            gravityCompensation += zoneBlend * pulse;
+          } else {
+            const dx = p.x - wind.x, dy = p.y - wind.y, distance = Math.hypot(dx, dy);
+            if (distance < 0.1 || distance >= wind.radius) continue;
+            const gust = wind.gust ?? 0;
+            const speed = wind.speed * (1 + gust * Math.sin(phase)) * pulse;
+            const radial = ((wind.radial ?? 2) - gust * (12 + 12 * Math.sin(this.windTime * 1.1 + (wind.phase ?? 0)))) * pulse;
+            const zoneBlend = 1 - Math.exp(-2 * pulse * seconds);
+            vx += (-dy / distance * speed + dx / distance * radial) * zoneBlend;
+            vy += (dx / distance * speed + dy / distance * radial) * zoneBlend;
+            totalBlend += zoneBlend;
+            gravityCompensation += zoneBlend * pulse;
+          }
+        }
+        if (!totalBlend) continue;
+        const blend = Math.min(0.45, totalBlend);
+        vx /= totalBlend;
+        vy /= totalBlend;
         const v = body.GetLinearVelocity();
-        // Relax toward a circulating airflow; compensate gravity only inside the fan chamber.
-        this.vector.Set(v.x + (-dy / distance * speed + dx / distance * radial - v.x) * blend,
-          v.y + (dx / distance * speed + dy / distance * radial - v.y) * blend - 10 * seconds);
+        this.vector.Set(v.x + (vx - v.x) * blend,
+          v.y + (vy - v.y) * blend - 10 * seconds * Math.min(1, gravityCompensation / totalBlend));
         body.SetLinearVelocity(this.vector);
       }
     }

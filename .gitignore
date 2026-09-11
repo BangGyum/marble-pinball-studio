@@ -7,6 +7,7 @@ dist/
 *.tgz
 
 .dev-dist/
+.wind-preview/
 .package-tmp/
 
 fairness-results/

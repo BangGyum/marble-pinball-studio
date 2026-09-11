@@ -3,7 +3,37 @@ import { neonJunction } from './neon-junction';
 import { pipelineRun } from './pipeline-run';
 import { neonMixer } from './neon-mixer';
 import { neonOrbit } from './neon-orbit';
+import { headwindElevator } from './headwind-elevator';
+import { twinVortex } from './twin-vortex';
+import { gustFork } from './gust-fork';
 import type { MapEntity } from '../types/MapEntity.type';
+
+export type WindZone = {
+  pulse?: number;
+  period?: number;
+  phase?: number;
+  fan?: { x: number; y: number; radius: number };
+} & (
+  | {
+      type: 'directional';
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      velocityX: number;
+      velocityY: number;
+      strength?: number;
+      turbulence?: number;
+    }
+  | {
+      type: 'vortex';
+      x: number;
+      y: number;
+      radius: number;
+      speed: number;
+      radial?: number;
+      gust?: number;
+    });
 
 export type AdBoard = {
   x: number;
@@ -18,6 +48,7 @@ export type StageDef = {
   width?: number;
   randomizeStart?: boolean;
   vortex?: { x: number; y: number; radius: number; speed: number; gust?: number };
+  windZones?: WindZone[];
   goalY: number;
   zoomY: number;
   adBoards?: AdBoard[];
@@ -3007,4 +3038,14 @@ const builtInStages: StageDef[] = [
   },
 ];
 
-export const stages: StageDef[] = [neonMixer, builtInStages[2], neonJunction, cascade, pipelineRun, neonOrbit];
+export const stages: StageDef[] = [
+  neonMixer,
+  builtInStages[2],
+  neonJunction,
+  cascade,
+  pipelineRun,
+  neonOrbit,
+  headwindElevator,
+  twinVortex,
+  gustFork,
+];

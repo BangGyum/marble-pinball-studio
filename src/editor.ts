@@ -2,6 +2,7 @@ import { blankStage, cloneStage, validateStage, type SavedMap } from './model';
 import type { StageDef } from './data/maps';
 import type { MapEntity } from './types/MapEntity.type';
 import { drawEntities } from './draw';
+import { drawWind } from './wind-render';
 import { el, toast, message } from './ui';
 
 type Tool = 'select' | 'wall' | 'freehand' | 'pin' | 'bumper' | 'ramp' | 'rotor';
@@ -550,6 +551,7 @@ export class Editor {
       life: e.props.life ?? -1,
     }));
     drawEntities(c, entities, SCALE, this.selected, false);
+    drawWind(c, this.stage.windZones ?? [], 0, SCALE);
     c.setLineDash([0.5, 0.3]);
     c.strokeStyle = '#65efda';
     c.lineWidth = 2 / SCALE;

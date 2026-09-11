@@ -62,6 +62,8 @@ const mode = el<HTMLSelectElement>('winner-mode'),
   start = el<HTMLButtonElement>('start');
 const record = el<HTMLInputElement>('record');
 const winnerCount = el<HTMLSelectElement>('winner-count');
+let preferredWinnerCount = 2;
+winnerCount.addEventListener('change', () => (preferredWinnerCount = Number(winnerCount.value) || 2));
 const initialMapIndex = stages.findIndex((stage) => stage.title === '네온 믹서');
 let currentStage: StageDef = stages[initialMapIndex];
 let initialized = false;
@@ -95,7 +97,7 @@ function refreshMaps(selected = mapSelect.value) {
   el('map-caption').textContent = currentStage.title;
 }
 function updateWinnerCount(count: number) {
-  const selected = Math.min(count, Math.max(1, Number(winnerCount.value) || 1));
+  const selected = Math.min(count, preferredWinnerCount);
   winnerCount.replaceChildren(...Array.from({ length: count }, (_, i) => new Option(i + 1 + '명', String(i + 1))));
   if (!count) winnerCount.add(new Option('0명', '0'));
   winnerCount.value = String(selected);
@@ -314,8 +316,8 @@ if (modelContext?.registerTool) {
         saveParticipantNames();
         currentStage = map.stage;
         mapSelect.value = map.id;
-        mode.value = 'asc';
-        winnerCount.value = '1';
+        mode.value = 'desc';
+        preferredWinnerCount = 2;
         record.checked = false;
         prepare();
         return { count: list.length, map: map.stage.title, state: game.state };
