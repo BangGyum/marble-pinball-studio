@@ -75,6 +75,7 @@ async function run() {
   values.set(MAPS_KEY, 'broken');
   assert.throws(() => readSavedMaps(storage));
   stages.forEach(validateStage);
+  assert.equal(stages[0].title, '네온 믹서', 'the neon mixer must stay first in the built-in map list');
   console.log('PASS input, winner rules, map validation and storage round-trip');
   const physics = new Box2dPhysics();
   await physics.init();

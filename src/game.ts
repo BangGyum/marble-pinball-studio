@@ -279,6 +279,20 @@ export class Game {
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
     drawEntities(ctx, entities, scale, -1, true, view);
+    if (this.stage.vortex) {
+      const wind = this.stage.vortex;
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#64f4e050';
+      ctx.lineWidth = 1.5 / scale;
+      const phase = wind.speed / wind.radius * (this.elapsed +
+        (wind.gust ?? 0) * (1 - Math.cos(this.elapsed * 1.7)) / 1.7);
+      for (let i = 0; i < 3; i++) {
+        const a = phase + i * Math.PI * 2 / 3, r = wind.radius * 0.7;
+        ctx.beginPath();
+        ctx.arc(wind.x, wind.y, r, a, a + 0.5);
+        ctx.stroke();
+      }
+    }
     ctx.shadowBlur = 0;
     ctx.strokeStyle = '#65efda';
     ctx.lineWidth = 2 / scale;

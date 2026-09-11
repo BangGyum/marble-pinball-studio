@@ -1,6 +1,8 @@
 import { cascade } from './cascade';
 import { neonJunction } from './neon-junction';
 import { pipelineRun } from './pipeline-run';
+import { neonMixer } from './neon-mixer';
+import { neonOrbit } from './neon-orbit';
 import type { MapEntity } from '../types/MapEntity.type';
 
 export type AdBoard = {
@@ -15,6 +17,7 @@ export type StageDef = {
   entities?: MapEntity[];
   width?: number;
   randomizeStart?: boolean;
+  vortex?: { x: number; y: number; radius: number; speed: number; gust?: number };
   goalY: number;
   zoomY: number;
   adBoards?: AdBoard[];
@@ -3004,4 +3007,4 @@ const builtInStages: StageDef[] = [
   },
 ];
 
-export const stages: StageDef[] = [builtInStages[2], neonJunction, cascade, pipelineRun];
+export const stages: StageDef[] = [neonMixer, builtInStages[2], neonJunction, cascade, pipelineRun, neonOrbit];

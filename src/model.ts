@@ -80,6 +80,10 @@ export function validateStage(value: unknown): StageDef {
     s.entities.length > 2000
   )
     throw new Error('올바른 맵 파일이 아니에요. 맵 이름, 결승선, 장애물을 확인해 주세요.');
+  if (s.vortex && (!finite(s.vortex.x, -1000, 1000) || !finite(s.vortex.y, -1000, 1000) ||
+    !finite(s.vortex.radius, 1, 100) || !finite(s.vortex.speed, -30, 30) ||
+    (s.vortex.gust !== undefined && !finite(s.vortex.gust, 0, 1))))
+    throw new Error('회전 바람 설정이 올바르지 않아요.');
   for (const e of s.entities) {
     if (
       !e ||

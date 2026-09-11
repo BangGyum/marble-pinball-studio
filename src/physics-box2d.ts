@@ -11,6 +11,8 @@ export class Box2dPhysics implements IPhysics {
   private marbleMap: Record<number, Box2D.b2Body> = {};
   private entities: ({ body: Box2D.b2Body } & MapEntityState)[] = [];
   private randomizeStart = false;
+  private vortex: StageDef['vortex'];
+  private windTime = 0;
   private collisionSubsteps = 4;
   private deleteCandidates: Box2D.b2Body[] = [];
 
@@ -20,6 +22,7 @@ export class Box2dPhysics implements IPhysics {
     this.world = new this.Box2D.b2World(this.vector);
   }
   clear() {
+    this.vortex = undefined;
     for (const entity of this.entities) this.world.DestroyBody(entity.body);
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
     this.entities = [];
@@ -30,6 +33,8 @@ export class Box2dPhysics implements IPhysics {
     this.marbleMap = {};
   }
   createStage(stage: StageDef) {
+    this.vortex = stage.vortex;
+    this.windTime = 0;
     this.randomizeStart = stage.randomizeStart === true;
     this.collisionSubsteps = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.backing) ? 16 : 4;
     this.createEntities(
@@ -178,6 +183,24 @@ export class Box2dPhysics implements IPhysics {
     }
   }
   step(seconds: number) {
+    if (this.vortex) {
+      const wind = this.vortex;
+      this.windTime += seconds;
+      const gust = wind.gust ?? 0;
+      const speed = wind.speed * (1 + gust * Math.sin(this.windTime * 1.7));
+      const radial = 2 - gust * (12 + 12 * Math.sin(this.windTime * 1.1));
+      const blend = 1 - Math.exp(-2 * seconds);
+      for (const body of Object.values(this.marbleMap)) {
+        const p = body.GetPosition(), dx = p.x - wind.x, dy = p.y - wind.y;
+        const distance = Math.hypot(dx, dy);
+        if (distance < 0.1 || distance >= wind.radius) continue;
+        const v = body.GetLinearVelocity();
+        // Relax toward a circulating airflow; compensate gravity only inside the fan chamber.
+        this.vector.Set(v.x + (-dy / distance * speed + dx / distance * radial - v.x) * blend,
+          v.y + (dx / distance * speed + dy / distance * radial - v.y) * blend - 10 * seconds);
+        body.SetLinearVelocity(this.vector);
+      }
+    }
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
     this.deleteCandidates = [];
     // Smaller angular increments keep rotating paddles from pushing marbles through thin walls.

@@ -6,7 +6,7 @@ import { el, toast, message } from './ui';
 import { Editor } from './editor';
 import { Rankings } from './rankings';
 
-const titles = ['욕망의 항아리', '네온 분기점', '캐스케이드', '네온 파이프라인'];
+const titles = ['네온 믹서', '욕망의 항아리', '네온 분기점', '캐스케이드', '네온 파이프라인', '네온 오비트'];
 stages.forEach((s, i) => (s.title = titles[i] ?? s.title));
 let saved: SavedMap[] = [];
 try {
@@ -14,7 +14,22 @@ try {
 } catch {
   toast('저장된 맵을 읽지 못했어요. 브라우저의 저장소 설정을 확인해 주세요.');
 }
-const allMaps = () => [...stages.map((stage, i) => ({ id: `builtin-${i}`, stage })), ...saved];
+const builtInMaps = () =>
+  stages.map((stage, i) => {
+    const savedOverride = stage.title === '네온 파이프라인'
+      ? saved.find((map) => map.stage.title === '네온 파이프라인')
+      : undefined;
+    return { id: `builtin-${i}`, stage: savedOverride?.stage ?? stage };
+  });
+const allMaps = () => [
+  ...builtInMaps(),
+  ...saved.filter((map) => map.stage.title !== '네온 파이프라인'),
+];
+const editorMaps = () => [...stages.map((stage, i) => ({ id: `builtin-${i}`, stage })), ...saved];
+const pipelineBuiltinId = () => {
+  const index = stages.findIndex((stage) => stage.title === '네온 파이프라인');
+  return index < 0 ? null : `builtin-${index}`;
+};
 const game = new Game(el<HTMLCanvasElement>('game'));
 const rankings = new Rankings();
 const rankingList = el('ranking-list');
@@ -47,7 +62,7 @@ const mode = el<HTMLSelectElement>('winner-mode'),
   start = el<HTMLButtonElement>('start');
 const record = el<HTMLInputElement>('record');
 const winnerCount = el<HTMLSelectElement>('winner-count');
-const initialMapIndex = stages.findIndex((stage) => stage.title === '네온 분기점');
+const initialMapIndex = stages.findIndex((stage) => stage.title === '네온 믹서');
 let currentStage: StageDef = stages[initialMapIndex];
 let initialized = false;
 const gameView = el('game-view'),
@@ -197,14 +212,14 @@ game
   });
 
 const editor = new Editor({
-  list: allMaps,
+  list: editorMaps,
   save(stage, id) {
     const nextId = id && !id.startsWith('builtin-') ? id : crypto.randomUUID();
     const next = [...saved.filter((m) => m.id !== nextId), { id: nextId, stage }];
     saveMaps(localStorage, next);
     saved = next;
     currentStage = stage;
-    refreshMaps(nextId);
+    refreshMaps(stage.title === '네온 파이프라인' ? pipelineBuiltinId() ?? nextId : nextId);
     prepare();
     return nextId;
   },
@@ -212,7 +227,11 @@ const editor = new Editor({
     const next = saved.filter((m) => m.id !== id);
     saveMaps(localStorage, next);
     saved = next;
-    if (mapSelect.value === id) {
+    if (currentStage.title === '네온 파이프라인' && id !== pipelineBuiltinId()) {
+      currentStage = stages.find((stage) => stage.title === '네온 파이프라인')!;
+      refreshMaps(pipelineBuiltinId() ?? undefined);
+      prepare();
+    } else if (mapSelect.value === id) {
       currentStage = stages[0];
       refreshMaps('builtin-0');
       prepare();
