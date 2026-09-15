@@ -35,3 +35,12 @@ export const propeller = (x: number, y: number, radius: number, spin: number): M
   { position: { x, y }, type: 'static', shape: { type: 'circle', radius: 0.65, color: '#d9caff' },
     props: { density: 1, restitution: 0.1, angularVelocity: 0 } },
 ];
+
+export const paddle = (x: number, y: number, radius: number, spin: number): MapEntity[] => [
+  { position: { x, y }, type: 'kinematic',
+    shape: { type: 'box', width: radius, height: 0.28, rotation: 0.3, color: '#ba9cff' },
+    props: { density: 1, restitution: 0.25, angularVelocity: spin } },
+  { position: { x, y }, type: 'static',
+    shape: { type: 'circle', radius: 0.55, color: '#d9caff' },
+    props: { density: 1, restitution: 0.1, angularVelocity: 0 } },
+];

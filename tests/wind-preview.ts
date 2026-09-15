@@ -41,8 +41,8 @@ async function init() {
         ctx.fillStyle = ball.color; ctx.beginPath(); ctx.arc(ball.x, ball.y, 0.3, 0, 2 * Math.PI); ctx.fill();
       }
       ctx.fillStyle = '#b5edeb'; ctx.font = '1.1px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText('START', 12.8, 1.5);
-      ctx.fillText('FINISH', 22, stage.goalY + 2);
+      ctx.fillText('START', stage.spawnX ?? 12.85, 1.5);
+      ctx.fillText('FINISH', stage === headwindElevator ? 22 : 27.5, stage.goalY + 2);
       if (game.state !== 'ready') output.textContent = `${game.elapsed.toFixed(1)}초 · ${game.arrivals.length}/28 도착 · DESC 2명`;
       requestAnimationFrame(frame);
     };

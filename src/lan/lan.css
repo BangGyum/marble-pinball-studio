@@ -1,0 +1,14 @@
+/* The game keeps its original style.css; only LAN-specific additions live here. */
+.rankings li[role="button"] { cursor: pointer; border-radius: 4px; }
+.rankings li[aria-pressed="true"] { background: #214339b8; outline: 1px solid #65efda70; }
+.rankings li[role="button"]:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.rankings li[data-ready="true"]::before { content: '—'; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.lan-connection { display: flex; align-items: center; gap: 14px; }
+#connection[data-offline="true"] { color: #ffc388; }
+.lan-connection details { position: relative; }
+.lan-connection summary { cursor: pointer; color: var(--accent); }
+.lan-connection details[open] { position: absolute; z-index: 5; right: 16px; bottom: 30px; width: min(330px, calc(100vw - 32px)); padding: 15px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); box-shadow: 0 4px 25px #0008; }
+.lan-connection details[open] label, .lan-connection details[open] select, #join-url { display: block; width: 100%; margin-top: 10px; }
+#join-url { color: var(--accent); overflow-wrap: anywhere; }
+body[data-role="viewer"] #game-view { min-height: 360px; }

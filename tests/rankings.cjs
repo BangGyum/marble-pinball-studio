@@ -20,6 +20,9 @@ class Element {
   moves = 0;
   attributeWrites = 0;
   parentElement = null;
+  events = {};
+  addEventListener(type, handler) { this.events[type] = handler; }
+  getAttribute(key) { return this.attributes[key] ?? null; }
   get firstElementChild() { return this.children[0] ?? null; }
   get nextElementSibling() {
     const siblings = this.parentElement?.children ?? [];
@@ -174,3 +177,20 @@ for (let round = 0; round < 12; round++) {
   assert.deepEqual(list.children.map(item => item.value), Array.from({ length: 300 }, (_, i) => i + 1));
 }
 console.log('PASS unified rankings, fixed arrivals, finished styling, colors, safe names, reset and 300 marbles');
+
+let selected = null;
+const spectator = new Rankings((id) => { selected = selected === id ? null : id; });
+race.state = 'ready'; race.balls = [ball(0, 5, 'A'), ball(1, 5, 'B')]; race.arrivals = [];
+spectator.update(race);
+assert.equal(list.hidden, false);
+assert.equal(list.children.length, 2);
+assert.equal(list.children[0].dataset.ready, 'true');
+assert.equal(list.children[0].attributes['aria-label'], '대기 · A');
+list.children[0].events.click(); spectator.update(race, selected);
+assert.equal(list.children[0].attributes['aria-pressed'], 'true');
+list.children[0].events.keydown({ key: 'Enter', preventDefault() {} }); spectator.update(race, selected);
+assert.equal(selected, null);
+race.state = 'running'; race.balls[1].y = 10; spectator.update(race, 0);
+assert.equal(list.children[0].children[1].textContent, 'B', 'LAN retains original live-order standings');
+assert.equal(list.children[1].attributes['aria-pressed'], 'true', 'selection follows marble identity through overtakes');
+console.log('PASS LAN pre-start roster, keyboard/click selection and original live-order UI');

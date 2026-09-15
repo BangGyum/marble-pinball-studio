@@ -10,6 +10,7 @@ const { gustFork } = require('../src/data/gust-fork.ts');
 const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
 const { Box2dPhysics } = require('../src/physics-box2d.ts');
 const { Game } = require('../src/game.ts');
+const { windPower, windTravel } = require('../src/wind-power.ts');
 
 const requestedStage = process.argv[2];
 const requestedCount = Number(process.argv[3]);
@@ -24,9 +25,12 @@ async function simulate(physics, stage, count, initial, limit = 120) {
   const game = Object.create(Game.prototype);
   Object.assign(game, { physics, recorder: { stop() {} }, render() {}, onFinish() {} });
   game.prepare(stage, Array.from({ length: count }, (_, i) => String(i)));
+  assert.ok(game.balls.every((ball) => Math.abs(ball.x - (stage.spawnX ?? 12.85)) < 3),
+    'every marble starts inside the map-specific inlet');
   game.start([Math.max(1, count - 1), count], false, 'desc');
-  let first = 0, earlyLeader;
+  let first = 0, earlyLeader, late;
   const visits = new Set(), returned = new Set(), lifted = new Set();
+  const bottomVisits = new Set(), bottomReturns = new Set();
   const depths = new Map();
   let minX = Infinity, maxX = -Infinity;
   while (game.state === 'running' && game.elapsed < limit) {
@@ -37,21 +41,30 @@ async function simulate(physics, stage, count, initial, limit = 120) {
       depths.set(ball.id, deepest);
       if (deepest - ball.y > 4) lifted.add(ball.id);
       if (stage.title === '돌풍 갈림길') {
+        if (ball.y >= 58 && ball.x > 18 && ball.x < 33) bottomVisits.add(ball.id);
+        if (bottomVisits.has(ball.id) && ball.y < 55) bottomReturns.add(ball.id);
         if (ball.x > 22 && ball.y > 40 && ball.y < 56 && !visits.has(ball.id)) {
           visits.add(ball.id);
         }
-        if (visits.has(ball.id) && ball.y < 26) returned.add(ball.id);
+        // The rebuilt loop rejoins the splitter at y=28, below the upper fan chamber.
+        if (visits.has(ball.id) && ball.y < 29) returned.add(ball.id);
+      }
+      if (stage.title === '쌍둥이 소용돌이') {
+        if (ball.x < 11 && ball.y > 36) visits.add(ball.id);
+        if (visits.has(ball.id) && ball.x > 12 && ball.y < 28) returned.add(ball.id);
       }
     }
     if (earlyLeader === undefined && game.elapsed > 2)
       earlyLeader = game.balls.reduce((a, b) => a.y > b.y ? a : b).id;
     if (!first && game.arrivals.length) first = game.elapsed;
+    if (!late && game.elapsed >= 60)
+      late = game.balls.filter((ball) => !ball.rank).slice(0, 5).map((ball) => ({ x: ball.x, y: ball.y }));
   }
   const result = {
     count, initial, first, finish: game.elapsed, arrived: game.arrivals.length,
     leaderWon: game.arrivals[0]?.id === earlyLeader,
     lifted: lifted.size, loopVisits: visits.size, loopReturns: returned.size,
-    minX, maxX,
+    minX, maxX, late, bottomReturns: bottomReturns.size,
   };
   if (game.state === 'finished')
     assert.deepEqual(game.winners.map((ball) => ball.id), game.arrivals.slice(-Math.min(count, 2)).map((ball) => ball.id),
@@ -69,11 +82,23 @@ async function simulate(physics, stage, count, initial, limit = 120) {
   const storage = { setItem: (_, value) => raw = value, getItem: () => raw };
   saveMaps(storage, stages.map((stage, i) => ({ id: String(i), stage })));
   assert.deepEqual(readSavedMaps(storage).map((map) => map.stage.windZones), stages.map((stage) => stage.windZones));
+  assert.deepEqual(readSavedMaps(storage).map((map) => map.stage.spawnX), stages.map((stage) => stage.spawnX));
   stages.forEach(validateStage);
   assert.throws(() => validateStage({ ...headwindElevator, windZones: [{ type: 'directional', x: 1, y: 1,
     width: 2, height: 2, velocityX: Infinity, velocityY: 0 }] }));
-  for (const invalid of [{ period: 0 }, { pulse: 2 }, { fan: { x: NaN, y: 0, radius: 2 } }])
+  for (const invalid of [{ period: 0 }, { pulse: 2 }, { dutyCycle: 0 }, { dutyCycle: 1.1 },
+    { fan: { x: NaN, y: 0, radius: 2 } }, { fan: { x: 1, y: 1, radius: 2, front: 'yes' } }])
     assert.throws(() => validateStage({ ...headwindElevator, windZones: [{ ...headwindElevator.windZones[0], ...invalid }] }));
+  assert.throws(() => validateStage({ ...twinVortex, spawnX: twinVortex.width + 1 }));
+  const timedFan = { ...headwindElevator.windZones[0], period: 8, phase: 0, pulse: 1, dutyCycle: 0.5 };
+  assert.equal(windPower(timedFan, 2), 1, 'fan reaches full thrust');
+  assert.equal(windPower(timedFan, 6), 0, 'fan provides a genuine coast interval');
+  assert.ok(Math.abs(windTravel(timedFan, 4) - windTravel(timedFan, 8)) < 1e-9,
+    'fan animation stops during the same interval as its physical thrust');
+  for (const wind of [timedFan, { ...timedFan, phase: -2 }, headwindElevator.windZones[0]])
+    for (const t of [0.1, 2, 5, 10])
+      assert.ok(Math.abs((windTravel(wind, t + 0.0001) - windTravel(wind, t)) / 0.0001 - windPower(wind, t)) < 0.001,
+        'visual airflow speed follows the actual physical wind power');
 
   const physics = new Box2dPhysics();
   await physics.init();
@@ -93,11 +118,24 @@ async function simulate(physics, stage, count, initial, limit = 120) {
     const packRuns = results.filter((result) => result.count === 28);
     if (packRuns.length) {
       assert.ok(packRuns.every((result) => result.finish >= 18), `${stage.title}: the pack race finished too quickly`);
+      assert.ok(packRuns.every((result) => result.finish < 80), `${stage.title}: the pack race took too long`);
       assert.ok(packRuns.some((result) => !result.leaderWon), `${stage.title}: the early leader always wins`);
       assert.ok(packRuns.every((result) => result.lifted > 0), `${stage.title}: wind must visibly lift the marbles`);
-      if (stage.title === '돌풍 갈림길')
+      if (stage.title === '쌍둥이 소용돌이')
         assert.ok(packRuns.every((result) => result.loopReturns > 0 && result.loopVisits < result.count),
           'both the shortcut and a complete return through the loop must be used');
+      if (stage.title === '돌풍 갈림길') {
+        const bottomReturnRate = packRuns.reduce((sum, result) => sum + result.bottomReturns, 0)
+          / packRuns.reduce((sum, result) => sum + result.count, 0);
+        assert.ok(bottomReturnRate >= 0.35 && bottomReturnRate <= 0.65,
+          `the bottom gust should lift roughly half the pack (${bottomReturnRate})`);
+        assert.ok(packRuns.every((result) => result.loopVisits > 0 && result.loopVisits < result.count),
+          'the rotating splitter must feed both routes');
+        // With a random splitter phase, a pack may reach the loop during its coast interval.
+        // Require repeatable returns across most rounds, not a forced return in every race.
+        assert.ok(packRuns.filter((result) => result.loopReturns > 0).length > packRuns.length / 2,
+          'the gust loop must return marbles in a majority of independently seeded races');
+      }
     }
   }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

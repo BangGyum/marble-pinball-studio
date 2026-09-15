@@ -7,10 +7,13 @@
     "dev": "node ./node_modules/parcel/lib/bin.js index.html --port 43187 --host 127.0.0.1 --dist-dir .dev-dist",
     "build": "node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/parcel/lib/bin.js build index.html --public-url ./ && node scripts/licenses.cjs --dist",
     "check": "node ./node_modules/typescript/bin/tsc --noEmit",
+    "build:lan": "node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/typescript/bin/tsc -p tsconfig.lan.json && node ./node_modules/parcel/lib/bin.js build lan.html --dist-dir .lan-dist --public-url ./",
+    "lan": "npm run build:lan && node server/lan.cjs",
+    "test:lan": "node tests/lan-playback.cjs && node ./node_modules/typescript/bin/tsc -p tsconfig.lan.json && node tests/lan.cjs",
     "test:orbit-mixing": "node tests/orbit-mixing.cjs",
     "test:wind-maps": "node tests/wind-maps.cjs",
     "dev:wind-preview": "node ./node_modules/parcel/lib/bin.js tests/wind-preview.html --port 43189 --host 127.0.0.1 --dist-dir .wind-preview",
-    "test": "node tests/run.cjs && node tests/recorder.cjs && node tests/interaction.cjs && node tests/junction.cjs && node tests/rankings.cjs && node tests/celebration.cjs && node tests/launch.cjs && node tests/freehand.cjs && node tests/cascade.cjs && node tests/rotor-wall-audit.cjs && node tests/pipeline-run.cjs && node tests/neon-mixer.cjs && node tests/neon-orbit.cjs && node tests/wind-maps.cjs",
+    "test": "node tests/run.cjs && node tests/recorder.cjs && node tests/interaction.cjs && node tests/junction.cjs && node tests/rankings.cjs && node tests/celebration.cjs && node tests/launch.cjs && node tests/freehand.cjs && node tests/cascade.cjs && node tests/rotor-wall-audit.cjs && node tests/pipeline-run.cjs && node tests/neon-mixer.cjs && node tests/neon-orbit.cjs && node tests/wind-maps.cjs && npm run test:lan",
     "predev": "node scripts/licenses.cjs",
     "prebuild": "node scripts/licenses.cjs"
   },
@@ -23,6 +26,7 @@
     "typescript": "^5.6.3"
   },
   "dependencies": {
-    "box2d-wasm": "^7.0.0"
+    "box2d-wasm": "^7.0.0",
+    "ws": "^8.21.3"
   }
 }

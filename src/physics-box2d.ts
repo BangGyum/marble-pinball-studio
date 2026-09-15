@@ -1,6 +1,7 @@
 // Adapted from lazygyu/roulette (MIT). See LICENSE and THIRD_PARTY.md.
 import Box2DFactory from 'box2d-wasm';
 import type { StageDef, WindZone } from './data/maps';
+import { windPower } from './wind-power';
 import type { IPhysics } from './IPhysics';
 import type { MapEntity, MapEntityState } from './types/MapEntity.type';
 
@@ -197,7 +198,7 @@ export class Box2dPhysics implements IPhysics {
         let vx = 0, vy = 0, totalBlend = 0, gravityCompensation = 0;
         for (const wind of winds) {
           const phase = this.windTime * (wind.period ? Math.PI * 2 / wind.period : 1.7) + (wind.phase ?? 0);
-          const pulse = 1 - (wind.pulse ?? 0) * (0.5 - 0.5 * Math.sin(phase));
+          const pulse = windPower(wind, this.windTime);
           if (wind.type === 'directional') {
             if (Math.abs(p.x - wind.x) > wind.width / 2 || Math.abs(p.y - wind.y) > wind.height / 2) continue;
             const turbulence = wind.turbulence ?? 0;

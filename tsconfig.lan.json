@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS", "moduleResolution": "Node",
+    "noEmit": false, "outDir": ".lan-build", "rootDir": "src"
+  },
+  "include": ["src/race.ts", "src/lan/protocol.ts"]
+}

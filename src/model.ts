@@ -76,6 +76,7 @@ export function validateStage(value: unknown): StageDef {
     !finite(s.goalY, 20, 300) ||
     (s.randomizeStart !== undefined && typeof s.randomizeStart !== 'boolean') ||
     (s.width !== undefined && !finite(s.width, 26, 200)) ||
+    (s.spawnX !== undefined && !finite(s.spawnX, 4, (s.width ?? 26) - 4)) ||
     !Array.isArray(s.entities) ||
     s.entities.length > 2000
   )
@@ -90,9 +91,11 @@ export function validateStage(value: unknown): StageDef {
     if (!wind || !finite(wind.x, -1000, 1000) || !finite(wind.y, -1000, 1000) ||
       (wind.phase !== undefined && !finite(wind.phase, -100, 100)) ||
       (wind.pulse !== undefined && !finite(wind.pulse, 0, 1)) ||
+      (wind.dutyCycle !== undefined && !finite(wind.dutyCycle, 0.1, 1)) ||
       (wind.period !== undefined && !finite(wind.period, 1, 60)) ||
       (wind.fan !== undefined && (!wind.fan || !finite(wind.fan.x, -1000, 1000) ||
-        !finite(wind.fan.y, -1000, 1000) || !finite(wind.fan.radius, 0.3, 15))))
+        !finite(wind.fan.y, -1000, 1000) || !finite(wind.fan.radius, 0.3, 15) ||
+        (wind.fan.front !== undefined && typeof wind.fan.front !== 'boolean'))))
       throw new Error('바람 영역 설정이 올바르지 않아요.');
     if (wind.type === 'directional') {
       if (!finite(wind.width, 0.5, 200) || !finite(wind.height, 0.5, 300) ||

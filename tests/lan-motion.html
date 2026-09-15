@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>LAN 움직임 진단</title>
+<style>
+  body { margin: 24px; background: #081017; color: #d8f4ed; font: 15px/1.6 system-ui; }
+  canvas { width: 100%; height: 180px; background: #111e29; border-radius: 12px; }
+  pre { white-space: pre-wrap; } button { padding: 8px 18px; }
+</style></head><body>
+<h1>LAN 움직임 진단</h1><p>경기는 관리자 화면에서 시작합니다. 이 화면은 같은 서버 데이터를 읽기만 합니다.</p>
+<p>일정한 속도로 흐르는 경기 시간을 구슬로 표시해, 실제 장애물의 가감속과 화면 재생의 출렁임을 구분합니다.</p>
+<button id="clear">측정 초기화</button><canvas id="motion" width="1200" height="180"></canvas>
+<pre id="metrics">연결 중</pre><script type="module" src="./lan-motion.ts"></script>
+</body></html>

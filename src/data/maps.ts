@@ -9,10 +9,11 @@ import { gustFork } from './gust-fork';
 import type { MapEntity } from '../types/MapEntity.type';
 
 export type WindZone = {
+  dutyCycle?: number;
   pulse?: number;
   period?: number;
   phase?: number;
-  fan?: { x: number; y: number; radius: number };
+  fan?: { x: number; y: number; radius: number; front?: boolean };
 } & (
   | {
       type: 'directional';
@@ -44,6 +45,7 @@ export type AdBoard = {
 
 export type StageDef = {
   title: string;
+  spawnX?: number;
   entities?: MapEntity[];
   width?: number;
   randomizeStart?: boolean;

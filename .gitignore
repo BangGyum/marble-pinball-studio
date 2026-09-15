@@ -8,6 +8,8 @@ dist/
 
 .dev-dist/
 .wind-preview/
+.lan-dist/
+.lan-build/
 .package-tmp/
 
 fairness-results/

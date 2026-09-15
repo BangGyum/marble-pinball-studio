@@ -532,15 +532,16 @@ export class Editor {
       c.stroke();
     }
     c.fillStyle = '#65efda0e';
-    c.fillRect(9.25, 0, 7.25, 6.5);
+    const spawnOffset = (this.stage.spawnX ?? 12.85) - 12.85;
+    c.fillRect(9.25 + spawnOffset, 0, 7.25, 6.5);
     c.font = '.45px sans-serif';
     c.textAlign = 'center';
     c.fillStyle = '#94bdb5';
-    c.fillText('출발 영역', 12.8, 2);
+    c.fillText('출발 영역', 12.8 + spawnOffset, 2);
     for (let i = 0; i < 4; i++) {
       c.fillStyle = `hsl(${i * 85} 90% 75%)`;
       c.beginPath();
-      c.arc(11.8 + i * 0.65, 4, 0.25, 0, Math.PI * 2);
+      c.arc(11.8 + spawnOffset + i * 0.65, 4, 0.25, 0, Math.PI * 2);
       c.fill();
     }
     const entities = (this.stage.entities ?? []).map((e) => ({
