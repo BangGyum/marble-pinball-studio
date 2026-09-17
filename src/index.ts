@@ -149,7 +149,6 @@ names.addEventListener('input', () => {
 });
 el('shuffle').addEventListener('click', () => {
   prepare();
-  if (!start.disabled) toast('구슬의 출발 위치를 섞었어요.');
 });
 el('reset').addEventListener('click', prepare);
 mapSelect.addEventListener('change', () => {
