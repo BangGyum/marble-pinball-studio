@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const { WebSocket } = require('ws');
 const { createLanServer } = require('../server/lan.cjs');
+const { DEFAULT_MAP_INDEX } = require('../.lan-build/data/maps.js');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function request(port, route, { method = 'GET', cookie, host = `127.0.0.1:${port}`, origin = `http://${host}`, address = '127.0.0.1' } = {}) {
@@ -69,7 +70,8 @@ async function connect(port, cookie, options = {}) {
       assert.equal((await request(port, '/api/health', { address: url.hostname, host: url.host })).status, 200);
     }
     await assert.rejects(connect(port, guestSession.cookie, { origin: 'https://evil.example' }));
-    assert.deepEqual(guest.scene.settings, { names: '', mapId: 0, order: 'desc', picks: 2 });
+    assert.deepEqual(guest.scene.settings, { names: '', mapId: DEFAULT_MAP_INDEX, order: 'desc', picks: 2 });
+    assert.equal(guest.scene.stage.title, '네온 분기점');
     const settings = { names: '동명이인, 동명이인, 참가자*26', mapId: 4, order: 'desc', picks: 2 };
     for (const command of [{ type: 'configure', settings }, { type: 'start' }, { type: 'pause' }, { type: 'reset' },
       { type: 'claim', code: '0123456789' }, { type: 'release', participantId: 'x' }, { type: 'skill', skill: 'jump' },

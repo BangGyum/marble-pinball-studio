@@ -62,6 +62,7 @@ async function run() {
   assert.throws(() =>
     saveMaps(
       {
+        getItem: () => null,
         setItem: () => {
           throw new Error('QuotaExceededError');
         },

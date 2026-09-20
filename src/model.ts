@@ -4,6 +4,7 @@ import type { MapEntity } from './types/MapEntity.type';
 export type WinnerOrder = 'asc' | 'desc';
 export type SavedMap = { id: string; stage: StageDef };
 export const MAPS_KEY = 'marble-pinball.maps.v1';
+export const MAPS_BACKUP_PREFIX = MAPS_KEY + '.recovery.';
 export const MAX_MARBLES = 300;
 export function parseNames(text: string): string[] {
   const names: string[] = [];
@@ -169,16 +170,37 @@ export function validateStage(value: unknown): StageDef {
   }
   return { ...cloneStage(s), title: s.title.trim(), zoomY: s.goalY - 5 };
 }
-export function readSavedMaps(storage: Pick<Storage, 'getItem'>): SavedMap[] {
+export function readSavedMaps(storage: Pick<Storage, 'getItem'>, onInvalid?: (count: number) => void): SavedMap[] {
   const raw = storage.getItem(MAPS_KEY);
   if (!raw) return [];
   const items: unknown = JSON.parse(raw);
   if (!Array.isArray(items)) throw new Error('저장된 맵 목록을 읽을 수 없어요.');
-  return items.map((item) => {
-    if (!item || typeof item.id !== 'string') throw new Error('저장된 맵 정보가 올바르지 않아요.');
-    return { id: item.id, stage: validateStage(item.stage) };
+  let invalid = 0;
+  const maps = items.flatMap((item) => {
+    try {
+      if (!item || typeof item.id !== 'string') throw new Error('저장된 맵 정보가 올바르지 않아요.');
+      return [{ id: item.id, stage: validateStage(item.stage) }];
+    } catch {
+      invalid++;
+      return [];
+    }
   });
+  if (invalid) onInvalid?.(invalid);
+  return maps;
 }
-export function saveMaps(storage: Pick<Storage, 'setItem'>, maps: SavedMap[]) {
-  storage.setItem(MAPS_KEY, JSON.stringify(maps.map((m) => ({ id: m.id, stage: validateStage(m.stage) }))));
+export function saveMaps(storage: Pick<Storage, 'getItem' | 'setItem'>, maps: SavedMap[]) {
+  const next = JSON.stringify(maps.map((m) => ({ id: m.id, stage: validateStage(m.stage) })));
+  const raw = storage.getItem(MAPS_KEY);
+  if (raw) {
+    let damaged = false;
+    try { readSavedMaps(storage, () => { damaged = true; }); } catch { damaged = true; }
+    if (damaged) {
+      const base = MAPS_BACKUP_PREFIX + Date.now();
+      let key = base;
+      for (let i = 1; storage.getItem(key) != null; i++) key = base + '.' + i;
+      // Preserve the original before replacement; failed backups must leave it untouched.
+      storage.setItem(key, raw);
+    }
+  }
+  storage.setItem(MAPS_KEY, next);
 }

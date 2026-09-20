@@ -3,7 +3,7 @@ import { LanView } from './view';
 import { Rankings } from '../rankings';
 import { Editor } from '../editor';
 import { Recorder } from '../recorder';
-import { stages, type StageDef } from '../data/maps';
+import { stages, DEFAULT_MAP_INDEX, type StageDef } from '../data/maps';
 import { parseNames, winningRange, readSavedMaps, saveMaps, type SavedMap, type WinnerOrder } from '../model';
 import { el, toast, message } from '../ui';
 import type { Command, Frame, Identity, Info, Scene, ServerMessage, Settings } from './protocol';
@@ -20,11 +20,12 @@ let info: Info, online = false, retry = 0, sequence = 0, uiUpdate = 0;
 let preferredPicks = 2, customStage: StageDef | undefined, saved: SavedMap[] = [];
 let inputTimer: ReturnType<typeof setTimeout>, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
-try { saved = readSavedMaps(localStorage); } catch { toast('저장된 맵을 읽지 못했어요.'); }
+try {
+  saved = readSavedMaps(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));
+} catch { toast('저장된 맵을 읽지 못했어요.'); }
 const allMaps = () => [
-  ...stages.map((stage, i) => ({ id: 'builtin-' + i, stage: stage.title === '네온 파이프라인'
-    ? saved.find((m) => m.stage.title === stage.title)?.stage ?? stage : stage })),
-  ...saved.filter((m) => m.stage.title !== '네온 파이프라인'),
+  ...stages.map((stage, i) => ({ id: 'builtin-' + i, stage })),
+  ...saved,
   ...(customStage ? [{ id: 'preview', stage: customStage }] : []),
 ];
 function refreshMaps(selected = mapSelect.value) {
@@ -223,14 +224,13 @@ const editor = new Editor({
     const nextId = id && !id.startsWith('builtin-') ? id : crypto.randomUUID();
     const next = [...saved.filter((m) => m.id !== nextId), { id: nextId, stage }];
     saveMaps(localStorage, next); saved = next; customStage = undefined;
-    const pipeline = stages.findIndex((s) => s.title === '네온 파이프라인');
-    refreshMaps(stage.title === '네온 파이프라인' ? 'builtin-' + pipeline : nextId);
+    refreshMaps(nextId);
     void prepareUI(true); return nextId;
   },
   remove(id) {
     const selected = mapSelect.value;
     const next = saved.filter((m) => m.id !== id); saveMaps(localStorage, next); saved = next;
-    refreshMaps(selected === id ? 'builtin-0' : selected); void prepareUI();
+    refreshMaps(selected === id ? 'builtin-' + DEFAULT_MAP_INDEX : selected); void prepareUI();
   },
   play(stage) { customStage = stage; refreshMaps('preview'); void prepareUI(true); },
 });

@@ -105,7 +105,7 @@ async function simulate(physics, stage, count, initial, limit = 120) {
 
   for (const stage of stages) {
     const results = [];
-    for (const count of (requestedCount ? [requestedCount] : [1, 28, 100, 300]))
+    for (const count of (requestedCount ? [requestedCount] : [1, 28, 49, 100, 300]))
       for (const seed of (count === 28 ? [123456, 271828, 314159, 161803, 577215, 141421] : [123456, 271828, 314159]))
         results.push(await simulate(physics, stage, count, seed));
     console.log(stage.title, JSON.stringify(results));

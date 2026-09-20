@@ -1,4 +1,4 @@
-import { stages, type StageDef } from './data/maps';
+import { stages, DEFAULT_MAP_INDEX, type StageDef } from './data/maps';
 import { Game } from './game';
 import { parseNames, readSavedMaps, saveMaps, winningRange, type WinnerOrder, type SavedMap } from './model';
 import { Recorder } from './recorder';
@@ -10,26 +10,14 @@ const titles = ['네온 믹서', '욕망의 항아리', '네온 분기점', '캐
 stages.forEach((s, i) => (s.title = titles[i] ?? s.title));
 let saved: SavedMap[] = [];
 try {
-  saved = readSavedMaps(localStorage);
+  saved = readSavedMaps(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));
 } catch {
   toast('저장된 맵을 읽지 못했어요. 브라우저의 저장소 설정을 확인해 주세요.');
 }
-const builtInMaps = () =>
-  stages.map((stage, i) => {
-    const savedOverride = stage.title === '네온 파이프라인'
-      ? saved.find((map) => map.stage.title === '네온 파이프라인')
-      : undefined;
-    return { id: `builtin-${i}`, stage: savedOverride?.stage ?? stage };
-  });
 const allMaps = () => [
-  ...builtInMaps(),
-  ...saved.filter((map) => map.stage.title !== '네온 파이프라인'),
+  ...stages.map((stage, i) => ({ id: `builtin-${i}`, stage })),
+  ...saved,
 ];
-const editorMaps = () => [...stages.map((stage, i) => ({ id: `builtin-${i}`, stage })), ...saved];
-const pipelineBuiltinId = () => {
-  const index = stages.findIndex((stage) => stage.title === '네온 파이프라인');
-  return index < 0 ? null : `builtin-${index}`;
-};
 const game = new Game(el<HTMLCanvasElement>('game'));
 const rankings = new Rankings();
 const rankingList = el('ranking-list');
@@ -64,7 +52,7 @@ const record = el<HTMLInputElement>('record');
 const winnerCount = el<HTMLSelectElement>('winner-count');
 let preferredWinnerCount = 2;
 winnerCount.addEventListener('change', () => (preferredWinnerCount = Number(winnerCount.value) || 2));
-const initialMapIndex = stages.findIndex((stage) => stage.title === '네온 믹서');
+const initialMapIndex = DEFAULT_MAP_INDEX;
 let currentStage: StageDef = stages[initialMapIndex];
 let initialized = false;
 const gameView = el('game-view'),
@@ -213,14 +201,14 @@ game
   });
 
 const editor = new Editor({
-  list: editorMaps,
+  list: allMaps,
   save(stage, id) {
     const nextId = id && !id.startsWith('builtin-') ? id : crypto.randomUUID();
     const next = [...saved.filter((m) => m.id !== nextId), { id: nextId, stage }];
     saveMaps(localStorage, next);
     saved = next;
     currentStage = stage;
-    refreshMaps(stage.title === '네온 파이프라인' ? pipelineBuiltinId() ?? nextId : nextId);
+    refreshMaps(nextId);
     prepare();
     return nextId;
   },
@@ -228,13 +216,9 @@ const editor = new Editor({
     const next = saved.filter((m) => m.id !== id);
     saveMaps(localStorage, next);
     saved = next;
-    if (currentStage.title === '네온 파이프라인' && id !== pipelineBuiltinId()) {
-      currentStage = stages.find((stage) => stage.title === '네온 파이프라인')!;
-      refreshMaps(pipelineBuiltinId() ?? undefined);
-      prepare();
-    } else if (mapSelect.value === id) {
-      currentStage = stages[0];
-      refreshMaps('builtin-0');
+    if (mapSelect.value === id) {
+      currentStage = stages[DEFAULT_MAP_INDEX];
+      refreshMaps('builtin-' + DEFAULT_MAP_INDEX);
       prepare();
     } else refreshMaps();
   },

@@ -7,7 +7,7 @@ const { WebSocketServer, WebSocket } = require('ws');
 // This Box2D build loads local WASM through Node's fs path, not global fetch.
 global.fetch = undefined;
 const { Race } = require('../.lan-build/race.js');
-const { stages } = require('../.lan-build/data/maps.js');
+const { stages, DEFAULT_MAP_INDEX } = require('../.lan-build/data/maps.js');
 const { parseNames, winningRange, validateStage } = require('../.lan-build/model.js');
 const { LAN_PORT } = require('../.lan-build/lan/protocol.js');
 const titles = ['네온 믹서', '욕망의 항아리', '네온 분기점', '캐스케이드', '네온 파이프라인', '네온 오비트'];
@@ -20,7 +20,7 @@ const requireThat = (condition, message) => { if (!condition) throw new Error(me
 async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
   const race = new Race();
   await race.physics.init();
-  let settings = { names: '', mapId: 0, order: 'desc', picks: 2 };
+  let settings = { names: '', mapId: DEFAULT_MAP_INDEX, order: 'desc', picks: 2 };
   let raceId, revision = 0, scene, seq = 0;
   let accumulator = 0, lastTick = performance.now();
   let speed = 1, boostOwner = null, boostUntil = 0;

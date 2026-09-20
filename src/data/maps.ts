@@ -3051,3 +3051,5 @@ export const stages: StageDef[] = [
   twinVortex,
   gustFork,
 ];
+
+export const DEFAULT_MAP_INDEX = stages.indexOf(neonJunction);

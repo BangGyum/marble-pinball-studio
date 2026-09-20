@@ -13,14 +13,15 @@ export const gustFork: StageDef = {
     { type: 'directional', x: 22, y: 19, width: 38, height: 16, velocityX: -24, velocityY: 9,
       strength: 3, pulse: 1, period: 6, phase: Math.PI - 1.5, turbulence: 3,
       fan: { x: 39, y: 18, radius: 2.6, front: true } },
+    // Allow a longer coast interval so the widened return lanes can drain between gusts.
     { type: 'directional', x: 24, y: 44, width: 7, height: 27, velocityX: 1, velocityY: -25,
-      strength: 4, pulse: 1, period: 10, phase: 2, turbulence: 2, dutyCycle: 0.5,
+      strength: 4, pulse: 1, period: 10, phase: 2, turbulence: 2, dutyCycle: 0.15,
       fan: { x: 24, y: 54, radius: 2.4, front: true } },
     { type: 'directional', x: 38, y: 44, width: 8, height: 27, velocityX: -1, velocityY: -27,
-      strength: 4, pulse: 1, period: 10, phase: 2, turbulence: 2, dutyCycle: 0.5,
+      strength: 4, pulse: 1, period: 10, phase: 2, turbulence: 2, dutyCycle: 0.15,
       fan: { x: 38, y: 54, radius: 2.4, front: true } },
     { type: 'directional', x: 30, y: 31, width: 20, height: 12, velocityX: -7, velocityY: -18,
-      strength: 3, pulse: 1, period: 10, phase: 2, dutyCycle: 0.5 },
+      strength: 3, pulse: 1, period: 10, phase: 2, dutyCycle: 0.15 },
   ],
   entities: [
     wall([...inletLeft.map(([x, y]): [number, number] => [x + 9.15, y]), [17, 10], [7, 10], ...curve([7, 10], [3, 10], [3, 12], [3, 16]).slice(1), [3, 23],
