@@ -10,7 +10,8 @@ export class Box2dPhysics implements IPhysics {
   private world!: Box2D.b2World;
   private vector!: Box2D.b2Vec2;
   private marbleMap: Record<number, Box2D.b2Body> = {};
-  private entities: ({ body: Box2D.b2Body } & MapEntityState)[] = [];
+  private entities: ({ body: Box2D.b2Body; oscillation?: MapEntity['props']['oscillation'] } & MapEntityState)[] = [];
+  private motionTime = 0;
   private randomizeStart = false;
   private vortex: StageDef['vortex'];
   private windZones: WindZone[] = [];
@@ -36,6 +37,7 @@ export class Box2dPhysics implements IPhysics {
     this.marbleMap = {};
   }
   createStage(stage: StageDef) {
+    this.motionTime = 0;
     this.vortex = stage.vortex;
     this.windZones = stage.windZones ?? [];
     this.windTime = 0;
@@ -43,7 +45,7 @@ export class Box2dPhysics implements IPhysics {
     this.collisionSubsteps = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.backing) ? 16 : 4;
     this.createEntities(
       (stage.entities ?? []).map((entity) =>
-        this.randomizeStart && entity.position.y < 28 && entity.type === 'kinematic' && entity.shape.type === 'box'
+        this.randomizeStart && !entity.props.oscillation && entity.position.y < 28 && entity.type === 'kinematic' && entity.shape.type === 'box'
           ? { ...entity, shape: { ...entity.shape, rotation: entity.shape.rotation + Math.random() * Math.PI * 2 } }
           : entity
       )
@@ -62,6 +64,7 @@ export class Box2dPhysics implements IPhysics {
       fixture.set_density(entity.props.density);
       fixture.set_restitution(entity.props.restitution);
       const s = entity.shape;
+      fixture.set_isSensor(s.type === 'box' && s.boostSpeed !== undefined);
       if (s.type === 'box') {
         const shape = new B.b2PolygonShape();
         this.vector.Set(0, 0);
@@ -128,6 +131,7 @@ export class Box2dPhysics implements IPhysics {
       body.SetAngularVelocity(entity.props.angularVelocity);
       this.entities.push({
         body,
+        oscillation: entity.props.oscillation,
         x: entity.position.x,
         y: entity.position.y,
         angle: 0,
@@ -234,8 +238,30 @@ export class Box2dPhysics implements IPhysics {
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
     this.deleteCandidates = [];
     // Smaller angular increments keep rotating paddles from pushing marbles through thin walls.
-    for (let i = 0; i < this.collisionSubsteps; i++)
-      this.world.Step(seconds / this.collisionSubsteps, 8, this.collisionSubsteps === 4 ? 4 : 8);
+    for (let i = 0; i < this.collisionSubsteps; i++) {
+      const dt = seconds / this.collisionSubsteps;
+      this.motionTime += dt;
+      for (const e of this.entities) if (e.oscillation) {
+        const target = e.oscillation.amplitude * Math.sin(this.motionTime * Math.PI * 2 / e.oscillation.period);
+        // Move through the solver, rather than teleporting a paddle across marbles.
+        e.body.SetAngularVelocity((target - e.body.GetAngle()) / dt);
+      }
+      this.world.Step(dt, 8, this.collisionSubsteps === 4 ? 4 : 8);
+      for (const e of this.entities) if (e.shape.type === 'box' && e.shape.boostSpeed !== undefined) {
+        const dx = Math.cos(e.shape.rotation), dy = Math.sin(e.shape.rotation);
+        let edge = e.body.GetContactList();
+        while (this.Box2D.getPointer(edge)) {
+          if (edge.contact.IsTouching() && edge.other.GetType() === this.Box2D.b2_dynamicBody) {
+            const body = edge.other, v = body.GetLinearVelocity();
+            // Only add speed along the arrow; preserve momentum after leaving the pad.
+            const gain = Math.max(0, e.shape.boostSpeed - (v.x * dx + v.y * dy)) * (1 - Math.exp(-18 * dt));
+            this.vector.Set(v.x + dx * gain, v.y + dy * gain);
+            body.SetLinearVelocity(this.vector);
+          }
+          edge = edge.next;
+        }
+      }
+    }
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const e = this.entities[i];
       if (e.life <= 0) continue;

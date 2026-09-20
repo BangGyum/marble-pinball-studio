@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const { WebSocket } = require('ws');
 const { createLanServer } = require('../server/lan.cjs');
-const { DEFAULT_MAP_INDEX } = require('../.lan-build/data/maps.js');
+const { DEFAULT_MAP_INDEX, stages } = require('../.lan-build/data/maps.js');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function request(port, route, { method = 'GET', cookie, host = `127.0.0.1:${port}`, origin = `http://${host}`, address = '127.0.0.1' } = {}) {
@@ -147,6 +147,19 @@ async function connect(port, cookie, options = {}) {
     assert.equal(app.race.stage.title, custom.title);
     assert.deepEqual(guest2.scene.settings.stage, { ...custom, zoomY: custom.goalY - 5 }, 'editor map uses the same normalization as saved maps');
     assert.equal((await guest2.command({ type: 'configure', settings: { ...settings, stage: custom } })).ok, false);
+    const rapids = stages.find(s => s.title === '지그재그 급류');
+    assert.equal((await host.command({ type: 'configure', settings: { ...settings, stage: rapids } })).ok, true);
+    await guest2.until(() => guest2.scene.stage.title === rapids.title);
+    assert.deepEqual(guest2.scene.stage.art, rapids.art, 'LAN viewers receive the same glass track and direction markings');
+    assert.deepEqual(guest2.scene.stage.entities, rapids.entities, 'LAN viewers receive the same swing device definitions');
+    const boostStage = { ...rapids, entities: [{ position: {x:23,y:30}, type:'static',
+      shape: {type:'box',width:2.5,height:1,rotation:Math.PI/2,boostSpeed:35,color:'#ffc653'},
+      props: {density:1,restitution:0,angularVelocity:0} }] };
+    assert.equal((await host.command({type:'configure',settings:{...settings,stage:boostStage}})).ok,true);
+    await guest2.until(() => guest2.scene.stage.entities[0]?.shape.boostSpeed === 35);
+    assert.deepEqual(guest2.scene.stage.entities, boostStage.entities, 'LAN guests retain booster direction and speed');
+    assert.equal((await host.command({ type: 'configure', settings: { ...settings,
+      stage: { ...rapids, art: { style: 'unknown', contours: [] } } } })).ok, false);
     assert.equal((await host.command({ type: 'configure', settings: { ...settings, names: '', picks: 0 } })).ok, true);
     assert.equal(host.scene.balls.length, 0);
     assert.equal((await host.command({ type: 'start' })).ok, false);

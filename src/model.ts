@@ -82,6 +82,15 @@ export function validateStage(value: unknown): StageDef {
     s.entities.length > 2000
   )
     throw new Error('올바른 맵 파일이 아니에요. 맵 이름, 결승선, 장애물을 확인해 주세요.');
+  if (s.art !== undefined && (!s.art || s.art.style !== 'rapids' || !Array.isArray(s.art.contours) ||
+    s.art.contours.length > 20 || s.art.contours.some((points) => !Array.isArray(points) ||
+      points.length < 3 || points.length > 1000 || points.some((p) => !Array.isArray(p) || p.length !== 2 ||
+        !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))))
+    throw new Error('맵 배경 장식 좌표가 올바르지 않아요.');
+  if (s.art?.arrows !== undefined && (!Array.isArray(s.art.arrows) || s.art.arrows.length > 100 ||
+    s.art.arrows.some((a) => !Array.isArray(a) || a.length !== 3 ||
+      !finite(a[0], -1000, 1000) || !finite(a[1], -1000, 1000) || !finite(a[2], -100, 100))))
+    throw new Error('맵 방향 표시가 올바르지 않아요.');
   if (s.vortex && (!finite(s.vortex.x, -1000, 1000) || !finite(s.vortex.y, -1000, 1000) ||
     !finite(s.vortex.radius, 1, 100) || !finite(s.vortex.speed, -30, 30) ||
     (s.vortex.gust !== undefined && !finite(s.vortex.gust, 0, 1))))
@@ -126,6 +135,13 @@ export function validateStage(value: unknown): StageDef {
     )
       throw new Error('장애물 위치 또는 물리 설정이 올바르지 않아요.');
     const sh = e.shape;
+    if (sh && 'boostSpeed' in sh && (sh.type !== 'box' || !finite(sh.boostSpeed, 5, 60) ||
+      e.type !== 'static' || e.props.angularVelocity !== 0 || e.props.oscillation ||
+      (e.props.life !== undefined && e.props.life !== -1)))
+      throw new Error('부스터는 고정된 네모 발판이며 속도는 5~60 사이여야 해요.');
+    if (e.props.oscillation !== undefined && (!e.props.oscillation || e.type !== 'kinematic' ||
+      !finite(e.props.oscillation.amplitude, 0.01, 1.5) || !finite(e.props.oscillation.period, 1, 30)))
+      throw new Error('왕복 장치의 각도 또는 주기가 올바르지 않아요.');
     if (!sh || (sh.color !== undefined && !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(sh.color)))
       throw new Error('장애물 색상이 올바르지 않아요.');
     if (sh.type === 'circle') {

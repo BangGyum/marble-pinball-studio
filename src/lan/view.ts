@@ -1,4 +1,5 @@
 import { drawEntities } from '../draw';
+import { drawMapArt } from '../map-art';
 import { drawWind } from '../wind-render';
 import { drawCelebration } from '../celebration';
 import { RenderCache } from '../render-cache';
@@ -133,7 +134,8 @@ export class LanView {
       top: cam.y - h * .43 / scale, bottom: cam.y + h * .57 / scale };
     const entities = scene.entities.map((entity, i) => ({ ...entity, angle: mix(before.angles[i], after.angles[i]) }));
     ctx.save(); ctx.translate(w * .56 - cam.x * scale, h * .43 - cam.y * scale); ctx.scale(scale, scale);
-    drawEntities(ctx, entities, scale, -1, true, view);
+    drawMapArt(ctx, scene.stage, scale);
+    drawEntities(ctx, entities, scale, -1, true, view, !!scene.stage.art);
     if (scene.stage.vortex) {
       const wind = scene.stage.vortex;
       ctx.shadowBlur = 0; ctx.strokeStyle = '#64f4e050'; ctx.lineWidth = 1.5 / scale;

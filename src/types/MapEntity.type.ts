@@ -10,6 +10,7 @@ export interface EntityShapeBase {
 
 export interface EntityBoxShape extends EntityShapeBase {
   type: 'box';
+  boostSpeed?: number;
   width: number;
   height: number;
   rotation: number;
@@ -35,6 +36,7 @@ export type EntityPhysicalProps = {
   density: number;
   restitution: number;
   angularVelocity: number;
+  oscillation?: { amplitude: number; period: number };
   life?: number;
 };
 

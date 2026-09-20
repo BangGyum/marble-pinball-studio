@@ -6,6 +6,7 @@ import { neonOrbit } from './neon-orbit';
 import { headwindElevator } from './headwind-elevator';
 import { twinVortex } from './twin-vortex';
 import { gustFork } from './gust-fork';
+import { zigzagRapids } from './zigzag-rapids';
 import type { MapEntity } from '../types/MapEntity.type';
 
 export type WindZone = {
@@ -45,6 +46,7 @@ export type AdBoard = {
 
 export type StageDef = {
   title: string;
+  art?: { style: 'rapids'; contours: [number, number][][]; arrows?: [number, number, number][] };
   spawnX?: number;
   entities?: MapEntity[];
   width?: number;
@@ -3050,6 +3052,7 @@ export const stages: StageDef[] = [
   headwindElevator,
   twinVortex,
   gustFork,
+  zigzagRapids,
 ];
 
 export const DEFAULT_MAP_INDEX = stages.indexOf(neonJunction);

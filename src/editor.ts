@@ -2,10 +2,11 @@ import { blankStage, cloneStage, validateStage, type SavedMap } from './model';
 import type { StageDef } from './data/maps';
 import type { MapEntity } from './types/MapEntity.type';
 import { drawEntities } from './draw';
+import { drawMapArt } from './map-art';
 import { drawWind } from './wind-render';
 import { el, toast, message } from './ui';
 
-type Tool = 'select' | 'wall' | 'freehand' | 'pin' | 'bumper' | 'ramp' | 'rotor';
+type Tool = 'select' | 'wall' | 'freehand' | 'pin' | 'bumper' | 'ramp' | 'rotor' | 'boost';
 type Point = { x: number; y: number };
 type EditorActions = {
   list: () => SavedMap[];
@@ -22,6 +23,7 @@ const HELP: Record<Tool, string> = {
   bumper: '배치할 곳을 클릭하세요. 구슬을 튕겨 내는 범퍼가 만들어집니다.',
   ramp: '클릭해서 반사판을 배치한 뒤 속성에서 기울기를 바꾸세요.',
   rotor: '클릭해서 회전 장애물을 배치하세요. 회전 속도를 바꿀 수 있어요.',
+  boost: '클릭해서 부스터를 배치하세요. 화살표 방향과 부스트 속도를 바꿀 수 있어요. 0°는 오른쪽, 90°는 아래쪽입니다.',
 };
 export class Editor {
   private stage = blankStage();
@@ -189,6 +191,7 @@ export class Editor {
       'prop-radius',
       'prop-bounce',
       'prop-spin',
+      'prop-boost',
       'prop-color',
     ])
       el(id).addEventListener('change', () => this.updateProperty(id));
@@ -322,9 +325,10 @@ export class Editor {
         : {
             type: 'box',
             width: this.tool === 'rotor' ? 2 : 2.5,
-            height: 0.15,
-            rotation: this.tool === 'ramp' ? 0.3 : 0,
-            color: '#65efda',
+            height: this.tool === 'boost' ? 1 : 0.15,
+            rotation: this.tool === 'boost' ? Math.PI / 2 : this.tool === 'ramp' ? 0.3 : 0,
+            color: this.tool === 'boost' ? '#ffc653' : '#65efda',
+            ...(this.tool === 'boost' ? { boostSpeed: 35 } : {}),
           },
       props: {
         density: 1,
@@ -470,6 +474,7 @@ export class Editor {
       if (id === 'prop-width') e.shape.width = v / 2;
       if (id === 'prop-height') e.shape.height = v / 2;
       if (id === 'prop-angle') e.shape.rotation = (v * Math.PI) / 180;
+      if (id === 'prop-boost' && e.shape.boostSpeed !== undefined) e.shape.boostSpeed = v;
     } else if (e.shape.type === 'circle' && id === 'prop-radius') e.shape.radius = v;
     try {
       const candidate = cloneStage(this.stage);
@@ -491,6 +496,10 @@ export class Editor {
     el('selection-empty').hidden = !!e;
     el('box-properties').hidden = e?.shape.type !== 'box';
     el('circle-properties').hidden = e?.shape.type !== 'circle';
+    const boost = e?.shape.type === 'box' && e.shape.boostSpeed !== undefined;
+    el('boost-properties').hidden = !boost;
+    el<HTMLInputElement>('prop-spin').disabled = boost;
+    el<HTMLInputElement>('prop-bounce').disabled = boost;
     el<HTMLButtonElement>('undo').disabled = !this.history.length;
     el<HTMLButtonElement>('redo').disabled = !this.future.length;
     if (!e) return;
@@ -503,6 +512,7 @@ export class Editor {
     el<HTMLInputElement>('prop-color').value =
       color.length === 4 ? '#' + [...color.slice(1)].map((c) => c + c).join('') : color;
     if (e.shape.type === 'box') {
+      if (boost) put('prop-boost', e.shape.boostSpeed!);
       put('prop-width', e.shape.width * 2);
       put('prop-height', e.shape.height * 2);
       put('prop-angle', (((((e.shape.rotation * 180) / Math.PI + 180) % 360) + 360) % 360) - 180);
@@ -517,6 +527,7 @@ export class Editor {
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     c.save();
     c.scale(SCALE, SCALE);
+    drawMapArt(c, this.stage, SCALE);
     c.strokeStyle = '#23323d';
     c.lineWidth = 0.5 / SCALE;
     for (let x = 0; x <= (this.stage.width ?? 26); x++) {
@@ -551,7 +562,7 @@ export class Editor {
       shape: e.shape,
       life: e.props.life ?? -1,
     }));
-    drawEntities(c, entities, SCALE, this.selected, false);
+    drawEntities(c, entities, SCALE, this.selected, false, undefined, !!this.stage.art);
     drawWind(c, this.stage.windZones ?? [], 0, SCALE);
     c.setLineDash([0.5, 0.3]);
     c.strokeStyle = '#65efda';

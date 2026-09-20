@@ -1,6 +1,7 @@
 import { Race } from './race';
 import type { StageDef } from './data/maps';
 import { drawEntities } from './draw';
+import { drawMapArt } from './map-art';
 import { drawWind } from './wind-render';
 import type { WinnerOrder } from './model';
 import { drawCelebration } from './celebration';
@@ -205,7 +206,8 @@ export class Game extends Race {
     ctx.save();
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
-    drawEntities(ctx, entities, scale, -1, true, view);
+    drawMapArt(ctx, this.stage, scale);
+    drawEntities(ctx, entities, scale, -1, true, view, !!this.stage.art);
     if (this.stage.vortex) {
       const wind = this.stage.vortex;
       ctx.shadowBlur = 0;
