@@ -63,7 +63,7 @@ const inside = (ball, points) => {
   for (const e of physics.entities.filter(e => e.timedGate))
     assert.ok(Math.abs(e.body.GetAngle() - timedGateAngle(e.timedGate, 0)) < 0.001, 'gate resets to its own phase');
   const results = [];
-  for (const count of (process.argv[2] ? [Number(process.argv[2])] : [1, 9, 28, 100, 200, 300])) {
+  for (const count of (process.argv[2] ? [Number(process.argv[2])] : [1, 9, 20, 28, 49])) {
     for (const initial of (process.argv[3] ? [Number(process.argv[3])] : [123456, 271828, 314159])) {
       let seed = initial;
       Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);

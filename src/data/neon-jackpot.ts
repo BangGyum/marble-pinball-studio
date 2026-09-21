@@ -9,8 +9,9 @@ const leftRim = rim(-135, -240), rightRim = rim(-45, 60), bottom = rim(80, 100);
 const leftExit = leftRim.at(-1)!, rightExit = rightRim.at(-1)!;
 const leftLip = bottom.at(-1)!, rightLip = bottom[0];
 const leftTop: Point[] = [[20, -30], [20, 6],
-  ...curve([20, 6], [20, 9], [13, 8], [13, 12]).slice(1), [13, 17],
-  ...curve([13, 17], [13, 20], [15, 21], leftRim[0]).slice(1), ...leftRim.slice(1)];
+  ...curve([20, 6], [20, 9], [16, 8], [16, 12]).slice(1), [16, 15],
+  ...curve([16, 15], [16, 18], [22, 18], [22, 21]).slice(1),
+  ...curve([22, 21], [19, 22], [15, 22], leftRim[0]).slice(1), ...leftRim.slice(1)];
 const rightTop: Point[] = leftTop.map(([x, y]) => [48 - x, y]);
 const leftSlide: Point[] = [leftExit,
   ...curve(leftExit, [8, 52], [9, 56], [11, 59]).slice(1),
@@ -40,7 +41,7 @@ for (let blade = 0; blade < 5; blade++) {
       polar(b[0], b[2] + offset), polar(a[0], a[2] + offset)];
     blades.push({ position: { x: center[0], y: center[1] }, type: 'kinematic',
       shape: { type: 'polyline', solid: true, rotation: 0, color: '#f24bcf', points: [...points, points[0]] },
-      props: { density: 1, restitution: 0.12, angularVelocity: 1.35,
+      props: { density: 1, restitution: 0.12, angularVelocity: 2.1,
         spinCycle: { period: 10, runFor: 5.5, phase: 0, idleSpeed: 0.3 } } });
   }
 }
@@ -64,12 +65,13 @@ export const neonJackpot: StageDef = {
   art: { style: 'jackpot', contours: [[...leftTop, ...leftSlide.slice(1),
     ...rightSlide.slice().reverse(), ...rightTop.slice(0, -1).reverse()], divider] },
   windZones: [
-    { type: 'directional', x: 19, y: 17, width: 6, height: 8, velocityX: -7, velocityY: -28,
-      strength: 7, pulse: 1, period: 5.5, dutyCycle: 0.45, phase: 0,
-      fan: { x: 19, y: 20.5, radius: 1.35, front: true } },
-    { type: 'directional', x: 29, y: 17, width: 6, height: 8, velocityX: 7, velocityY: -28,
-      strength: 7, pulse: 1, period: 5.5, dutyCycle: 0.45, phase: 1.8,
-      fan: { x: 29, y: 20.5, radius: 1.35, front: true } },
+    // Every starting column shares the same lift; alternating crosswinds break up the rows.
+    { type: 'directional', x: 24, y: 14, width: 16, height: 10, velocityX: 0, velocityY: -6,
+      strength: 2, pulse: 1, period: 4, dutyCycle: 0.55, phase: 0, turbulence: 2,
+      fan: { x: 24, y: 18, radius: 1.35, front: true } },
+    ...[0, 1].map((i) => ({ type: 'directional' as const, x: 24, y: 14, width: 16, height: 10,
+      velocityX: i ? -16 : 16, velocityY: -2, strength: 2, pulse: 1,
+      period: 2.4, dutyCycle: 0.5, phase: i * Math.PI, turbulence: 1.5 })),
     { type: 'directional', x: 24, y: 37, width: 31, height: 31, velocityX: 2, velocityY: 18,
       strength: 3, pulse: 1, period: 10, dutyCycle: 0.45, phase: Math.PI },
     // Alternate the release direction so the rim cannot shelter the final few marbles.
@@ -84,12 +86,15 @@ export const neonJackpot: StageDef = {
   entities: [
     wall(leftTop, -0.8), wall(rightTop, 0.8),
     wall(leftSlide, -0.8), wall(rightSlide, 0.8), wall(divider, 0.8),
-    wall(rim(-110, -70), 0.6),
     ...blades,
     { position: { x: 24, y: 37 }, type: 'static', shape: { type: 'circle', radius: 1.5, color: '#ad277f' },
       props: { density: 1, restitution: 0.1, angularVelocity: 0 } },
     // Hinges sit on the divider: open leaves fold into the island, never across a route.
     gate(leftLip, leftExit, -1.45, 5), gate(rightLip, rightExit, 1.45, 4.5),
     boost(37, 57, 1.8), boost(31.5, 64, 2.1), boost(26.7, 70, 1.9),
+    // Random initial angles and opposing sweeps mix the pack before the common central neck.
+    ...[0, 1].map((i): MapEntity => ({ position: { x: i ? 27 : 21, y: 12 }, type: 'kinematic',
+      shape: { type: 'box', width: 2.4, height: 0.2, rotation: 0, color: '#79edde' },
+      props: { density: 1, restitution: 0.15, angularVelocity: i ? -3.2 : 3.2 } })),
   ],
 };
