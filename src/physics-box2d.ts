@@ -2,6 +2,8 @@
 import Box2DFactory from 'box2d-wasm';
 import type { StageDef, WindZone } from './data/maps';
 import { windPower } from './wind-power';
+import { timedGateAngle } from './timed-gate';
+import { rotorPower } from './rotor-cycle';
 import type { IPhysics } from './IPhysics';
 import type { MapEntity, MapEntityState } from './types/MapEntity.type';
 
@@ -10,7 +12,7 @@ export class Box2dPhysics implements IPhysics {
   private world!: Box2D.b2World;
   private vector!: Box2D.b2Vec2;
   private marbleMap: Record<number, Box2D.b2Body> = {};
-  private entities: ({ body: Box2D.b2Body; oscillation?: MapEntity['props']['oscillation'] } & MapEntityState)[] = [];
+  private entities: ({ body: Box2D.b2Body; oscillation?: MapEntity['props']['oscillation']; timedGate?: MapEntity['props']['timedGate']; spinCycle?: MapEntity['props']['spinCycle']; spin: number } & MapEntityState)[] = [];
   private motionTime = 0;
   private randomizeStart = false;
   private vortex: StageDef['vortex'];
@@ -45,7 +47,7 @@ export class Box2dPhysics implements IPhysics {
     this.collisionSubsteps = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.backing) ? 16 : 4;
     this.createEntities(
       (stage.entities ?? []).map((entity) =>
-        this.randomizeStart && !entity.props.oscillation && entity.position.y < 28 && entity.type === 'kinematic' && entity.shape.type === 'box'
+        this.randomizeStart && !entity.props.oscillation && !entity.props.timedGate && entity.position.y < 28 && entity.type === 'kinematic' && entity.shape.type === 'box'
           ? { ...entity, shape: { ...entity.shape, rotation: entity.shape.rotation + Math.random() * Math.PI * 2 } }
           : entity
       )
@@ -128,10 +130,17 @@ export class Box2dPhysics implements IPhysics {
         B.destroy(endpoint);
       }
       B.destroy(fixture);
+      if (entity.props.timedGate) {
+        this.vector.Set(entity.position.x, entity.position.y);
+        body.SetTransform(this.vector, timedGateAngle(entity.props.timedGate, 0));
+      }
       body.SetAngularVelocity(entity.props.angularVelocity);
       this.entities.push({
         body,
         oscillation: entity.props.oscillation,
+        timedGate: entity.props.timedGate,
+        spinCycle: entity.props.spinCycle,
+        spin: entity.props.angularVelocity,
         x: entity.position.x,
         y: entity.position.y,
         angle: 0,
@@ -241,10 +250,13 @@ export class Box2dPhysics implements IPhysics {
     for (let i = 0; i < this.collisionSubsteps; i++) {
       const dt = seconds / this.collisionSubsteps;
       this.motionTime += dt;
-      for (const e of this.entities) if (e.oscillation) {
-        const target = e.oscillation.amplitude * Math.sin(this.motionTime * Math.PI * 2 / e.oscillation.period);
+      for (const e of this.entities) if (e.oscillation || e.timedGate) {
+        const target = e.timedGate ? timedGateAngle(e.timedGate, this.motionTime)
+          : e.oscillation!.amplitude * Math.sin(this.motionTime * Math.PI * 2 / e.oscillation!.period);
         // Move through the solver, rather than teleporting a paddle across marbles.
         e.body.SetAngularVelocity((target - e.body.GetAngle()) / dt);
+      } else if (e.spinCycle) {
+        e.body.SetAngularVelocity(e.spinCycle.idleSpeed + (e.spin - e.spinCycle.idleSpeed) * rotorPower(e.spinCycle, this.motionTime));
       }
       this.world.Step(dt, 8, this.collisionSubsteps === 4 ? 4 : 8);
       for (const e of this.entities) if (e.shape.type === 'box' && e.shape.boostSpeed !== undefined) {

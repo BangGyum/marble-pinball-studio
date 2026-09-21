@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>네온 잭팟 · 실제 맵 미리보기</title>
+<style>
+  * { box-sizing: border-box; } body { margin: 0; background: #070a0e; color: #e4f9f6; font: 14px system-ui; }
+  main { display: flex; align-items: center; justify-content: center; gap: 32px; min-height: 100vh; padding: 20px; }
+  canvas { width: min(55vw, 560px); height: min(91vh, 940px); }
+  aside { width: 260px; } h1 { font-size: 36px; color: #f793e7; margin-bottom: 8px; }
+  p { line-height: 1.8; color: #a1b5c2; } label { display: block; margin-top: 24px; }
+  button, select { padding: 10px 14px; border: 1px solid #396575; border-radius: 8px; background: #13222e; color: #e4f9f6; margin: 8px 6px 12px 0; }
+  output { display: block; line-height: 1.8; color: #79edde; white-space: pre-line; }
+  @media (max-width: 600px) { main { flex-direction: column-reverse; gap: 0; } aside { width: 100%; } h1 { font-size: 24px; } canvas { width: 100%; height: 760px; } }
+</style></head>
+<body><main><canvas aria-label="네온 잭팟 전체 맵"></canvas><aside>
+<h1>네온 잭팟</h1><p>돌풍 발사 → 5날 믹서 → 막판 역전<br />실제 게임과 같은 물리·렌더링으로 실행합니다.</p>
+<label for="count">테스트 구슬</label><select id="count"><option>9</option><option selected>28</option><option>200</option><option>300</option></select>
+<div><button id="start">1배속 주행</button><button id="reset">다시 준비</button></div><output aria-live="polite">준비 중</output>
+</aside></main><script type="module" src="./neon-jackpot.ts"></script></body></html>

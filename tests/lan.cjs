@@ -158,6 +158,21 @@ async function connect(port, cookie, options = {}) {
     assert.equal((await host.command({type:'configure',settings:{...settings,stage:boostStage}})).ok,true);
     await guest2.until(() => guest2.scene.stage.entities[0]?.shape.boostSpeed === 35);
     assert.deepEqual(guest2.scene.stage.entities, boostStage.entities, 'LAN guests retain booster direction and speed');
+    const jackpot = stages.find(s => s.title === '네온 잭팟');
+    assert.equal((await host.command({ type: 'configure', settings: { ...settings, stage: jackpot } })).ok, true);
+    await guest2.until(() => guest2.scene.stage.title === jackpot.title);
+    assert.deepEqual(guest2.scene.stage.entities, jackpot.entities, 'LAN retains timed gates and five-blade spin cycles');
+    assert.deepEqual(guest2.scene.stage.art, jackpot.art, 'LAN retains jackpot scenery');
+    const moving = jackpot.entities.map((e, i) => e.props.timedGate || e.props.spinCycle ? i : -1).filter(i => i >= 0);
+    assert.ok(moving.every(i => !guest2.scene.fixed[i]), 'gates and rotor blades must never enter the static cache');
+    await host.command({ type: 'start' });
+    for (let i = 0; i < 390; i++) app.race.advance();
+    await host.command({ type: 'pause' });
+    await guest2.until(() => guest2.frame.state === 'paused');
+    const states = app.race.physics.getEntities();
+    for (const i of moving)
+      assert.ok(Math.abs(guest2.frame.angles[i] - states[i].angle) <= 0.001, 'viewer angles match authoritative gate and blade angles');
+    await host.command({ type: 'reset' });
     assert.equal((await host.command({ type: 'configure', settings: { ...settings,
       stage: { ...rapids, art: { style: 'unknown', contours: [] } } } })).ok, false);
     assert.equal((await host.command({ type: 'configure', settings: { ...settings, names: '', picks: 0 } })).ok, true);

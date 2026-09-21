@@ -7,6 +7,36 @@ export function drawMapArt(
   if (!stage.art) return;
   ctx.save();
   const height = stage.goalY, width = stage.width ?? 48;
+  if (stage.art.style === 'jackpot') {
+    ctx.beginPath();
+    for (const points of stage.art.contours) {
+      ctx.moveTo(...points[0]);
+      for (const point of points.slice(1)) ctx.lineTo(...point);
+      ctx.closePath();
+    }
+    const glow = ctx.createRadialGradient(24, 37, 2, 24, 37, 25);
+    glow.addColorStop(0, '#28102a'); glow.addColorStop(0.65, '#111425'); glow.addColorStop(1, '#0a2026');
+    ctx.fillStyle = glow; ctx.fill('evenodd');
+    ctx.strokeStyle = '#ef64d82b'; ctx.lineWidth = 0.08;
+    for (const r of [2, 12.8, 14.9]) {
+      ctx.beginPath(); ctx.arc(24, 37, r, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.font = '600 0.85px system-ui'; ctx.textAlign = 'center';
+    for (const [label, x, y, color] of [
+      ['돌풍 발사', 24, 12, '#72eadf'], ['초고속 믹서', 24, 29, '#f5a0e5'],
+      ['역풍', 14, 57, '#72eadf'], ['BOOST', 36, 58, '#ffcf67'],
+      ['막판 역전', 24, 72, '#ffcf67'],
+    ] as const) {
+      ctx.fillStyle = color; ctx.fillText(label, x, y);
+    }
+    ctx.fillStyle = '#c2fff1'; ctx.font = '700 1px system-ui'; ctx.fillText('FINISH', 24, 82);
+    for (let row = 0; row < 2; row++) for (let col = 0; col < 10; col++) {
+      ctx.fillStyle = (row + col) % 2 ? '#101820' : '#dbfff6';
+      ctx.fillRect(21.5 + col * 0.5, 79 + row * 0.5, 0.5, 0.5);
+    }
+    ctx.restore();
+    return;
+  }
   for (const x of [6, width - 6]) {
     const metal = ctx.createLinearGradient(x - 0.5, 0, x + 0.5, 0);
     metal.addColorStop(0, '#0a101a'); metal.addColorStop(0.5, '#253747'); metal.addColorStop(1, '#080c13');

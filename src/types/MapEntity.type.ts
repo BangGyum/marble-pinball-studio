@@ -37,6 +37,8 @@ export type EntityPhysicalProps = {
   restitution: number;
   angularVelocity: number;
   oscillation?: { amplitude: number; period: number };
+  timedGate?: { period: number; openFor: number; phase: number; angle: number };
+  spinCycle?: { period: number; runFor: number; phase: number; idleSpeed: number };
   life?: number;
 };
 

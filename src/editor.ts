@@ -469,7 +469,7 @@ export class Editor {
     else if (id === 'prop-bounce') e.props.restitution = v;
     else if (id === 'prop-spin') {
       e.props.angularVelocity = (v * Math.PI) / 180;
-      e.type = v ? 'kinematic' : 'static';
+      e.type = v || e.props.oscillation || e.props.timedGate || e.props.spinCycle ? 'kinematic' : 'static';
     } else if (e.shape.type === 'box') {
       if (id === 'prop-width') e.shape.width = v / 2;
       if (id === 'prop-height') e.shape.height = v / 2;
@@ -498,7 +498,7 @@ export class Editor {
     el('circle-properties').hidden = e?.shape.type !== 'circle';
     const boost = e?.shape.type === 'box' && e.shape.boostSpeed !== undefined;
     el('boost-properties').hidden = !boost;
-    el<HTMLInputElement>('prop-spin').disabled = boost;
+    el<HTMLInputElement>('prop-spin').disabled = boost || !!e?.props.timedGate;
     el<HTMLInputElement>('prop-bounce').disabled = boost;
     el<HTMLButtonElement>('undo').disabled = !this.history.length;
     el<HTMLButtonElement>('redo').disabled = !this.future.length;
