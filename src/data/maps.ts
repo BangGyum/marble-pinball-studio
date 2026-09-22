@@ -1,4 +1,3 @@
-import { cascade } from './cascade';
 import { neonJunction } from './neon-junction';
 import { pipelineRun } from './pipeline-run';
 import { neonMixer } from './neon-mixer';
@@ -8,6 +7,8 @@ import { twinVortex } from './twin-vortex';
 import { gustFork } from './gust-fork';
 import { zigzagRapids } from './zigzag-rapids';
 import { neonJackpot } from './neon-jackpot';
+import { pinballCascade } from './pinball-cascade';
+import { chaosClocktower } from './chaos-clocktower';
 import type { MapEntity } from '../types/MapEntity.type';
 
 export type WindZone = {
@@ -47,7 +48,7 @@ export type AdBoard = {
 
 export type StageDef = {
   title: string;
-  art?: { style: 'rapids' | 'jackpot'; contours: [number, number][][]; arrows?: [number, number, number][] };
+  art?: { style: 'rapids' | 'jackpot' | 'pinball-cascade' | 'clocktower'; contours: [number, number][][]; arrows?: [number, number, number][] };
   spawnX?: number;
   entities?: MapEntity[];
   width?: number;
@@ -945,7 +946,7 @@ const builtInStages: StageDef[] = [
     ],
   },
   {
-    title: 'Pot of greed',
+    title: '욕망의 항아리',
     goalY: 91,
     zoomY: 92.5,
     adBoards: [{ x: 13.0, y: 75.5, w: 9.5, h: 2.375 }],
@@ -3044,17 +3045,18 @@ const builtInStages: StageDef[] = [
 ];
 
 export const stages: StageDef[] = [
+  neonJackpot,
   neonMixer,
   builtInStages[2],
   neonJunction,
-  cascade,
   pipelineRun,
   neonOrbit,
   headwindElevator,
   twinVortex,
   gustFork,
   zigzagRapids,
-  neonJackpot,
+  pinballCascade,
+  chaosClocktower,
 ];
 
 export const DEFAULT_MAP_INDEX = stages.indexOf(neonJunction);

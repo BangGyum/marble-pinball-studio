@@ -139,6 +139,24 @@ const camera60 = cameraAt(60);
 for (const hz of [30, 120, 144]) assert.ok(Math.abs(cameraAt(hz) - camera60) < 1e-8, 'camera follow speed does not depend on refresh rate');
 console.log('PASS actual LAN renderer interpolation, selected marble and refresh-independent camera');
 
+// Translations use the same buffered samples as marbles, including returning to the scene origin.
+ctx.rotate = noop;
+const slideShape = { type: 'box', width: 3, height: .3, rotation: 0, color: '#b579ff' };
+const slideView = new LanView(canvas);
+slideView.setScene({ ...scene, entities: [{ x: 10, y: 30, angle: 0, shape: slideShape, life: -1 }], fixed: [false] });
+let drawnEntities;
+slideView.renderMinimap = entities => { drawnEntities = entities; };
+slideView.playback.push({ ...frame(0, 1), positions: [[0, 12, 30]] }, 0);
+slideView.playback.push({ ...frame(.2, 2), positions: [[0, 16, 30]] }, 200);
+slideView.draw(200);
+assert.ok(Math.abs(drawnEntities[0].x - 13.6) < 1e-9, 'platforms interpolate on the same time as the marbles');
+slideView.playback.push(frame(.4, 3, 'paused'), 400);
+slideView.draw(600);
+assert.equal(drawnEntities[0].x, 10, 'omitted translation returns to scene position instead of leaving a stale offset');
+slideView.draw(900);
+assert.equal(drawnEntities[0].x, 10, 'paused platforms stay still');
+console.log('PASS actual renderer sliding platform interpolation and pause');
+
 const pointerHandlers = {}, windowHandlers = {}, boosts = [], captures = [];
 global.window = { addEventListener: (name, callback) => { windowHandlers[name] = callback; } };
 const interactiveCanvas = { ...canvas,

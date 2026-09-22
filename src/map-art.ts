@@ -1,10 +1,15 @@
 import type { StageDef } from './data/maps';
+import { drawArcadeArt } from './arcade-art';
 
 // Pure scenery: these surfaces, beams and lamps never enter the physics world.
 export function drawMapArt(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number
 ) {
   if (!stage.art) return;
+  if (stage.art.style === 'pinball-cascade' || stage.art.style === 'clocktower') {
+    drawArcadeArt(ctx, stage);
+    return;
+  }
   ctx.save();
   const height = stage.goalY, width = stage.width ?? 48;
   if (stage.art.style === 'jackpot') {

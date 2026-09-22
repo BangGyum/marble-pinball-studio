@@ -46,6 +46,7 @@ async function connect(port, cookie, options = {}) {
   const clients = [];
   try {
     const port = app.port;
+    assert.equal(app.info().maps[0].title, '네온 잭팟', 'map order must never overwrite a different map title');
     const guestSession = await request(port, '/api/session', { method: 'POST' });
     const guest2Session = await request(port, '/api/session', { method: 'POST' });
     const hostSession = await request(port, '/api/host-session', { method: 'POST' });
@@ -175,6 +176,29 @@ async function connect(port, cookie, options = {}) {
     await host.command({ type: 'reset' });
     assert.equal((await host.command({ type: 'configure', settings: { ...settings,
       stage: { ...rapids, art: { style: 'unknown', contours: [] } } } })).ok, false);
+    for (const title of ['네온 핀볼 폭포', '카오스 시계탑']) {
+      const stage = stages.find(s => s.title === title), mapId = stages.indexOf(stage);
+      assert.equal((await host.command({ type: 'configure', settings: { ...settings, mapId } })).ok, true);
+      await guest2.until(() => guest2.scene.stage.title === title);
+      assert.deepEqual(guest2.scene.stage.entities, stage.entities, 'builtin arcade devices reach spectators intact');
+      assert.deepEqual(guest2.scene.stage.art, stage.art);
+      const slides = stage.entities.flatMap((e, i) => e.props.sliding ? [i] : []);
+      assert.ok(slides.every(i => !guest2.scene.fixed[i]), 'moving platforms cannot be statically cached');
+      await host.command({ type: 'start' });
+      for (let i = 0; i < 90; i++) app.race.advance();
+      await host.command({ type: 'pause' });
+      await guest2.until(() => guest2.frame.state === 'paused');
+      const positions = new Map((guest2.frame.positions ?? []).map(([i, x, y]) => [i, { x, y }]));
+      const entities = app.race.physics.getEntities();
+      if (slides.length) assert.ok(positions.size > 0, 'server sends physical platform translations');
+      for (const i of slides) {
+        const received = positions.get(i) ?? guest2.scene.entities[i];
+        assert.ok(Math.abs(received.x - entities[i].x) < 0.001 && Math.abs(received.y - entities[i].y) < 0.001,
+          'spectator translations match authoritative physics');
+      }
+      await host.command({ type: 'reset' });
+    }
+    console.log('PASS arcade builtins, scenery, moving platforms, authoritative translations, pause and reset');
     assert.equal((await host.command({ type: 'configure', settings: { ...settings, names: '', picks: 0 } })).ok, true);
     assert.equal(host.scene.balls.length, 0);
     assert.equal((await host.command({ type: 'start' })).ok, false);

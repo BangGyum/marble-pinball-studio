@@ -82,7 +82,7 @@ export function validateStage(value: unknown): StageDef {
     s.entities.length > 2000
   )
     throw new Error('올바른 맵 파일이 아니에요. 맵 이름, 결승선, 장애물을 확인해 주세요.');
-  if (s.art !== undefined && (!s.art || !['rapids', 'jackpot'].includes(s.art.style) || !Array.isArray(s.art.contours) ||
+  if (s.art !== undefined && (!s.art || !['rapids', 'jackpot', 'pinball-cascade', 'clocktower'].includes(s.art.style) || !Array.isArray(s.art.contours) ||
     s.art.contours.length > 20 || s.art.contours.some((points) => !Array.isArray(points) ||
       points.length < 3 || points.length > 1000 || points.some((p) => !Array.isArray(p) || p.length !== 2 ||
         !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))))
@@ -136,13 +136,18 @@ export function validateStage(value: unknown): StageDef {
       throw new Error('장애물 위치 또는 물리 설정이 올바르지 않아요.');
     const sh = e.shape;
     if (sh && 'boostSpeed' in sh && (sh.type !== 'box' || !finite(sh.boostSpeed, 5, 60) ||
-      e.type !== 'static' || e.props.angularVelocity !== 0 || e.props.oscillation || e.props.timedGate || e.props.spinCycle ||
+      e.type !== 'static' || e.props.angularVelocity !== 0 || e.props.oscillation || e.props.timedGate || e.props.spinCycle || e.props.sliding ||
       (e.props.life !== undefined && e.props.life !== -1)))
       throw new Error('부스터는 고정된 네모 발판이며 속도는 5~60 사이여야 해요.');
     if (e.props.oscillation !== undefined && (!e.props.oscillation || e.type !== 'kinematic' ||
       !finite(e.props.oscillation.amplitude, 0.01, 1.5) || !finite(e.props.oscillation.period, 1, 30)))
       throw new Error('왕복 장치의 각도 또는 주기가 올바르지 않아요.');
     const gate = e.props.timedGate;
+    const slide = e.props.sliding;
+    if (slide !== undefined && (!slide || e.type !== 'kinematic' || e.props.angularVelocity !== 0 ||
+      e.props.oscillation || gate || e.props.spinCycle || (e.props.life !== undefined && e.props.life !== -1) ||
+      !finite(slide.amplitude, 0.1, 20) || !finite(slide.period, 1, 30) || !finite(slide.phase, -60, 60)))
+      throw new Error('이동 발판의 거리와 주기를 확인해 주세요.');
     if (gate !== undefined && (!gate || e.type !== 'kinematic' || e.props.oscillation ||
       e.props.angularVelocity !== 0 || (e.props.life !== undefined && e.props.life !== -1) ||
       !finite(gate.period, 2, 30) || !finite(gate.openFor, 0.5, gate.period - 0.5) ||

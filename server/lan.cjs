@@ -10,7 +10,6 @@ const { Race } = require('../.lan-build/race.js');
 const { stages, DEFAULT_MAP_INDEX } = require('../.lan-build/data/maps.js');
 const { parseNames, winningRange, validateStage } = require('../.lan-build/model.js');
 const { LAN_PORT } = require('../.lan-build/lan/protocol.js');
-const titles = ['네온 믹서', '욕망의 항아리', '네온 분기점', '캐스케이드', '네온 파이프라인', '네온 오비트'];
 const loopback = (ip) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip);
 const round = (n) => Math.round(n * 1000) / 1000;
 const allowedKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
@@ -35,7 +34,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
     .map((address) => `${address}:${actualPort}`));
   const validOrigin = (req) => allowedHosts().has(req.headers.host) && req.headers.origin === `http://${req.headers.host}`;
   const info = () => ({
-    maps: stages.map((s, id) => ({ id, title: titles[id] ?? s.title })),
+    maps: stages.map((s, id) => ({ id, title: s.title })),
     addresses: (interfaces.length ? interfaces : [{ name: '이 PC에서만 접속 가능', address: '127.0.0.1' }])
       .map((i) => ({ name: `${i.name} · ${i.address}`, url: `http://${i.address}:${actualPort}/` })),
   });
@@ -73,7 +72,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
   function prepare() {
     raceId = randomUUID();
     accumulator = 0; boostOwner = null;
-    race.prepare(settings.stage ?? { ...stages[settings.mapId], title: titles[settings.mapId] ?? stages[settings.mapId].title },
+    race.prepare(settings.stage ?? stages[settings.mapId],
       parseNames(settings.names));
     makeScene();
   }
@@ -86,10 +85,13 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
   function frame() {
     const entities = race.physics.getEntities();
     if (entities.length !== scene.entities.length) makeScene(entities);
+    const positions = entities.flatMap((e, i) => e.x !== scene.entities[i].x || e.y !== scene.entities[i].y
+      ? [[i, round(e.x), round(e.y)]] : []);
     return { type: 'frame', raceId, revision, seq: ++seq, time: performance.now(), elapsed: race.elapsed,
       state: race.state, connected: clients.size, speed, playbackRate: playbackRate(),
       balls: race.balls.map((b) => [b.id, round(b.x), round(b.y), round(b.angle), b.rank ?? 0]),
-      angles: entities.map((e) => round(e.angle)), winners: race.winners.map((b) => b.id) };
+      angles: entities.map((e) => round(e.angle)), ...(positions.length ? { positions } : {}),
+      winners: race.winners.map((b) => b.id) };
   }
   function broadcast() {
     const data = JSON.stringify(frame());

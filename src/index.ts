@@ -6,8 +6,6 @@ import { el, toast, message } from './ui';
 import { Editor } from './editor';
 import { Rankings } from './rankings';
 
-const titles = ['네온 믹서', '욕망의 항아리', '네온 분기점', '캐스케이드', '네온 파이프라인', '네온 오비트'];
-stages.forEach((s, i) => (s.title = titles[i] ?? s.title));
 let saved: SavedMap[] = [];
 try {
   saved = readSavedMaps(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));

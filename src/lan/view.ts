@@ -132,7 +132,12 @@ export class LanView {
     const scale = this.viewScale(), cam = this.manual ?? this.camera;
     const view = { left: cam.x - w * .56 / scale, right: cam.x + w * .44 / scale,
       top: cam.y - h * .43 / scale, bottom: cam.y + h * .57 / scale };
-    const entities = scene.entities.map((entity, i) => ({ ...entity, angle: mix(before.angles[i], after.angles[i]) }));
+    const beforePositions = new Map(before.positions?.map(([i, x, y]) => [i, { x, y }]));
+    const afterPositions = new Map(after.positions?.map(([i, x, y]) => [i, { x, y }]));
+    const entities = scene.entities.map((entity, i) => {
+      const a = beforePositions.get(i) ?? entity, b = afterPositions.get(i) ?? entity;
+      return { ...entity, x: mix(a.x, b.x), y: mix(a.y, b.y), angle: mix(before.angles[i], after.angles[i]) };
+    });
     ctx.save(); ctx.translate(w * .56 - cam.x * scale, h * .43 - cam.y * scale); ctx.scale(scale, scale);
     drawMapArt(ctx, scene.stage, scale);
     drawEntities(ctx, entities, scale, -1, true, view, !!scene.stage.art);
