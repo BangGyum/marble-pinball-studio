@@ -93,3 +93,7 @@ for (const file of ['src/index.ts', 'src/lan/client.ts']) {
 }
 assert.equal(stages[DEFAULT_MAP_INDEX].title, '네온 분기점');
 console.log('PASS shared initial map is neon junction');
+assert.equal(stages.length, 12, 'the supported built-in maps include the new neon hourglass');
+assert.ok(!stages.some(stage => ['네온 오비트', '네온 믹서'].includes(stage.title)),
+  'retired orbit and mixer maps are absent from every built-in picker');
+console.log('PASS retired neon orbit and mixer maps are removed');

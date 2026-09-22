@@ -11,6 +11,7 @@ export type Ball = {
   angle: number;
   stuck: number;
   rank?: number;
+  onBridge?: boolean;
 };
 
 // One simulation, shared by the standalone browser and the authoritative LAN server.
@@ -78,6 +79,7 @@ export class Race {
       ball.x = p.x;
       ball.y = p.y;
       ball.angle = p.angle;
+      if (this.stage.exitBridge) ball.onBridge = this.physics.isMarbleOnBridge(ball.id);
       if (p.y >= this.stage.goalY)
         crossing.push({ ball, fraction: (this.stage.goalY - oldY) / Math.max(0.000001, p.y - oldY) });
     }

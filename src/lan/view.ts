@@ -1,5 +1,5 @@
 import { drawEntities } from '../draw';
-import { drawMapArt } from '../map-art';
+import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from '../map-art';
 import { drawWind } from '../wind-render';
 import { drawCelebration } from '../celebration';
 import { RenderCache } from '../render-cache';
@@ -116,9 +116,11 @@ export class LanView {
     if (!scene || !sample) return;
     const { before, after, t, elapsed } = sample, shown = t >= 1 ? after : before;
     const mix = (a: number, b: number) => a + (b - a) * t;
+    const bridgeIds = new Set(shown.bridgeIds ?? []);
     after.balls.forEach((_, i) => {
       const a = before.balls[i], b = after.balls[i];
       Object.assign(this.balls[i], { x: mix(a[1], b[1]), y: mix(a[2], b[2]), angle: mix(a[3], b[3]), rank: (t >= 1 ? b[4] : a[4]) || undefined });
+      this.balls[i].onBridge = bridgeIds.has(a[0]);
     });
     const { balls } = this;
     const selected = balls.find((b) => b.id === this.focusedBallId);
@@ -140,7 +142,7 @@ export class LanView {
     });
     ctx.save(); ctx.translate(w * .56 - cam.x * scale, h * .43 - cam.y * scale); ctx.scale(scale, scale);
     drawMapArt(ctx, scene.stage, scale);
-    drawEntities(ctx, entities, scale, -1, true, view, !!scene.stage.art);
+    drawEntities(ctx, scene.stage.exitBridge ? entities.filter(e => e.shape.collisionLayer !== 2) : entities, scale, -1, true, view, !!scene.stage.art);
     if (scene.stage.vortex) {
       const wind = scene.stage.vortex;
       ctx.shadowBlur = 0; ctx.strokeStyle = '#64f4e050'; ctx.lineWidth = 1.5 / scale;
@@ -151,6 +153,7 @@ export class LanView {
       }
     }
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
+    drawMapOverlay(ctx, scene.stage, entities, scale);
     ctx.shadowBlur = 0; ctx.strokeStyle = '#65efda'; ctx.lineWidth = 2 / scale; ctx.setLineDash([.35, .3]);
     ctx.beginPath(); ctx.moveTo(0, scene.stage.goalY); ctx.lineTo(scene.stage.width ?? 26, scene.stage.goalY); ctx.stroke(); ctx.setLineDash([]);
     ctx.font = 12 / scale + 'px sans-serif'; ctx.fillStyle = '#65efda'; ctx.fillText('FINISH', 1, scene.stage.goalY - .4);
@@ -161,10 +164,12 @@ export class LanView {
       if (ball === selected) {
         ctx.strokeStyle = '#fff3a8'; ctx.lineWidth = 2 / scale; ctx.beginPath(); ctx.arc(ball.x, ball.y, .52, 0, Math.PI * 2); ctx.stroke();
       }
+      ctx.globalAlpha = bridgeBallOpacity(scene.stage, ball);
       if (!this.cache.drawBall(ctx, ball, scale, dpr)) {
         ctx.fillStyle = ball.color; ctx.beginPath(); ctx.arc(ball.x, ball.y, .25, 0, Math.PI * 2); ctx.fill();
         ctx.font = 12 / scale + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(ball.name, ball.x, ball.y + .55);
       }
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
     this.renderMinimap(entities, elapsed, cam);
@@ -193,10 +198,13 @@ export class LanView {
     ctx.fillStyle = '#142027'; ctx.fillRect(0, 0, mapWidth, scene.stage.goalY);
     this.cache.drawMinimap(ctx, this.minimapStage!, entities, scale, Math.min(devicePixelRatio, 2));
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
+    drawMapOverlay(ctx, scene.stage, entities, scale);
     for (const ball of this.balls) if (!ball.rank) {
+      ctx.globalAlpha = bridgeBallOpacity(scene.stage, ball);
       ctx.fillStyle = ball.id === this.focusedBallId ? '#fff3a8' : ball.color; ctx.beginPath();
       ctx.arc(ball.x, ball.y, Math.max(.23, (ball.id === this.focusedBallId ? 2.5 : 1.4) / scale), 0, Math.PI * 2); ctx.fill();
     }
+    ctx.globalAlpha = 1;
     ctx.strokeStyle = '#65efda70'; ctx.lineWidth = 1 / scale;
     const viewScale = this.viewScale();
     ctx.strokeRect(cam.x - this.width * .56 / viewScale, cam.y - this.height * .43 / viewScale, this.width / viewScale, this.height / viewScale);

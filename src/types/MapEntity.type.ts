@@ -6,6 +6,12 @@ export interface EntityShapeBase {
   type: EntityShapeTypes;
   color?: string;
   bloomColor?: string;
+  // Decorative collision-free geometry (for example a hinge cap).
+  sensor?: boolean;
+  // Physics-only back faces can be represented by scenery instead of a visible wall.
+  hidden?: boolean;
+  // Layer 2 is the elevated outlet; ordinary tracks remain on layer 1.
+  collisionLayer?: 1 | 2;
 }
 
 export interface EntityBoxShape extends EntityShapeBase {
@@ -38,7 +44,7 @@ export type EntityPhysicalProps = {
   angularVelocity: number;
   oscillation?: { amplitude: number; period: number };
   sliding?: { amplitude: number; period: number; phase: number };
-  timedGate?: { period: number; openFor: number; phase: number; angle: number };
+  timedGate?: { period: number; openFor: number; phase: number; angle: number; releaseAfter?: number };
   spinCycle?: { period: number; runFor: number; phase: number; idleSpeed: number };
   life?: number;
 };

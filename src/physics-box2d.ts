@@ -17,6 +17,8 @@ export class Box2dPhysics implements IPhysics {
   private randomizeStart = false;
   private vortex: StageDef['vortex'];
   private windZones: WindZone[] = [];
+  private exitBridge: StageDef['exitBridge'];
+  private bridgeBodies = new Set<Box2D.b2Body>();
   private windTime = 0;
   private collisionSubsteps = 4;
   private deleteCandidates: Box2D.b2Body[] = [];
@@ -29,6 +31,8 @@ export class Box2dPhysics implements IPhysics {
   clear() {
     this.vortex = undefined;
     this.windZones = [];
+    this.exitBridge = undefined;
+    this.bridgeBodies.clear();
     for (const entity of this.entities) this.world.DestroyBody(entity.body);
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
     this.entities = [];
@@ -37,11 +41,13 @@ export class Box2dPhysics implements IPhysics {
   clearMarbles() {
     for (const body of Object.values(this.marbleMap)) this.world.DestroyBody(body);
     this.marbleMap = {};
+    this.bridgeBodies.clear();
   }
   createStage(stage: StageDef) {
     this.motionTime = 0;
     this.vortex = stage.vortex;
     this.windZones = stage.windZones ?? [];
+    this.exitBridge = stage.exitBridge;
     this.windTime = 0;
     this.randomizeStart = stage.randomizeStart === true;
     this.collisionSubsteps = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.backing) ? 16 : 4;
@@ -66,7 +72,11 @@ export class Box2dPhysics implements IPhysics {
       fixture.set_density(entity.props.density);
       fixture.set_restitution(entity.props.restitution);
       const s = entity.shape;
-      fixture.set_isSensor(s.type === 'box' && s.boostSpeed !== undefined);
+      const filter = fixture.get_filter();
+      filter.set_categoryBits(s.collisionLayer ?? 1);
+      filter.set_maskBits(s.collisionLayer ?? 1);
+      fixture.set_filter(filter);
+      fixture.set_isSensor(s.sensor === true || (s.type === 'box' && s.boostSpeed !== undefined));
       if (s.type === 'box') {
         const shape = new B.b2PolygonShape();
         this.vector.Set(0, 0);
@@ -163,7 +173,10 @@ export class Box2dPhysics implements IPhysics {
     this.vector.Set(x, y);
     def.set_position(this.vector);
     const body = this.world.CreateBody(def);
-    body.CreateFixture(shape, 1);
+    const fixture = body.CreateFixture(shape, 1);
+    const filter = fixture.GetFilterData();
+    filter.set_maskBits(1);
+    fixture.SetFilterData(filter);
     body.SetBullet(true);
     body.SetAwake(false);
     body.SetEnabled(false);
@@ -182,6 +195,7 @@ export class Box2dPhysics implements IPhysics {
     const body = this.marbleMap[id];
     if (body) {
       this.world.DestroyBody(body);
+      this.bridgeBodies.delete(body);
       delete this.marbleMap[id];
     }
   }
@@ -191,6 +205,7 @@ export class Box2dPhysics implements IPhysics {
     const p = body.GetPosition();
     return { x: p.x, y: p.y, angle: body.GetAngle() };
   }
+  isMarbleOnBridge(id: number) { return this.bridgeBodies.has(this.marbleMap[id]); }
   getEntities(): MapEntityState[] {
     return this.entities.map((e) => ({ x: e.sliding ? e.body.GetPosition().x : e.x, y: e.y,
       angle: e.body.GetAngle(), shape: e.shape, life: e.life }));
@@ -210,9 +225,11 @@ export class Box2dPhysics implements IPhysics {
       ...(this.vortex ? [{ type: 'vortex' as const, ...this.vortex }] : []),
       ...this.windZones,
     ];
+    const bodies = winds.length || this.exitBridge ? Object.values(this.marbleMap) : [];
     if (winds.length) {
       this.windTime += seconds;
-      for (const body of Object.values(this.marbleMap)) {
+      for (const body of bodies) {
+        if (this.bridgeBodies.has(body)) continue;
         const p = body.GetPosition();
         let vx = 0, vy = 0, totalBlend = 0, gravityCompensation = 0;
         for (const wind of winds) {
@@ -229,7 +246,7 @@ export class Box2dPhysics implements IPhysics {
             gravityCompensation += zoneBlend * pulse;
           } else {
             const dx = p.x - wind.x, dy = p.y - wind.y, distance = Math.hypot(dx, dy);
-            if (distance < 0.1 || distance >= wind.radius) continue;
+            if (distance < Math.max(0.1, wind.innerRadius ?? 0) || distance >= wind.radius) continue;
             const gust = wind.gust ?? 0;
             const speed = wind.speed * (1 + gust * Math.sin(phase)) * pulse;
             const radial = ((wind.radial ?? 2) - gust * (12 + 12 * Math.sin(this.windTime * 1.1 + (wind.phase ?? 0)))) * pulse;
@@ -270,6 +287,18 @@ export class Box2dPhysics implements IPhysics {
         e.body.SetAngularVelocity(e.spinCycle.idleSpeed + (e.spin - e.spinCycle.idleSpeed) * rotorPower(e.spinCycle, this.motionTime));
       }
       this.world.Step(dt, 8, this.collisionSubsteps === 4 ? 4 : 8);
+      if (this.exitBridge) {
+        const entry = this.exitBridge.entry;
+        for (const body of bodies) {
+          if (this.bridgeBodies.has(body)) continue;
+          const p = body.GetPosition();
+          if (Math.abs(p.x - entry.x) > entry.width / 2 || Math.abs(p.y - entry.y) > entry.height / 2) continue;
+          const fixture = body.GetFixtureList(), filter = fixture.GetFilterData();
+          filter.set_categoryBits(2); filter.set_maskBits(2);
+          fixture.SetFilterData(filter);
+          this.bridgeBodies.add(body);
+        }
+      }
       for (const e of this.entities) if (e.shape.type === 'box' && e.shape.boostSpeed !== undefined) {
         const dx = Math.cos(e.shape.rotation), dy = Math.sin(e.shape.rotation);
         let edge = e.body.GetContactList();

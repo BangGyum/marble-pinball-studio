@@ -1,7 +1,5 @@
 import { neonJunction } from './neon-junction';
 import { pipelineRun } from './pipeline-run';
-import { neonMixer } from './neon-mixer';
-import { neonOrbit } from './neon-orbit';
 import { headwindElevator } from './headwind-elevator';
 import { twinVortex } from './twin-vortex';
 import { gustFork } from './gust-fork';
@@ -9,6 +7,8 @@ import { zigzagRapids } from './zigzag-rapids';
 import { neonJackpot } from './neon-jackpot';
 import { pinballCascade } from './pinball-cascade';
 import { chaosClocktower } from './chaos-clocktower';
+import { orbitalLock } from './orbital-lock';
+import { neonHourglass } from './neon-hourglass';
 import type { MapEntity } from '../types/MapEntity.type';
 
 export type WindZone = {
@@ -34,6 +34,7 @@ export type WindZone = {
       x: number;
       y: number;
       radius: number;
+      innerRadius?: number;
       speed: number;
       radial?: number;
       gust?: number;
@@ -48,7 +49,8 @@ export type AdBoard = {
 
 export type StageDef = {
   title: string;
-  art?: { style: 'rapids' | 'jackpot' | 'pinball-cascade' | 'clocktower'; contours: [number, number][][]; arrows?: [number, number, number][] };
+  art?: { style: 'rapids' | 'jackpot' | 'pinball-cascade' | 'clocktower' | 'orbital-lock' | 'hourglass'; contours: [number, number][][]; arrows?: [number, number, number][] };
+  exitBridge?: { entry: { x: number; y: number; width: number; height: number }; deck: [number, number][] };
   spawnX?: number;
   entities?: MapEntity[];
   width?: number;
@@ -3046,17 +3048,17 @@ const builtInStages: StageDef[] = [
 
 export const stages: StageDef[] = [
   neonJackpot,
-  neonMixer,
   builtInStages[2],
   neonJunction,
   pipelineRun,
-  neonOrbit,
   headwindElevator,
   twinVortex,
   gustFork,
   zigzagRapids,
   pinballCascade,
   chaosClocktower,
+  orbitalLock,
+  neonHourglass,
 ];
 
 export const DEFAULT_MAP_INDEX = stages.indexOf(neonJunction);

@@ -90,6 +90,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
     return { type: 'frame', raceId, revision, seq: ++seq, time: performance.now(), elapsed: race.elapsed,
       state: race.state, connected: clients.size, speed, playbackRate: playbackRate(),
       balls: race.balls.map((b) => [b.id, round(b.x), round(b.y), round(b.angle), b.rank ?? 0]),
+      ...(race.stage.exitBridge ? { bridgeIds: race.balls.filter((b) => b.onBridge).map((b) => b.id) } : {}),
       angles: entities.map((e) => round(e.angle)), ...(positions.length ? { positions } : {}),
       winners: race.winners.map((b) => b.id) };
   }

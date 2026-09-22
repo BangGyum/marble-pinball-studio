@@ -14,6 +14,7 @@ export type Frame = {
   balls: [id: number, x: number, y: number, angle: number, rank: number][];
   angles: number[]; winners: number[]; connected: number; speed: number; playbackRate: number;
   positions?: [entityIndex: number, x: number, y: number][];
+  bridgeIds?: number[];
 };
 export type Identity = { type: 'identity'; role: 'host' | 'viewer' };
 export type Info = { maps: { id: number; title: string }[]; addresses: { name: string; url: string }[] };

@@ -12,7 +12,7 @@ export function drawWind(ctx: CanvasRenderingContext2D, winds: WindZone[], time:
     ctx.globalAlpha = 0.15 + 0.4 * power;
     ctx.shadowBlur = 0;
     if (wind.type === 'vortex') {
-      const sign = Math.sign(wind.speed), radius = wind.radius * 0.73;
+      const sign = Math.sign(wind.speed), radius = wind.innerRadius === undefined ? wind.radius * 0.73 : (wind.radius + wind.innerRadius) / 2;
       for (let i = 0; i < 3; i++) {
         const a = travelTime * wind.speed / wind.radius + i * Math.PI * 2 / 3;
         const end = a + sign * 0.65;

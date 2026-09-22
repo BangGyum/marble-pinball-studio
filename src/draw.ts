@@ -11,6 +11,7 @@ export function drawEntities(
 ) {
   entities.forEach((e, i) => {
     const shape = e.shape;
+    if (shape.hidden && i !== selected) return;
     let bounds: ViewBounds | undefined;
     if (view) {
       // Conservative viewport in the entity's local coordinates, including the glow.

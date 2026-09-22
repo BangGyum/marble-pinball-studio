@@ -176,18 +176,33 @@ async function connect(port, cookie, options = {}) {
     await host.command({ type: 'reset' });
     assert.equal((await host.command({ type: 'configure', settings: { ...settings,
       stage: { ...rapids, art: { style: 'unknown', contours: [] } } } })).ok, false);
-    for (const title of ['네온 핀볼 폭포', '카오스 시계탑']) {
+    for (const title of ['네온 핀볼 폭포', '카오스 시계탑', '오비탈 락', '네온 모래시계']) {
+      // Keep independent map scenarios below the real server's 30 commands/second limit.
+      await delay(1050);
       const stage = stages.find(s => s.title === title), mapId = stages.indexOf(stage);
       assert.equal((await host.command({ type: 'configure', settings: { ...settings, mapId } })).ok, true);
       await guest2.until(() => guest2.scene.stage.title === title);
       assert.deepEqual(guest2.scene.stage.entities, stage.entities, 'builtin arcade devices reach spectators intact');
       assert.deepEqual(guest2.scene.stage.art, stage.art);
+      assert.deepEqual(guest2.scene.stage.exitBridge, stage.exitBridge, 'spectators receive the same elevated outlet geometry');
+      assert.deepEqual(guest2.scene.stage.windZones, stage.windZones, 'annular wind boundaries survive scene serialization');
       const slides = stage.entities.flatMap((e, i) => e.props.sliding ? [i] : []);
       assert.ok(slides.every(i => !guest2.scene.fixed[i]), 'moving platforms cannot be statically cached');
       await host.command({ type: 'start' });
       for (let i = 0; i < 90; i++) app.race.advance();
+      if (stage.exitBridge) {
+        while (!app.race.balls.some(b => b.onBridge) && app.race.elapsed < 60) app.race.advance();
+        assert.ok(app.race.balls.some(b => b.onBridge), 'orbital race reaches its open bridge entrance');
+      }
       await host.command({ type: 'pause' });
       await guest2.until(() => guest2.frame.state === 'paused');
+      if (stage.exitBridge) {
+        const bridgeIds = app.race.balls.filter(b => b.onBridge).map(b => b.id);
+        assert.deepEqual(guest2.frame.bridgeIds, bridgeIds, 'spectators render the authoritative floor at crossings');
+        const lateSession = await request(port, '/api/session', { method: 'POST' });
+        const late = await connect(port, lateSession.cookie); clients.push(late);
+        assert.deepEqual(late.frame.bridgeIds, bridgeIds, 'mid-race join restores the upper-floor marbles');
+      }
       const positions = new Map((guest2.frame.positions ?? []).map(([i, x, y]) => [i, { x, y }]));
       const entities = app.race.physics.getEntities();
       if (slides.length) assert.ok(positions.size > 0, 'server sends physical platform translations');
@@ -197,6 +212,10 @@ async function connect(port, cookie, options = {}) {
           'spectator translations match authoritative physics');
       }
       await host.command({ type: 'reset' });
+      if (stage.exitBridge) {
+        await guest2.until(() => guest2.frame.state === 'ready');
+        assert.deepEqual(guest2.frame.bridgeIds, [], 'reset clears bridge membership on spectators');
+      }
     }
     console.log('PASS arcade builtins, scenery, moving platforms, authoritative translations, pause and reset');
     assert.equal((await host.command({ type: 'configure', settings: { ...settings, names: '', picks: 0 } })).ok, true);

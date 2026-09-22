@@ -117,13 +117,17 @@ const scene = { type: 'scene', raceId: 'race', revision: 1, stage: { title: 'Tes
 const movingView = new LanView(canvas);
 movingView.setScene(scene);
 movingView.playback.push(frame(0, 1), 0);
-movingView.playback.push({ ...frame(.2, 2), balls: [[0, 2, 5, .4, 1]] }, 200);
+movingView.playback.push({ ...frame(.2, 2), balls: [[0, 2, 5, .4, 1]], bridgeIds: [0] }, 200);
 movingView.draw(200);
 assert.ok(Math.abs(movingView.balls[0].x - .8) < 1e-10, 'renderer interpolates positions on simulation time');
 assert.ok(Math.abs(movingView.balls[0].angle - .16) < 1e-10, 'rotation uses the same interpolation time');
 assert.equal(movingView.balls[0].rank, undefined, 'arrival is not rendered ahead of the interpolated position');
+assert.equal(movingView.balls[0].onBridge, false, 'bridge membership is not shown ahead of the interpolated entry');
 movingView.draw(350);
 assert.equal(movingView.balls[0].rank, 1);
+assert.equal(movingView.balls[0].onBridge, true, 'authoritative bridge membership reaches the renderer');
+movingView.playback.reset(); movingView.playback.push(frame(.4, 3, 'paused'), 400); movingView.draw(400);
+assert.equal(movingView.balls[0].onBridge, false, 'omitted bridge state clears stale upper-floor membership');
 function cameraAt(hz) {
   const view = new LanView(canvas);
   view.setScene(scene); view.focusedBallId = 0;

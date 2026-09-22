@@ -82,7 +82,7 @@ export function validateStage(value: unknown): StageDef {
     s.entities.length > 2000
   )
     throw new Error('올바른 맵 파일이 아니에요. 맵 이름, 결승선, 장애물을 확인해 주세요.');
-  if (s.art !== undefined && (!s.art || !['rapids', 'jackpot', 'pinball-cascade', 'clocktower'].includes(s.art.style) || !Array.isArray(s.art.contours) ||
+  if (s.art !== undefined && (!s.art || !['rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass'].includes(s.art.style) || !Array.isArray(s.art.contours) ||
     s.art.contours.length > 20 || s.art.contours.some((points) => !Array.isArray(points) ||
       points.length < 3 || points.length > 1000 || points.some((p) => !Array.isArray(p) || p.length !== 2 ||
         !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))))
@@ -91,6 +91,14 @@ export function validateStage(value: unknown): StageDef {
     s.art.arrows.some((a) => !Array.isArray(a) || a.length !== 3 ||
       !finite(a[0], -1000, 1000) || !finite(a[1], -1000, 1000) || !finite(a[2], -100, 100))))
     throw new Error('맵 방향 표시가 올바르지 않아요.');
+  if (s.exitBridge !== undefined) {
+    const bridge = s.exitBridge, entry = bridge?.entry;
+    if (!entry || !finite(entry.x, -1000, 1000) || !finite(entry.y, -1000, 1000) ||
+      !finite(entry.width, 0.5, 200) || !finite(entry.height, 0.5, 300) ||
+      !Array.isArray(bridge.deck) || bridge.deck.length < 3 || bridge.deck.length > 1000 ||
+      bridge.deck.some(p => !Array.isArray(p) || p.length !== 2 || !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))
+      throw new Error('입체 출구의 진입 영역과 바닥 좌표를 확인해 주세요.');
+  }
   if (s.vortex && (!finite(s.vortex.x, -1000, 1000) || !finite(s.vortex.y, -1000, 1000) ||
     !finite(s.vortex.radius, 1, 100) || !finite(s.vortex.speed, -30, 30) ||
     (s.vortex.gust !== undefined && !finite(s.vortex.gust, 0, 1))))
@@ -115,6 +123,7 @@ export function validateStage(value: unknown): StageDef {
         throw new Error('직선 바람 설정이 올바르지 않아요.');
     } else if (wind.type === 'vortex') {
       if (!finite(wind.radius, 1, 100) || !finite(wind.speed, -30, 30) ||
+        (wind.innerRadius !== undefined && (!finite(wind.innerRadius, 0, wind.radius) || wind.innerRadius >= wind.radius)) ||
         (wind.radial !== undefined && !finite(wind.radial, -30, 30)) ||
         (wind.gust !== undefined && !finite(wind.gust, 0, 1)))
         throw new Error('회전 바람 설정이 올바르지 않아요.');
@@ -135,6 +144,9 @@ export function validateStage(value: unknown): StageDef {
     )
       throw new Error('장애물 위치 또는 물리 설정이 올바르지 않아요.');
     const sh = e.shape;
+    if (sh?.collisionLayer !== undefined && (sh.collisionLayer !== 1 && sh.collisionLayer !== 2 ||
+      sh.collisionLayer === 2 && !s.exitBridge))
+      throw new Error('입체 출구가 있는 맵에서만 두 번째 충돌 층을 사용할 수 있어요.');
     if (sh && 'boostSpeed' in sh && (sh.type !== 'box' || !finite(sh.boostSpeed, 5, 60) ||
       e.type !== 'static' || e.props.angularVelocity !== 0 || e.props.oscillation || e.props.timedGate || e.props.spinCycle || e.props.sliding ||
       (e.props.life !== undefined && e.props.life !== -1)))
@@ -151,6 +163,7 @@ export function validateStage(value: unknown): StageDef {
     if (gate !== undefined && (!gate || e.type !== 'kinematic' || e.props.oscillation ||
       e.props.angularVelocity !== 0 || (e.props.life !== undefined && e.props.life !== -1) ||
       !finite(gate.period, 2, 30) || !finite(gate.openFor, 0.5, gate.period - 0.5) ||
+      (gate.releaseAfter !== undefined && !finite(gate.releaseAfter, 5, 180)) ||
       !finite(gate.phase, -60, 60) || !finite(gate.angle, -1.5, 1.5) || Math.abs(gate.angle) < 0.1))
       throw new Error('타이밍 게이트의 열림 각도와 주기를 확인해 주세요.');
     const spin = e.props.spinCycle;
@@ -158,7 +171,9 @@ export function validateStage(value: unknown): StageDef {
       !finite(spin.period, 2, 30) || !finite(spin.runFor, 0.5, spin.period - 0.5) ||
       !finite(spin.phase, -60, 60) || !finite(spin.idleSpeed, -5, 5)))
       throw new Error('주기형 회전판의 회전 시간과 주기를 확인해 주세요.');
-    if (!sh || (sh.color !== undefined && !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(sh.color)))
+    if (!sh || (sh.sensor !== undefined && typeof sh.sensor !== 'boolean') ||
+      (sh.hidden !== undefined && typeof sh.hidden !== 'boolean') ||
+      (sh.color !== undefined && !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(sh.color)))
       throw new Error('장애물 색상이 올바르지 않아요.');
     if (sh.type === 'circle') {
       if (!finite(sh.radius, 0.05, 30)) throw new Error('핀 크기가 올바르지 않아요.');

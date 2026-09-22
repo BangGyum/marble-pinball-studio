@@ -1,7 +1,7 @@
 import { Race } from './race';
 import type { StageDef } from './data/maps';
 import { drawEntities } from './draw';
-import { drawMapArt } from './map-art';
+import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from './map-art';
 import { drawWind } from './wind-render';
 import type { WinnerOrder } from './model';
 import { drawCelebration } from './celebration';
@@ -207,7 +207,7 @@ export class Game extends Race {
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
     drawMapArt(ctx, this.stage, scale);
-    drawEntities(ctx, entities, scale, -1, true, view, !!this.stage.art);
+    drawEntities(ctx, this.stage.exitBridge ? entities.filter(e => e.shape.collisionLayer !== 2) : entities, scale, -1, true, view, !!this.stage.art);
     if (this.stage.vortex) {
       const wind = this.stage.vortex;
       ctx.shadowBlur = 0;
@@ -223,6 +223,7 @@ export class Game extends Race {
       }
     }
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
+    drawMapOverlay(ctx, this.stage, entities, scale);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = '#65efda';
     ctx.lineWidth = 2 / scale;
@@ -241,7 +242,8 @@ export class Game extends Race {
         b.y < view.top - 1 || b.y > view.bottom + 1 ||
         b.x < view.left - labelMargin || b.x > view.right + labelMargin
       ) continue;
-      if (this.renderCache.drawBall(ctx, b, scale, d)) continue;
+      ctx.globalAlpha = bridgeBallOpacity(this.stage, b);
+      if (this.renderCache.drawBall(ctx, b, scale, d)) { ctx.globalAlpha = 1; continue; }
       ctx.beginPath();
       ctx.fillStyle = b.color;
       ctx.shadowColor = b.color;
@@ -258,6 +260,7 @@ export class Game extends Race {
       ctx.lineWidth = 3 / scale;
       ctx.strokeText(b.name, b.x, b.y + 0.55);
       ctx.fillText(b.name, b.x, b.y + 0.55);
+      ctx.globalAlpha = 1;
     }
     ctx.restore();
     this.renderMinimap(entities);
@@ -307,13 +310,16 @@ export class Game extends Race {
     ctx.fillRect(0, 0, mapWidth, this.stage.goalY);
     this.renderCache.drawMinimap(ctx, this.stage, entities, scale, Math.min(devicePixelRatio, 2));
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
+    drawMapOverlay(ctx, this.stage, entities, scale);
     for (const b of this.balls) {
       if (b.rank) continue;
+      ctx.globalAlpha = bridgeBallOpacity(this.stage, b);
       ctx.fillStyle = b.color;
       ctx.beginPath();
       ctx.arc(b.x, b.y, Math.max(0.23, 1.4 / scale), 0, Math.PI * 2);
       ctx.fill();
     }
+    ctx.globalAlpha = 1;
     const cam = this.manual ?? this.camera;
     ctx.strokeStyle = '#65efda70';
     ctx.lineWidth = 1 / scale;

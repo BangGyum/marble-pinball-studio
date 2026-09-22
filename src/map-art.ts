@@ -1,11 +1,53 @@
 import type { StageDef } from './data/maps';
 import { drawArcadeArt } from './arcade-art';
+import { drawOrbitalArt } from './orbital-art';
+import { drawHourglassArt } from './hourglass-art';
+import { drawEntities } from './draw';
+import type { MapEntityState } from './types/MapEntity.type';
+
+// Draw the elevated exit after the ground-level rings, including on both minimaps.
+export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number) {
+  if (!stage.exitBridge) return;
+  ctx.save();
+  if (stage.art?.style === 'orbital-lock') {
+    drawOrbitalArt(ctx, stage, 2);
+  } else {
+    const points = stage.exitBridge.deck;
+    ctx.beginPath(); ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
+    ctx.fillStyle = '#10232f'; ctx.fill();
+  }
+  drawEntities(ctx, entities.filter(e => e.shape.collisionLayer === 2), scale, -1, scale > 3, undefined, !!stage.art);
+  ctx.restore();
+}
+
+// Keep a faint silhouette for tracking a marble while it passes beneath the deck.
+export function bridgeBallOpacity(stage: StageDef, ball: { x: number; y: number; onBridge?: boolean }) {
+  const bridge = stage.exitBridge;
+  if (!bridge || ball.onBridge || ball.y <= bridge.entry.y + bridge.entry.height / 2 + 1) return 1;
+  let inside = false, distance = Infinity;
+  const points = bridge.deck;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    const a = points[j], b = points[i], dx = b[0] - a[0], dy = b[1] - a[1];
+    if ((a[1] > ball.y) !== (b[1] > ball.y) && ball.x < dx * (ball.y - a[1]) / dy + a[0]) inside = !inside;
+    const t = Math.max(0, Math.min(1, ((ball.x - a[0]) * dx + (ball.y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+    distance = Math.min(distance, Math.hypot(ball.x - a[0] - t * dx, ball.y - a[1] - t * dy));
+  }
+  return inside ? 1 - 0.78 * Math.min(1, distance / 0.5) : 1;
+}
 
 // Pure scenery: these surfaces, beams and lamps never enter the physics world.
 export function drawMapArt(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number
 ) {
   if (!stage.art) return;
+  if (stage.art.style === 'hourglass') {
+    drawHourglassArt(ctx, stage);
+    return;
+  }
+  if (stage.art.style === 'orbital-lock') {
+    drawOrbitalArt(ctx, stage);
+    return;
+  }
   if (stage.art.style === 'pinball-cascade' || stage.art.style === 'clocktower') {
     drawArcadeArt(ctx, stage);
     return;
