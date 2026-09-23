@@ -226,6 +226,7 @@ const context = new Proxy(
   {
     get: (_, key) => () => {
       if (key === 'fill' || key === 'stroke') bitmapHasScene = true;
+      if (key === 'createRadialGradient') return { addColorStop() {} };
     },
   }
 );
@@ -394,6 +395,7 @@ global.OffscreenCanvas = class {
       get: (_, key) => (...args) => {
         this.calls.push([key, ...args]);
         if (key === 'measureText') return { width: args[0].length * 17 };
+        if (key === 'createRadialGradient') return { addColorStop() {} };
       },
     });
     bitmaps.push(this);

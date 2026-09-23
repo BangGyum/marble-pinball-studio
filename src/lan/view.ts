@@ -3,6 +3,7 @@ import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from '../map-art';
 import { drawWind } from '../wind-render';
 import { drawCelebration } from '../celebration';
 import { RenderCache } from '../render-cache';
+import { drawMarble } from '../marble-art';
 import { Recorder } from '../recorder';
 import { SnapshotPlayback } from './playback';
 import type { Scene, Frame } from './protocol';
@@ -166,7 +167,7 @@ export class LanView {
       }
       ctx.globalAlpha = bridgeBallOpacity(scene.stage, ball);
       if (!this.cache.drawBall(ctx, ball, scale, dpr)) {
-        ctx.fillStyle = ball.color; ctx.beginPath(); ctx.arc(ball.x, ball.y, .25, 0, Math.PI * 2); ctx.fill();
+        drawMarble(ctx, ball.x, ball.y, .25, ball.color); ctx.fillStyle = ball.color;
         ctx.font = 12 / scale + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(ball.name, ball.x, ball.y + .55);
       }
       ctx.globalAlpha = 1;

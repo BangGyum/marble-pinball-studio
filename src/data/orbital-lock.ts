@@ -56,7 +56,7 @@ export const orbitalLock: StageDef = {
     ...gate(outerIn[0], outerIn[1], 9.2, 6.2, 1.4, 6, 24),
     ...gate(middleIn[0], middleIn[1], 6.4, 5.1, 1.4, 4.9, 30),
     ...gate(coreOut[0], coreOut[1], 5.8, 4.9, 1.3, 4.8, 34),
-    ...paddle(7, 39, 1.8, -2.4), ...paddle(55, 51, 1.8, 2.8),
+    ...paddle(7, 39, 1.8, -2.4), ...paddle(40.2, 26.8, 1.2, 2),
     ...paddle(32, 40, 2.9, -3.4),
     ...[wall(left, -0.8), wall(right, 0.8), entryBackstop,
       ...gate([34, 54], [30, 54], 5.7, 2, -1.4, 3.2, 38),

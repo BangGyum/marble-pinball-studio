@@ -1,12 +1,16 @@
 import type { StageDef } from './data/maps';
+import { drawCrosswayArt, drawCrosswayDevices } from './crossway-art';
 import { drawArcadeArt } from './arcade-art';
 import { drawOrbitalArt } from './orbital-art';
 import { drawHourglassArt } from './hourglass-art';
+import { drawCanyonArt, drawCanyonDevices } from './canyon-art';
 import { drawEntities } from './draw';
 import type { MapEntityState } from './types/MapEntity.type';
 
 // Draw the elevated exit after the ground-level rings, including on both minimaps.
 export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number) {
+  if (stage.art?.style === 'crossway') drawCrosswayDevices(ctx, entities);
+  if (stage.art?.style === 'fracture-canyon') drawCanyonDevices(ctx, entities, scale);
   if (!stage.exitBridge) return;
   ctx.save();
   if (stage.art?.style === 'orbital-lock') {
@@ -40,6 +44,8 @@ export function drawMapArt(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number
 ) {
   if (!stage.art) return;
+  if (stage.art.style === 'crossway') { drawCrosswayArt(ctx, stage); return; }
+  if (stage.art.style === 'fracture-canyon') { drawCanyonArt(ctx, stage); return; }
   if (stage.art.style === 'hourglass') {
     drawHourglassArt(ctx, stage);
     return;

@@ -2,6 +2,9 @@ import { pinballCascade } from '../src/data/pinball-cascade';
 import { chaosClocktower } from '../src/data/chaos-clocktower';
 import { orbitalLock } from '../src/data/orbital-lock';
 import { neonHourglass } from '../src/data/neon-hourglass';
+import { neonCrossway } from '../src/data/neon-crossway';
+import { fractureCanyon } from '../src/data/fracture-canyon';
+import { drawMarble } from '../src/marble-art';
 import { Race } from '../src/race';
 import { drawEntities } from '../src/draw';
 import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from '../src/map-art';
@@ -12,9 +15,11 @@ async function init() {
   const canvas = document.querySelector('canvas')!, ctx = canvas.getContext('2d')!;
   const map = document.querySelector<HTMLSelectElement>('#map')!, count = document.querySelector<HTMLSelectElement>('#count')!;
   const output = document.querySelector('output')!, trails = new Map<number, [number, number][]>();
+  if (new URLSearchParams(location.search).get('map') === 'canyon') { map.value = '4'; count.value = '20'; }
+  if (new URLSearchParams(location.search).get('map') === 'crossway') { map.value = '5'; count.value = '20'; }
   let last = 0, accumulator = 0, first = 0, frames = 0, fps = 0, sampledAt = 0;
   const prepare = () => {
-    race.prepare([pinballCascade, chaosClocktower, orbitalLock, neonHourglass][Number(map.value)], Array.from({ length: Number(count.value) }, (_, i) => String(i + 1)));
+    race.prepare([pinballCascade, chaosClocktower, orbitalLock, neonHourglass, fractureCanyon, neonCrossway][Number(map.value)], Array.from({ length: Number(count.value) }, (_, i) => String(i + 1)));
     first = 0; accumulator = 0; trails.clear();
     document.querySelector('h1')!.textContent = race.stage.title;
     document.querySelector('#description')!.textContent = [
@@ -22,6 +27,8 @@ async function init() {
       '6날·4날·3날 회전판이 서로 다른 주기로 섞고, 마지막 게이트에서 한 번 더 순위를 뒤집습니다.',
       '동심원 궤도 3개와 엇박자 잠금장치를 통과하고, 중앙 입체 출구에서 S자 부스터로 빠져나옵니다.',
       '두 모래시계에 쌓인 구슬을 양문 게이트가 방출합니다. 오른쪽 우회로와 마지막 두 곡선 출구에서 순위가 뒤집힙니다.',
+      '검은 암벽 사이의 급강하 통로와 굽은 길. 세 경사 다리, 열리는 발판, 스프링 부스터에서 순위가 바뀝니다.',
+      '청록·금색 곡선 레일, 중앙 낙하로, 삼각 회전판과 점프 부스터를 지나 결승선으로 합류합니다.',
     ][Number(map.value)];
   };
   prepare(); count.onchange = prepare; map.onchange = prepare;
@@ -47,7 +54,7 @@ async function init() {
       const opacity = bridgeBallOpacity(stage, ball);
       ctx.strokeStyle = ball.color; ctx.lineWidth = 0.1; ctx.globalAlpha = 0.4 * opacity; ctx.beginPath();
       trail.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.stroke(); ctx.globalAlpha = opacity;
-      ctx.fillStyle = ball.color; ctx.beginPath(); ctx.arc(ball.x, ball.y, 0.25, 0, Math.PI * 2); ctx.fill();
+      drawMarble(ctx, ball.x, ball.y, 0.25, ball.color);
       ctx.globalAlpha = 1;
     }
     output.textContent = `${race.state === 'ready' ? '준비 완료' : race.state === 'finished' ? '전원 도착' : '주행 중'} · ${race.elapsed.toFixed(1)}초\n${race.arrivals.length}/${race.balls.length} 도착${first ? ` · 첫 도착 ${first.toFixed(1)}초` : ''}\n${fps} FPS`;

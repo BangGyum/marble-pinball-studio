@@ -110,7 +110,8 @@ global.requestAnimationFrame = () => 1;
 global.ResizeObserver = class { observe() {} };
 const noop = () => {};
 const ctx = Object.fromEntries(['setTransform', 'fillRect', 'save', 'restore', 'translate', 'scale', 'beginPath',
-  'moveTo', 'lineTo', 'stroke', 'setLineDash', 'arc', 'fill', 'fillText', 'rect', 'clip', 'strokeRect'].map((key) => [key, noop]));
+  'moveTo', 'lineTo', 'stroke', 'setLineDash', 'arc', 'ellipse', 'fill', 'fillText', 'rect', 'clip', 'strokeRect'].map((key) => [key, noop]));
+ctx.createRadialGradient = () => ({ addColorStop: noop });
 const canvas = { getContext: () => ctx, addEventListener: noop };
 const scene = { type: 'scene', raceId: 'race', revision: 1, stage: { title: 'Test', goalY: 100, entities: [] },
   settings: { names: 'A', mapId: 0, order: 'desc', picks: 1 }, entities: [], fixed: [], balls: [{ id: 0, name: 'A', color: '#fff' }] };

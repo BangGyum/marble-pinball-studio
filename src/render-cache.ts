@@ -2,6 +2,7 @@ import type { Ball } from './game';
 import type { StageDef } from './data/maps';
 import type { MapEntityState } from './types/MapEntity.type';
 import { drawEntities } from './draw';
+import { drawMarble } from './marble-art';
 
 type Sprite = { canvas: OffscreenCanvas; width: number; height: number; left: number; top: number };
 
@@ -28,16 +29,8 @@ export class RenderCache {
       canvas.width = Math.ceil(width * dpr);
       canvas.height = Math.ceil(height * dpr);
       spriteCtx.setTransform(dpr, 0, 0, dpr, left * dpr, top * dpr);
+      drawMarble(spriteCtx, 0, 0, radius, ball.color);
       spriteCtx.fillStyle = ball.color;
-      spriteCtx.shadowColor = ball.color;
-      spriteCtx.shadowBlur = 7;
-      spriteCtx.beginPath();
-      spriteCtx.arc(0, 0, radius, 0, Math.PI * 2);
-      spriteCtx.fill();
-      spriteCtx.shadowBlur = 0;
-      spriteCtx.strokeStyle = '#ffffff60';
-      spriteCtx.lineWidth = 1;
-      spriteCtx.stroke();
       spriteCtx.font = `${font}px sans-serif`;
       spriteCtx.textAlign = 'center';
       spriteCtx.strokeStyle = '#050a10';

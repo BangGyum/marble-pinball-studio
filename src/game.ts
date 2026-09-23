@@ -7,6 +7,7 @@ import type { WinnerOrder } from './model';
 import { drawCelebration } from './celebration';
 import { Recorder } from './recorder';
 import { RenderCache } from './render-cache';
+import { drawMarble } from './marble-art';
 import type { MapEntityState } from './types/MapEntity.type';
 export type { Ball } from './race';
 export class Game extends Race {
@@ -244,16 +245,8 @@ export class Game extends Race {
       ) continue;
       ctx.globalAlpha = bridgeBallOpacity(this.stage, b);
       if (this.renderCache.drawBall(ctx, b, scale, d)) { ctx.globalAlpha = 1; continue; }
-      ctx.beginPath();
+      drawMarble(ctx, b.x, b.y, 0.25, b.color);
       ctx.fillStyle = b.color;
-      ctx.shadowColor = b.color;
-      ctx.shadowBlur = 7;
-      ctx.arc(b.x, b.y, 0.25, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#ffffff60';
-      ctx.lineWidth = 1 / scale;
-      ctx.stroke();
       ctx.font = `${Math.min(17, Math.max(12, scale * 0.24)) / scale}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.strokeStyle = '#050a10';

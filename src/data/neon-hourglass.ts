@@ -60,8 +60,8 @@ export const neonHourglass: StageDef = {
     ...leaf([24.5, 39.2], [33.5, 41.5], { oscillation: { amplitude: 0.65, period: 3.4 } }),
     // The left hinge is embedded in the rim, so an open leaf cannot form a marble-sized pocket behind it.
     ...gates(51.2, 26.8, 35, 8.3, 0.8, 35),
-    boost(50.3, 36, 1.7), boost(49, 44, 1.9), boost(43, 51, 2.6),
-    boost(21, 61.5, 2.65), boost(16, 71, 0.8), boost(26, 79, 0.9),
-    boost(43, 61.5, 0.5), boost(48, 71, 2.34), boost(38, 79, 2.24),
+    boost(50.3, 36, 1.7), boost(47.3, 47.8, 2.3), boost(43, 51, 2.6),
+    boost(21, 61.5, 2.65), boost(16, 71, 0.8), boost(23.6, 78.9, 0.9),
+    boost(45, 68, 0.5), boost(48, 71, 2.34), boost(43.6, 76.4, 2.24),
   ],
 };

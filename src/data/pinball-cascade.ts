@@ -35,21 +35,21 @@ export const pinballCascade: StageDef = {
   entities: [wall(left, -1), wall(right, 1), ...shelves,
     // Split the initial pack onto both terraces instead of dropping down the empty centre.
     wall([[19, 16], [24, 12], [29, 16]], 0.6),
-    ...[[14, 78], [27, 81], [34, 84], [24, 87], [16, 89]].map(([x, y], i): MapEntity => ({
+    ...[[14, 78], [27, 81], [20, 84], [24, 87], [16, 89]].map(([x, y], i): MapEntity => ({
       position: { x, y }, type: 'kinematic',
       shape: { type: 'box', width: 3.3, height: 0.28, rotation: i % 2 ? -0.12 : 0.12, color: '#b579ff' },
       props: { density: 1, restitution: 0.15, angularVelocity: 0,
         sliding: { amplitude: 2.2, period: 3.3 + i * 0.35, phase: i * 1.2 } },
     })),
-    { position: { x: 31, y: 93 }, type: 'kinematic',
+    { position: { x: 28, y: 94 }, type: 'kinematic',
       shape: { type: 'polyline', solid: true, rotation: 0, color: '#ba68ff',
         points: [[0, -0.3], [-8, -1.3], [-8, -0.7], [0, 0.3], [0, -0.3]] },
       props: { density: 1, restitution: 0.3, angularVelocity: 0, oscillation: { amplitude: 0.45, period: 2.5 } } },
-    { position: { x: 31, y: 93 }, type: 'static',
+    { position: { x: 28, y: 94 }, type: 'static',
       shape: { type: 'circle', radius: 0.48, color: '#d29cff' },
       props: { density: 1, restitution: 0.1, angularVelocity: 0 } },
-    { position: { x: 31, y: 94 }, type: 'static',
-      shape: { type: 'box', width: 1.3, height: 0.8, rotation: -2.65, boostSpeed: 17, color: '#ffc653' },
+    { position: { x: 31, y: 93.6 }, type: 'static',
+      shape: { type: 'box', width: 0.9, height: 0.45, rotation: -2.65, boostSpeed: 17, color: '#ffc653' },
       props: { density: 1, restitution: 0, angularVelocity: 0 } },
   ],
 };
