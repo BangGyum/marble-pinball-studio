@@ -4,9 +4,9 @@ import { orbitalRings, orbitalTransfers } from './data/orbital-lock';
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 const backgrounds = new WeakMap<StageDef, Map<number, OffscreenCanvas>>();
 const bridges = new WeakMap<StageDef, Map<number, OffscreenCanvas>>();
-export function drawOrbitalArt(ctx: Context, stage: StageDef, layer: 1 | 2 = 1) {
+export function drawOrbitalArt(ctx: Context, stage: StageDef, layer: 1 | 2 = 1, cacheBackground = true) {
   const paint = layer === 2 ? paintOrbitalBridge : paintOrbitalArt, cache = layer === 2 ? bridges : backgrounds;
-  if (typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
+  if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
   const transform = ctx.getTransform();
   // Bucket zoom levels and cap texture size; camera movement only blits this static scenery.
   const resolution = Math.min(24, Math.max(8, Math.ceil(Math.hypot(transform.a, transform.b) / 8) * 8));

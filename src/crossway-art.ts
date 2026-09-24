@@ -69,8 +69,8 @@ function paint(ctx: Context, stage: StageDef) {
   ctx.restore();
 }
 
-export function drawCrosswayArt(ctx: Context, stage: StageDef) {
-  if (typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
+export function drawCrosswayArt(ctx: Context, stage: StageDef, cacheBackground = true) {
+  if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
   let canvas = cache.get(stage);
   if (!canvas) {
     const density = 18; canvas = new OffscreenCanvas((stage.width ?? 64) * density, (stage.goalY + 35) * density);

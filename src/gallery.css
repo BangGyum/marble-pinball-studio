@@ -1,0 +1,272 @@
+.map-gallery {
+  min-height: 100dvh;
+  background: #090d12;
+}
+.gallery-topbar {
+  background: #0c1117;
+}
+#gallery-create {
+  border-color: #365a52;
+  color: #b7fff1;
+  background: #142421;
+}
+#gallery-resume {
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
+}
+.gallery-content {
+  max-width: 1336px;
+  margin: 0 auto;
+  padding: 0 36px;
+}
+.gallery-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 56px 0 46px;
+}
+.gallery-eyebrow {
+  margin: 0 0 15px;
+  color: var(--accent);
+  letter-spacing: 3px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+.gallery-intro h1 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.65rem);
+  letter-spacing: -1.5px;
+  line-height: 1.25;
+}
+.gallery-intro h1 span {
+  color: var(--accent);
+}
+.gallery-description {
+  margin: 15px 0 0;
+  color: #97a5b4;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  word-break: keep-all;
+}
+.gallery-marble-art {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px 22px 40px;
+  border-bottom: 1px solid #35454a;
+  transform: rotate(-9deg);
+}
+.gallery-marble-art i {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 25%, #ecfff8 0%, #78f5db 18%, #31a793 54%, #112d2a 88%);
+  box-shadow: inset -3px -3px 5px #0008, 4px 11px 12px #0007;
+}
+.gallery-marble-art i:nth-child(2) {
+  background: radial-gradient(circle at 32% 25%, #fff9dd 0%, #fbd782 18%, #b27b2f 54%, #3c2c11 88%);
+}
+.gallery-marble-art i:nth-child(3) {
+  background: radial-gradient(circle at 32% 25%, #fcf0ff 0%, #c4b0ff 18%, #7058b5 54%, #241737 88%);
+}
+.gallery-marble-art span {
+  position: absolute;
+  bottom: 11px;
+  left: 24px;
+  color: #708482;
+  font-size: 0.6rem;
+  letter-spacing: 4px;
+}
+.gallery-list-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 0 0 20px;
+  border-bottom: 1px solid #223039;
+  margin-bottom: 24px;
+}
+.gallery-list-heading h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: -0.2px;
+}
+#gallery-count {
+  font-size: 0.75rem;
+  color: var(--accent);
+  background: #142b27;
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-variant-numeric: tabular-nums;
+}
+.gallery-list-heading p {
+  margin: 0;
+  color: #8293a3;
+  font-size: 0.75rem;
+}
+.map-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+}
+.map-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  white-space: normal;
+  overflow: hidden;
+  border: 1px solid #29333e;
+  border-radius: 14px;
+  background: #10171f;
+  transition: border-color 180ms, transform 180ms, box-shadow 180ms;
+}
+.map-card:hover,
+.map-card:focus-visible {
+  border-color: var(--map-color);
+  background: #131e27;
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px #0005;
+}
+.map-card:focus-visible {
+  outline-color: var(--map-color);
+}
+.map-preview {
+  display: block;
+  position: relative;
+  width: 100%;
+  background: radial-gradient(ellipse at 50% 46%, color-mix(in srgb, var(--map-color) 7%, #080d13), #080d13 75%);
+  border-bottom: 1px solid #23303a;
+  overflow: hidden;
+}
+.map-preview::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 40px #02060a66;
+}
+.map-preview canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 14 / 15;
+}
+.map-card-number,
+.map-card-tag {
+  position: absolute;
+  top: 13px;
+  z-index: 1;
+  font-size: 0.625rem;
+  letter-spacing: 0.8px;
+}
+.map-card-number {
+  left: 15px;
+  color: #748794;
+  font-variant-numeric: tabular-nums;
+}
+.map-card-tag {
+  right: 13px;
+  color: var(--map-color);
+  padding: 4px 7px;
+  border: 1px solid color-mix(in srgb, var(--map-color) 22%, transparent);
+  border-radius: 5px;
+  background: #0c141bea;
+}
+.map-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 19px 20px 17px;
+}
+.map-card-title {
+  color: #edf2f6;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: -0.4px;
+  overflow-wrap: anywhere;
+}
+.map-card-description {
+  flex: 1;
+  color: #91a0ae;
+  font-size: 0.75rem;
+  line-height: 1.8;
+  margin: 9px 0 20px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.map-card-action {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--map-color);
+  font-size: 0.75rem;
+}
+.map-card-action > span {
+  font-size: 1.05rem;
+  transition: transform 180ms;
+}
+.map-card:hover .map-card-action > span {
+  transform: translate(2px, -2px);
+}
+.gallery-storage-note {
+  color: #80919f;
+  font-size: 0.75rem;
+  line-height: 1.8;
+  margin: 30px 0 42px;
+  text-align: center;
+  word-break: keep-all;
+}
+.gallery-footer {
+  border-top: 1px solid #202a33;
+  min-height: 64px;
+  padding: 20px 36px;
+  height: auto;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.gallery-footer > div {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+@media (max-width: 1100px) {
+  .map-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .gallery-content { padding: 0 28px; }
+}
+@media (max-width: 800px) {
+  .map-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .gallery-intro { padding: 40px 0 32px; }
+  .gallery-marble-art { display: none; }
+  .gallery-list-heading p { display: none; }
+  #game-view .top-actions { gap: 8px; }
+  #game-view .top-actions #status { display: none; }
+}
+@media (max-width: 520px) {
+  .gallery-content { padding: 0 18px; }
+  .map-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .map-preview canvas { height: 300px; object-fit: contain; }
+  .gallery-intro { padding: 36px 0 30px; }
+  .gallery-description { font-size: 0.8125rem; }
+  .gallery-topbar .top-actions { gap: 2px; }
+  .gallery-topbar .top-actions button { font-size: 0.75rem; padding: 8px; }
+  #gallery-resume { white-space: nowrap; }
+  #gallery-resume span { display: none; }
+  .gallery-footer { padding: 20px 18px; }
+  #game-view .topbar { padding: 0 12px; gap: 6px; }
+  #game-view .brand { gap: 6px; }
+  #game-view .top-actions button { padding: 8px; font-size: 0.75rem; }
+  #editor-open span { margin-left: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-card, .map-card-action > span { transition: none; }
+  .map-card:hover, .map-card:focus-visible { transform: none; }
+}

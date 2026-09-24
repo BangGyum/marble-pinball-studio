@@ -1,3 +1,5 @@
+import { drawRoundhouseArt, drawRoundhouseTrains } from './roundhouse-art';
+import { drawExpressArt, drawExpressDevices } from './express-art';
 import type { StageDef } from './data/maps';
 import { drawCrosswayArt, drawCrosswayDevices } from './crossway-art';
 import { drawArcadeArt } from './arcade-art';
@@ -8,13 +10,15 @@ import { drawEntities } from './draw';
 import type { MapEntityState } from './types/MapEntity.type';
 
 // Draw the elevated exit after the ground-level rings, including on both minimaps.
-export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number) {
+export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number, cacheBackground = true) {
+  if (stage.art?.style === 'roundhouse') drawRoundhouseTrains(ctx, entities);
+  if (stage.art?.style === 'switchback-express') drawExpressDevices(ctx, entities);
   if (stage.art?.style === 'crossway') drawCrosswayDevices(ctx, entities);
   if (stage.art?.style === 'fracture-canyon') drawCanyonDevices(ctx, entities, scale);
   if (!stage.exitBridge) return;
   ctx.save();
   if (stage.art?.style === 'orbital-lock') {
-    drawOrbitalArt(ctx, stage, 2);
+    drawOrbitalArt(ctx, stage, 2, cacheBackground);
   } else {
     const points = stage.exitBridge.deck;
     ctx.beginPath(); ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
@@ -41,17 +45,19 @@ export function bridgeBallOpacity(stage: StageDef, ball: { x: number; y: number;
 
 // Pure scenery: these surfaces, beams and lamps never enter the physics world.
 export function drawMapArt(
-  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number, cacheBackground = true
 ) {
   if (!stage.art) return;
-  if (stage.art.style === 'crossway') { drawCrosswayArt(ctx, stage); return; }
-  if (stage.art.style === 'fracture-canyon') { drawCanyonArt(ctx, stage); return; }
+  if (stage.art.style === 'roundhouse') { drawRoundhouseArt(ctx, stage); return; }
+  if (stage.art.style === 'switchback-express') { drawExpressArt(ctx, stage, cacheBackground); return; }
+  if (stage.art.style === 'crossway') { drawCrosswayArt(ctx, stage, cacheBackground); return; }
+  if (stage.art.style === 'fracture-canyon') { drawCanyonArt(ctx, stage, cacheBackground); return; }
   if (stage.art.style === 'hourglass') {
-    drawHourglassArt(ctx, stage);
+    drawHourglassArt(ctx, stage, cacheBackground);
     return;
   }
   if (stage.art.style === 'orbital-lock') {
-    drawOrbitalArt(ctx, stage);
+    drawOrbitalArt(ctx, stage, 1, cacheBackground);
     return;
   }
   if (stage.art.style === 'pinball-cascade' || stage.art.style === 'clocktower') {

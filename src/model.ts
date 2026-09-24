@@ -1,4 +1,4 @@
-import type { StageDef } from './data/maps';
+import { ART_STYLES, type StageDef } from './data/maps';
 import type { MapEntity } from './types/MapEntity.type';
 
 export type WinnerOrder = 'asc' | 'desc';
@@ -82,7 +82,7 @@ export function validateStage(value: unknown): StageDef {
     s.entities.length > 2000
   )
     throw new Error('올바른 맵 파일이 아니에요. 맵 이름, 결승선, 장애물을 확인해 주세요.');
-  if (s.art !== undefined && (!s.art || !['rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway'].includes(s.art.style) || !Array.isArray(s.art.contours) ||
+  if (s.art !== undefined && (!s.art || !(ART_STYLES as readonly string[]).includes(s.art.style) || !Array.isArray(s.art.contours) ||
     s.art.contours.length > 20 || s.art.contours.some((points) => !Array.isArray(points) ||
       points.length < 3 || points.length > 1000 || points.some((p) => !Array.isArray(p) || p.length !== 2 ||
         !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))))

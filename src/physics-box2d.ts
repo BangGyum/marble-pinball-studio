@@ -12,7 +12,7 @@ export class Box2dPhysics implements IPhysics {
   private world!: Box2D.b2World;
   private vector!: Box2D.b2Vec2;
   private marbleMap: Record<number, Box2D.b2Body> = {};
-  private entities: ({ body: Box2D.b2Body; sliding?: MapEntity['props']['sliding']; oscillation?: MapEntity['props']['oscillation']; timedGate?: MapEntity['props']['timedGate']; spinCycle?: MapEntity['props']['spinCycle']; spin: number } & MapEntityState)[] = [];
+  private entities: ({ body: Box2D.b2Body; moving: boolean; sliding?: MapEntity['props']['sliding']; oscillation?: MapEntity['props']['oscillation']; timedGate?: MapEntity['props']['timedGate']; spinCycle?: MapEntity['props']['spinCycle']; spin: number } & MapEntityState)[] = [];
   private motionTime = 0;
   private randomizeStart = false;
   private vortex: StageDef['vortex'];
@@ -22,6 +22,9 @@ export class Box2dPhysics implements IPhysics {
   private windTime = 0;
   private collisionSubsteps = 4;
   private deleteCandidates: Box2D.b2Body[] = [];
+  // Moving obstacle poses (x, angle) before the latest step, for drawing between steps.
+  private previousPoses = new Float64Array(0);
+  private previousCount = -1;
 
   async init() {
     this.Box2D = await Box2DFactory();
@@ -37,6 +40,7 @@ export class Box2dPhysics implements IPhysics {
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
     this.entities = [];
     this.deleteCandidates = [];
+    this.previousCount = -1;
   }
   clearMarbles() {
     for (const body of Object.values(this.marbleMap)) this.world.DestroyBody(body);
@@ -151,6 +155,7 @@ export class Box2dPhysics implements IPhysics {
       body.SetAngularVelocity(entity.props.angularVelocity);
       this.entities.push({
         body,
+        moving: entity.type === 'kinematic',
         sliding: entity.props.sliding,
         oscillation: entity.props.oscillation,
         timedGate: entity.props.timedGate,
@@ -205,10 +210,42 @@ export class Box2dPhysics implements IPhysics {
     const p = body.GetPosition();
     return { x: p.x, y: p.y, angle: body.GetAngle() };
   }
+  getMarbleSpeed(id: number) {
+    const body = this.marbleMap[id];
+    if (!body) return 0;
+    const v = body.GetLinearVelocity();
+    return Math.hypot(v.x, v.y);
+  }
+  placeMarble(id: number, x: number, y: number) {
+    const body = this.marbleMap[id];
+    if (!body) return;
+    this.vector.Set(x, y);
+    body.SetTransform(this.vector, body.GetAngle());
+    this.vector.Set(0, 0);
+    body.SetLinearVelocity(this.vector);
+    body.SetAwake(true);
+  }
   isMarbleOnBridge(id: number) { return this.bridgeBodies.has(this.marbleMap[id]); }
-  getEntities(): MapEntityState[] {
-    return this.entities.map((e) => ({ x: e.sliding ? e.body.GetPosition().x : e.x, y: e.y,
-      angle: e.body.GetAngle(), shape: e.shape, life: e.life }));
+  getEntities(blend = 1): MapEntityState[] {
+    // A breakable obstacle removed in the last step shifts indices; draw that frame unblended.
+    const previous = blend < 1 && this.previousCount === this.entities.length ? this.previousPoses : undefined;
+    return this.entities.map((e, i) => {
+      let x = e.sliding ? e.body.GetPosition().x : e.x, angle = e.body.GetAngle();
+      if (previous && e.moving) {
+        x = previous[i * 2] + (x - previous[i * 2]) * blend;
+        angle = previous[i * 2 + 1] + (angle - previous[i * 2 + 1]) * blend;
+      }
+      return { x, y: e.y, angle, shape: e.shape, life: e.life };
+    });
+  }
+  private recordPoses() {
+    if (this.previousPoses.length < this.entities.length * 2) this.previousPoses = new Float64Array(this.entities.length * 2);
+    this.entities.forEach((e, i) => {
+      if (!e.moving) return;
+      this.previousPoses[i * 2] = e.sliding ? e.body.GetPosition().x : e.x;
+      this.previousPoses[i * 2 + 1] = e.body.GetAngle();
+    });
+    this.previousCount = this.entities.length;
   }
   start() {
     for (const body of Object.values(this.marbleMap)) {
@@ -221,6 +258,7 @@ export class Box2dPhysics implements IPhysics {
     }
   }
   step(seconds: number) {
+    this.recordPoses();
     const winds: WindZone[] = [
       ...(this.vortex ? [{ type: 'vortex' as const, ...this.vortex }] : []),
       ...this.windZones,

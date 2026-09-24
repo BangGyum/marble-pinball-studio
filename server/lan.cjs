@@ -77,10 +77,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
     makeScene();
   }
   function playbackRate() {
-    const active = race.balls.filter((b) => !b.rank).sort((a, b) => b.y - a.y);
-    const target = active[Math.min(active.length - 1, Math.max(0, race.range[1] - race.arrivals.length - 1))];
-    const slow = !race.winners.length && target && target.y > race.stage.goalY - 4 ? .45 : 1;
-    return speed * (boostOwner && performance.now() < boostUntil ? 2 : 1) * slow;
+    return speed * (boostOwner && performance.now() < boostUntil ? 2 : 1) * race.finishSlowdown();
   }
   function frame() {
     const entities = race.physics.getEntities();
@@ -91,6 +88,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
       state: race.state, connected: clients.size, speed, playbackRate: playbackRate(),
       balls: race.balls.map((b) => [b.id, round(b.x), round(b.y), round(b.angle), b.rank ?? 0]),
       ...(race.stage.exitBridge ? { bridgeIds: race.balls.filter((b) => b.onBridge).map((b) => b.id) } : {}),
+      ...(race.finishReason === 'stalled' ? { stalled: true } : {}),
       angles: entities.map((e) => round(e.angle)), ...(positions.length ? { positions } : {}),
       winners: race.winners.map((b) => b.id) };
   }

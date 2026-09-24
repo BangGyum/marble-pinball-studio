@@ -426,6 +426,12 @@ hr {
   align-items: center;
   gap: 8px;
 }
+.map-setting .inline {
+  min-width: 0;
+}
+.map-setting .inline select {
+  min-width: 0;
+}
 .inline select {
   flex: 1;
   min-width: 100px;
@@ -759,6 +765,15 @@ h1 {
   }
   .setting > .inline {
     flex-wrap: nowrap;
+  }
+  .map-setting > .inline {
+    flex-wrap: wrap;
+  }
+  .map-setting .inline select {
+    flex-basis: 100%;
+  }
+  .map-setting .inline button {
+    flex: 1;
   }
   .play-actions {
     margin-top: 3px;

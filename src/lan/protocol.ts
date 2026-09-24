@@ -15,6 +15,8 @@ export type Frame = {
   angles: number[]; winners: number[]; connected: number; speed: number; playbackRate: number;
   positions?: [entityIndex: number, x: number, y: number][];
   bridgeIds?: number[];
+  // Remaining marbles were trapped and ranked by depth.
+  stalled?: boolean;
 };
 export type Identity = { type: 'identity'; role: 'host' | 'viewer' };
 export type Info = { maps: { id: number; title: string }[]; addresses: { name: string; url: string }[] };

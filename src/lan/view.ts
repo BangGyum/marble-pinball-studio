@@ -157,7 +157,7 @@ export class LanView {
     drawMapOverlay(ctx, scene.stage, entities, scale);
     ctx.shadowBlur = 0; ctx.strokeStyle = '#65efda'; ctx.lineWidth = 2 / scale; ctx.setLineDash([.35, .3]);
     ctx.beginPath(); ctx.moveTo(0, scene.stage.goalY); ctx.lineTo(scene.stage.width ?? 26, scene.stage.goalY); ctx.stroke(); ctx.setLineDash([]);
-    ctx.font = 12 / scale + 'px sans-serif'; ctx.fillStyle = '#65efda'; ctx.fillText('FINISH', 1, scene.stage.goalY - .4);
+    ctx.font = 12 / scale + 'px sans-serif'; ctx.fillStyle = '#65efda'; ctx.fillText(scene.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, scene.stage.goalY - .4);
     for (const ball of balls) {
       if (ball.rank && ball !== selected) continue;
       const labelMargin = Math.max(1, ball.name.length * 17 / scale);

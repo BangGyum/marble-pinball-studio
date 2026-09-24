@@ -1,3 +1,4 @@
+import { switchbackExpress } from '../src/data/switchback-express';
 import { pinballCascade } from '../src/data/pinball-cascade';
 import { chaosClocktower } from '../src/data/chaos-clocktower';
 import { orbitalLock } from '../src/data/orbital-lock';
@@ -17,9 +18,11 @@ async function init() {
   const output = document.querySelector('output')!, trails = new Map<number, [number, number][]>();
   if (new URLSearchParams(location.search).get('map') === 'canyon') { map.value = '4'; count.value = '20'; }
   if (new URLSearchParams(location.search).get('map') === 'crossway') { map.value = '5'; count.value = '20'; }
+  map.add(new Option(switchbackExpress.title, '6'));
+  if (new URLSearchParams(location.search).get('map') === 'express') { map.value = '6'; count.value = '20'; }
   let last = 0, accumulator = 0, first = 0, frames = 0, fps = 0, sampledAt = 0;
   const prepare = () => {
-    race.prepare([pinballCascade, chaosClocktower, orbitalLock, neonHourglass, fractureCanyon, neonCrossway][Number(map.value)], Array.from({ length: Number(count.value) }, (_, i) => String(i + 1)));
+    race.prepare([pinballCascade, chaosClocktower, orbitalLock, neonHourglass, fractureCanyon, neonCrossway, switchbackExpress][Number(map.value)], Array.from({ length: Number(count.value) }, (_, i) => String(i + 1)));
     first = 0; accumulator = 0; trails.clear();
     document.querySelector('h1')!.textContent = race.stage.title;
     document.querySelector('#description')!.textContent = [
@@ -29,6 +32,7 @@ async function init() {
       '두 모래시계에 쌓인 구슬을 양문 게이트가 방출합니다. 오른쪽 우회로와 마지막 두 곡선 출구에서 순위가 뒤집힙니다.',
       '검은 암벽 사이의 급강하 통로와 굽은 길. 세 경사 다리, 열리는 발판, 스프링 부스터에서 순위가 바뀝니다.',
       '청록·금색 곡선 레일, 중앙 낙하로, 삼각 회전판과 점프 부스터를 지나 결승선으로 합류합니다.',
+      '야간 철교 위의 다섯 급커브, 작은 가속 발판, 신호에 따라 열리는 두 지름길을 지나 결승역에 도착합니다.',
     ][Number(map.value)];
   };
   prepare(); count.onchange = prepare; map.onchange = prepare;

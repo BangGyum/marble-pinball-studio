@@ -64,11 +64,11 @@ function paintCanyon(ctx: Context, stage: StageDef, texture?: HTMLImageElement) 
   ctx.restore();
 }
 
-export function drawCanyonArt(ctx: Context, stage: StageDef) {
+export function drawCanyonArt(ctx: Context, stage: StageDef, cacheBackground = true) {
   const texture = typeof document === 'undefined' ? undefined
     : document.getElementById('canyon-rock-texture') as HTMLImageElement | null;
   const textured = !!texture?.complete && !!texture.naturalWidth;
-  if (typeof OffscreenCanvas === 'undefined') { paintCanyon(ctx, stage, textured ? texture! : undefined); return; }
+  if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paintCanyon(ctx, stage, textured ? texture! : undefined); return; }
   let stored = cache.get(stage);
   if (!stored || stored.textured !== textured) {
     const density = 20, width = stage.width ?? 64, height = stage.goalY + 39;

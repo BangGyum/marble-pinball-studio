@@ -18,7 +18,12 @@ export interface IPhysics {
 
   getMarblePosition(id: number): { x: number; y: number; angle: number };
 
-  getEntities(): MapEntityState[];
+  getMarbleSpeed(id: number): number;
+
+  placeMarble(id: number, x: number, y: number): void;
+
+  // blend < 1 mixes moving obstacles back toward their pose before the last step.
+  getEntities(blend?: number): MapEntityState[];
 
   start(): void;
 

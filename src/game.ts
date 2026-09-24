@@ -13,6 +13,7 @@ export type { Ball } from './race';
 export class Game extends Race {
   private reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
   speed = 1;
+  private visible = true;
   private fastForward = false;
   zoom = 1;
   celebrationRightInset = 18;
@@ -22,7 +23,10 @@ export class Game extends Race {
   private recorder = new Recorder();
   private recordStop: ReturnType<typeof setTimeout> | undefined;
   private last = 0;
+  private lastRender = 0;
   private accumulator = 0;
+  // Blending needs a step taken since the last start, pause or resume.
+  private stepped = false;
   private camera = { x: 12.8, y: 3 };
   private manual: { x: number; y: number } | null = null;
   private width = 1000;
@@ -89,6 +93,7 @@ export class Game extends Race {
     this.fastForward = false;
     this.renderCache = new RenderCache();
     this.accumulator = 0;
+    this.stepped = false;
     this.manual = null;
     super.prepare(stage, names);
     const rows = Math.ceil(names.length / 10);
@@ -103,6 +108,7 @@ export class Game extends Race {
     if (!this.balls.length) throw new Error('참가자 이름을 먼저 입력해 주세요.');
     this.fastForward = false;
     this.accumulator = 0;
+    this.stepped = false;
     if (record) {
       this.recorder.start(this.canvas);
       this.recording = true;
@@ -113,6 +119,7 @@ export class Game extends Race {
     this.fastForward = false;
     super.pause();
     this.accumulator = 0;
+    this.stepped = false;
   }
   follow() {
     this.manual = null;
@@ -121,6 +128,15 @@ export class Game extends Race {
     if (!Number.isFinite(value)) return;
     this.zoom = Math.max(0.35, Math.min(3, value));
     this.onZoomChange(this.zoom);
+  }
+  setVisible(visible: boolean) {
+    this.visible = visible;
+    this.accumulator = 0;
+    this.last = 0;
+    if (visible) {
+      this.resize();
+      this.render();
+    }
   }
   private viewScale() {
     const base =
@@ -143,11 +159,13 @@ export class Game extends Race {
   private frame(now: number) {
     const delta = this.last ? Math.min((now - this.last) / 1000, 0.1) : 0;
     this.last = now;
+    if (!this.visible) {
+      this.accumulator = 0;
+      this.frameId = requestAnimationFrame((t) => this.frame(t));
+      return;
+    }
     if (this.state === 'running') {
-      const candidates = this.balls.filter((b) => !b.rank).sort((a, b) => b.y - a.y);
-      const target = candidates[Math.min(candidates.length - 1, Math.max(0, this.range[1] - this.arrivals.length - 1))];
-      const slow = !this.winners.length && target && target.y > this.stage.goalY - 4 ? 0.45 : 1;
-      this.accumulator += delta * this.speed * (this.fastForward ? 2 : 1) * slow;
+      this.accumulator += delta * this.speed * (this.fastForward ? 2 : 1) * this.finishSlowdown();
       const physicsStart = performance.now();
       const maxSteps = Math.max(1, Math.ceil(this.speed * (this.fastForward ? 2 : 1) * 2));
       let steps = 0;
@@ -170,13 +188,14 @@ export class Game extends Race {
   }
   advance() {
     super.advance();
+    this.stepped = true;
     if (this.state === 'finished') {
       this.fastForward = false;
       if (this.recording) this.recordStop = setTimeout(() => this.stopRecording(), 1800);
     }
   }
   private render() {
-    if (!this.stage) return;
+    if (!this.stage || !this.visible) return;
     const ctx = this.ctx,
       w = this.width,
       h = this.height,
@@ -189,12 +208,19 @@ export class Game extends Race {
     ctx.setTransform(this.canvas.width / w, 0, 0, this.canvas.height / h, 0, 0);
     ctx.fillStyle = '#070a0e';
     ctx.fillRect(0, 0, w, h);
-    const active = this.balls.filter((b) => !b.rank).sort((a, b) => b.y - a.y);
-    const target = active[Math.min(active.length - 1, Math.max(0, this.range[1] - this.arrivals.length - 1))];
+    const now = performance.now();
+    const dt = this.lastRender ? Math.max(0, Math.min(0.1, (now - this.lastRender) / 1000)) : 1 / 60;
+    this.lastRender = now;
+    // Draw between the last two physics steps: motion stays smooth at any refresh rate or speed.
+    const blend = this.state === 'running' && this.stepped ? Math.min(1, this.accumulator * 60) : 1;
+    const at = (from: number | undefined, to: number) => (from === undefined ? to : from + (to - from) * blend);
+    const active = this.racing();
+    const target = this.focusBall(active);
     const scale = this.viewScale();
     if (this.state !== 'ready' && target && !this.manual) {
-      this.camera.x += (target.x - this.camera.x) * 0.06;
-      this.camera.y += (target.y - this.camera.y) * 0.13;
+      // Same easing as 0.06 / 0.13 per frame at 60Hz, independent of the display refresh rate.
+      this.camera.x += (at(target.px, target.x) - this.camera.x) * (1 - Math.pow(0.94, dt * 60));
+      this.camera.y += (at(target.py, target.y) - this.camera.y) * (1 - Math.pow(0.87, dt * 60));
     }
     const cam = this.manual ?? this.camera;
     const view = {
@@ -203,7 +229,7 @@ export class Game extends Race {
       top: cam.y - (h * 0.43) / scale,
       bottom: cam.y + (h * 0.57) / scale,
     };
-    const entities = this.physics.getEntities();
+    const entities = this.physics.getEntities(blend);
     ctx.save();
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
@@ -236,27 +262,28 @@ export class Game extends Race {
     ctx.setLineDash([]);
     ctx.font = `${12 / scale}px sans-serif`;
     ctx.fillStyle = '#65efda';
-    ctx.fillText('FINISH', 1, this.stage.goalY - 0.4);
+    ctx.fillText(this.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, this.stage.goalY - 0.4);
     for (const b of active) {
+      const x = at(b.px, b.x), y = at(b.py, b.y);
       const labelMargin = Math.max(1, (b.name.length * 17) / scale);
       if (
-        b.y < view.top - 1 || b.y > view.bottom + 1 ||
-        b.x < view.left - labelMargin || b.x > view.right + labelMargin
+        y < view.top - 1 || y > view.bottom + 1 ||
+        x < view.left - labelMargin || x > view.right + labelMargin
       ) continue;
-      ctx.globalAlpha = bridgeBallOpacity(this.stage, b);
-      if (this.renderCache.drawBall(ctx, b, scale, d)) { ctx.globalAlpha = 1; continue; }
-      drawMarble(ctx, b.x, b.y, 0.25, b.color);
+      ctx.globalAlpha = bridgeBallOpacity(this.stage, { x, y, onBridge: b.onBridge });
+      if (this.renderCache.drawBall(ctx, b, scale, d, x, y)) { ctx.globalAlpha = 1; continue; }
+      drawMarble(ctx, x, y, 0.25, b.color);
       ctx.fillStyle = b.color;
       ctx.font = `${Math.min(17, Math.max(12, scale * 0.24)) / scale}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.strokeStyle = '#050a10';
       ctx.lineWidth = 3 / scale;
-      ctx.strokeText(b.name, b.x, b.y + 0.55);
-      ctx.fillText(b.name, b.x, b.y + 0.55);
+      ctx.strokeText(b.name, x, y + 0.55);
+      ctx.fillText(b.name, x, y + 0.55);
       ctx.globalAlpha = 1;
     }
     ctx.restore();
-    this.renderMinimap(entities);
+    this.renderMinimap(entities, blend);
     ctx.textAlign = 'right';
     ctx.font = '12px sans-serif';
     ctx.fillStyle = '#728393';
@@ -288,7 +315,7 @@ export class Game extends Race {
     }
   }
 
-  private renderMinimap(entities: MapEntityState[] = this.physics.getEntities()) {
+  private renderMinimap(entities: MapEntityState[] = this.physics.getEntities(), blend = 1) {
     const ctx = this.ctx;
     const mapWidth = this.stage.width ?? 26;
     const scale = Math.min((this.width < 600 ? 75 : 125) / mapWidth, (this.height - 65) / this.stage.goalY);
@@ -306,10 +333,12 @@ export class Game extends Race {
     drawMapOverlay(ctx, this.stage, entities, scale);
     for (const b of this.balls) {
       if (b.rank) continue;
-      ctx.globalAlpha = bridgeBallOpacity(this.stage, b);
+      const x = b.px === undefined ? b.x : b.px + (b.x - b.px) * blend;
+      const y = b.py === undefined ? b.y : b.py + (b.y - b.py) * blend;
+      ctx.globalAlpha = bridgeBallOpacity(this.stage, { x, y, onBridge: b.onBridge });
       ctx.fillStyle = b.color;
       ctx.beginPath();
-      ctx.arc(b.x, b.y, Math.max(0.23, 1.4 / scale), 0, Math.PI * 2);
+      ctx.arc(x, y, Math.max(0.23, 1.4 / scale), 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.globalAlpha = 1;

@@ -10,7 +10,7 @@ export class RenderCache {
   private balls = new WeakMap<Ball, { key: string; sprite: Sprite }>();
   private minimap?: { stage: StageDef; scale: number; dpr: number; canvas: OffscreenCanvas; fixed: Set<MapEntityState['shape']> };
 
-  drawBall(ctx: CanvasRenderingContext2D, ball: Ball, scale: number, dpr: number) {
+  drawBall(ctx: CanvasRenderingContext2D, ball: Ball, scale: number, dpr: number, x = ball.x, y = ball.y) {
     // Older browsers can keep using the vector renderer.
     if (typeof OffscreenCanvas === 'undefined') return false;
     const key = `${scale}/${dpr}/${ball.color}/${ball.name}`;
@@ -41,7 +41,7 @@ export class RenderCache {
       this.balls.set(ball, cached);
     }
     const s = cached.sprite;
-    ctx.drawImage(s.canvas, ball.x - s.left / scale, ball.y - s.top / scale, s.width / scale, s.height / scale);
+    ctx.drawImage(s.canvas, x - s.left / scale, y - s.top / scale, s.width / scale, s.height / scale);
     return true;
   }
 

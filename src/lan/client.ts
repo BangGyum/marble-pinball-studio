@@ -5,7 +5,7 @@ import { Editor } from '../editor';
 import { Recorder } from '../recorder';
 import { stages, DEFAULT_MAP_INDEX, type StageDef } from '../data/maps';
 import { parseNames, winningRange, readSavedMaps, saveMaps, type SavedMap, type WinnerOrder } from '../model';
-import { el, toast, message } from '../ui';
+import { el, toast, message, STALLED_MESSAGE } from '../ui';
 import type { Command, Frame, Identity, Info, Scene, ServerMessage, Settings } from './protocol';
 
 const view = new LanView(el<HTMLCanvasElement>('game'));
@@ -82,7 +82,7 @@ function updateRaceUI() {
   el('count').textContent = scene.balls.length + '개의 구슬';
   el('map-caption').textContent = scene.stage.title;
   el('status').textContent = frame.state === 'ready' ? scene.balls.length ? '시작할 준비가 됐어요' : '이름을 입력해 주세요'
-    : frame.state === 'paused' ? '잠시 멈췄어요' : frame.state === 'finished' ? '모든 구슬이 도착했어요'
+    : frame.state === 'paused' ? '잠시 멈췄어요' : frame.state === 'finished' ? frame.stalled ? STALLED_MESSAGE : '모든 구슬이 도착했어요'
     : (view.recording ? '● 녹화 중 · ' : '') + '경주 중 · ' + Math.floor(frame.elapsed) + '초';
   el('connection').textContent = online ? '실시간 · ' + frame.connected + '개 화면 연결' : '재접속 중';
   el<HTMLSelectElement>('speed').value = String(frame.speed ?? 1);

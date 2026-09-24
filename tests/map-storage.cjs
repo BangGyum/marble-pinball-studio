@@ -61,7 +61,7 @@ for (const file of ['src/index.ts', 'src/lan/client.ts']) {
   const store = storageFor();
   const ctx = { stages, DEFAULT_MAP_INDEX, saved: [], customStage: undefined, currentStage: stages[DEFAULT_MAP_INDEX],
     mapSelect: { value: '' }, localStorage: store, saveMaps, crypto: require('node:crypto'),
-    refreshMaps(id) { if (id !== undefined) ctx.mapSelect.value = id; }, prepare() {},
+    refreshMaps(id) { if (id !== undefined) ctx.mapSelect.value = id; }, prepare() {}, showGame() {},
     prepareUI() { ctx.transmitted = vm.runInContext('allMaps().find(m => m.id === mapSelect.value)?.stage', ctx); },
   };
   vm.createContext(ctx);
@@ -93,8 +93,9 @@ for (const file of ['src/index.ts', 'src/lan/client.ts']) {
 }
 assert.equal(stages[DEFAULT_MAP_INDEX].title, '네온 분기점');
 console.log('PASS shared initial map is neon junction');
-assert.equal(stages.length, 12, 'the built-in map list includes crossway and excludes the two retired maps');
+assert.equal(stages.length, 14, 'the built-in map list includes switchback express and roundhouse, and excludes retired maps');
 assert.ok(stages.some(stage => stage.title === '네온 크로스웨이'));
+assert.ok(stages.some(stage => stage.title === '회전 차고지'));
 assert.ok(!stages.some(stage => ['역풍 엘리베이터', '돌풍 갈림길'].includes(stage.title)),
   'removed maps must be absent from both built-in pickers');
 assert.ok(!stages.some(stage => ['네온 오비트', '네온 믹서'].includes(stage.title)),

@@ -2,9 +2,10 @@ import { stages, DEFAULT_MAP_INDEX, type StageDef } from './data/maps';
 import { Game } from './game';
 import { parseNames, readSavedMaps, saveMaps, winningRange, type WinnerOrder, type SavedMap } from './model';
 import { Recorder } from './recorder';
-import { el, toast, message } from './ui';
+import { el, toast, message, STALLED_MESSAGE } from './ui';
 import { Editor } from './editor';
 import { Rankings } from './rankings';
+import { MapGallery } from './map-gallery';
 
 let saved: SavedMap[] = [];
 try {
@@ -17,6 +18,7 @@ const allMaps = () => [
   ...saved,
 ];
 const game = new Game(el<HTMLCanvasElement>('game'));
+game.setVisible(false);
 const rankings = new Rankings();
 const rankingList = el('ranking-list');
 const resultLayout = new ResizeObserver(() => {
@@ -56,6 +58,45 @@ let initialized = false;
 const gameView = el('game-view'),
   panel = el('control-panel'),
   panelToggle = el<HTMLButtonElement>('panel-toggle');
+const galleryView = el('map-gallery');
+let galleryScroll = 0, resumeAfterGallery = false;
+const gallery = new MapGallery((id) => {
+  const selected = allMaps().find((map) => map.id === id);
+  if (!selected) return;
+  currentStage = selected.stage;
+  mapSelect.value = id;
+  showGame();
+  prepare();
+});
+function showGame() {
+  if (!galleryView.hidden) galleryScroll = window.scrollY;
+  galleryView.hidden = true;
+  gameView.hidden = false;
+  game.setVisible(true);
+  el('gallery-resume').hidden = false;
+  window.scrollTo(0, 0);
+  el('maps-open').focus({ preventScroll: true });
+}
+el('maps-open').addEventListener('click', () => {
+  resumeAfterGallery = game.state === 'running';
+  if (resumeAfterGallery) game.pause();
+  el('pause').textContent = game.state === 'paused' ? '계속하기' : '일시정지';
+  game.stopRecording();
+  game.setVisible(false);
+  gameView.hidden = true;
+  galleryView.hidden = false;
+  gallery.refresh(allMaps(), mapSelect.value);
+  window.scrollTo(0, galleryScroll);
+  gallery.focus(mapSelect.value);
+});
+el('maps-show-all').addEventListener('click', () => el<HTMLButtonElement>('maps-open').click());
+el('gallery-resume').addEventListener('click', () => {
+  showGame();
+  if (resumeAfterGallery && game.state === 'paused') {
+    game.pause();
+    el('pause').textContent = '일시정지';
+  }
+});
 function setPanelCollapsed(collapsed: boolean) {
   if (collapsed && panel.contains(document.activeElement)) panelToggle.focus({ preventScroll: true });
   gameView.classList.toggle('controls-collapsed', collapsed);
@@ -81,6 +122,7 @@ function refreshMaps(selected = mapSelect.value) {
   }
   if (allMaps().some((m) => m.id === selected)) mapSelect.value = selected;
   el('map-caption').textContent = currentStage.title;
+  gallery.refresh(allMaps(), mapSelect.value);
 }
 function updateWinnerCount(count: number) {
   const selected = Math.min(count, preferredWinnerCount);
@@ -172,7 +214,7 @@ game.onFinish = () => {
   updateStandings();
   lockControls(false);
   start.disabled = false;
-  el('status').textContent = '모든 구슬이 도착했어요';
+  el('status').textContent = game.finishReason === 'stalled' ? STALLED_MESSAGE : '모든 구슬이 도착했어요';
 };
 setInterval(() => {
   if (initialized) updateStandings();
@@ -207,6 +249,7 @@ const editor = new Editor({
     saved = next;
     currentStage = stage;
     refreshMaps(nextId);
+    showGame();
     prepare();
     return nextId;
   },
@@ -225,10 +268,12 @@ const editor = new Editor({
     refreshMaps();
     mapSelect.add(new Option(`미리보기 · ${stage.title}`, 'preview'));
     mapSelect.value = 'preview';
+    showGame();
     prepare();
     el('editor-open').textContent = '맵 편집으로 돌아가기 ↗';
   },
 });
+el('gallery-create').addEventListener('click', () => editor.open());
 el('editor-open').addEventListener('click', () => {
   if (initialized) {
     game.stopRecording();
@@ -300,6 +345,7 @@ if (modelContext?.registerTool) {
         mode.value = 'desc';
         preferredWinnerCount = 2;
         record.checked = false;
+        showGame();
         prepare();
         return { count: list.length, map: map.stage.title, state: game.state };
       },

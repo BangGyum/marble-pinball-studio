@@ -3,8 +3,8 @@ import type { StageDef } from './data/maps';
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 const backgrounds = new WeakMap<StageDef, Map<number, OffscreenCanvas>>();
 
-export function drawHourglassArt(ctx: Context, stage: StageDef) {
-  if (typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
+export function drawHourglassArt(ctx: Context, stage: StageDef, cacheBackground = true) {
+  if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
   const t = ctx.getTransform(), resolution = Math.min(24, Math.max(8, Math.ceil(Math.hypot(t.a, t.b) / 8) * 8));
   let textures = backgrounds.get(stage);
   if (!textures) { textures = new Map(); backgrounds.set(stage, textures); }

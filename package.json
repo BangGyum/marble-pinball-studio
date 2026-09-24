@@ -17,12 +17,16 @@
     "test:hourglass": "node tests/neon-hourglass.cjs",
     "test:canyon": "node tests/fracture-canyon.cjs",
     "test:crossway": "node tests/neon-crossway.cjs",
+    "test:engine": "node tests/engine.cjs",
+    "test:fairness-report": "node tests/fairness-report.cjs",
     "dev:arcade": "node ./node_modules/parcel/lib/bin.js tests/arcade-preview.html --port 43189 --host 127.0.0.1 --dist-dir .wind-preview --cache-dir .parcel-cache/arcade-preview",
     "dev:jackpot": "node ./node_modules/parcel/lib/bin.js tests/neon-jackpot.html --port 43189 --host 127.0.0.1 --dist-dir .wind-preview",
     "dev:wind-preview": "node ./node_modules/parcel/lib/bin.js tests/wind-preview.html --port 43189 --host 127.0.0.1 --dist-dir .wind-preview",
-    "test": "node tests/neon-crossway.cjs && node tests/device-placement.cjs && node tests/boost.cjs && node tests/run.cjs && node tests/map-storage.cjs && node tests/recorder.cjs && node tests/interaction.cjs && node tests/junction.cjs && node tests/rankings.cjs && node tests/celebration.cjs && node tests/launch.cjs && node tests/freehand.cjs && node tests/rotor-wall-audit.cjs && node tests/wall-contact.cjs && node tests/pipeline-run.cjs && node tests/zigzag-rapids.cjs && node tests/neon-jackpot.cjs && node tests/arcade-maps.cjs && node tests/orbital-lock.cjs && node tests/neon-hourglass.cjs && node tests/fracture-canyon.cjs && node tests/wind-maps.cjs && npm run test:lan",
+    "test": "node tests/roundhouse.cjs && node tests/switchback-express.cjs && node tests/fairness-report.cjs && node tests/engine.cjs && node tests/neon-crossway.cjs && node tests/device-placement.cjs && node tests/boost.cjs && node tests/run.cjs && node tests/map-storage.cjs && node tests/recorder.cjs && node tests/interaction.cjs && node tests/junction.cjs && node tests/rankings.cjs && node tests/celebration.cjs && node tests/launch.cjs && node tests/freehand.cjs && node tests/rotor-wall-audit.cjs && node tests/wall-contact.cjs && node tests/pipeline-run.cjs && node tests/zigzag-rapids.cjs && node tests/neon-jackpot.cjs && node tests/arcade-maps.cjs && node tests/orbital-lock.cjs && node tests/neon-hourglass.cjs && node tests/fracture-canyon.cjs && node tests/wind-maps.cjs && npm run test:lan",
     "predev": "node scripts/licenses.cjs",
-    "prebuild": "node scripts/licenses.cjs"
+    "prebuild": "node scripts/licenses.cjs",
+    "test:express": "node tests/switchback-express.cjs",
+    "test:roundhouse": "node tests/roundhouse.cjs"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.4",
