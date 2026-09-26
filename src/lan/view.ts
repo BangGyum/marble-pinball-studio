@@ -1,3 +1,4 @@
+import { SpringControls } from '../spring-controls';
 import { drawEntities } from '../draw';
 import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from '../map-art';
 import { drawWind } from '../wind-render';
@@ -14,6 +15,8 @@ import type { MapEntityState } from '../types/MapEntity.type';
 export class LanView {
   focusedBallId: number | null = null;
   canControl = false;
+  onSpring: (index: number) => void = () => {};
+  private springControls: SpringControls;
   zoom = 1;
   celebrationRightInset = 18;
   onZoomChange: (zoom: number) => void = () => {};
@@ -37,6 +40,7 @@ export class LanView {
   private recorder = new Recorder();
   private recordStop?: ReturnType<typeof setTimeout>;
   constructor(readonly canvas: HTMLCanvasElement) {
+    this.springControls = new SpringControls(canvas, index => this.onSpring(index), () => this.state === 'running');
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     new ResizeObserver(() => {
       const size = canvas.getBoundingClientRect();
@@ -49,6 +53,7 @@ export class LanView {
     };
     const release = () => this.onBoost(false);
     canvas.addEventListener('pointerdown', (event) => {
+      if (this.springControls.select(event)) { release(); return; }
       followMinimap(event);
       if (this.canControl && event.pointerType === 'mouse' && event.button === 0 && this.state === 'running') {
         this.onBoost(true); canvas.setPointerCapture(event.pointerId);
@@ -88,6 +93,7 @@ export class LanView {
       this.camera = { x: offset + (count < 10 ? 10.1 + (Math.max(1, count) - 1) * .305 : 12.85), y: 5 - (rows - 1) * .31 };
       this.balls = scene.balls.map((b) => ({ ...b, x: 0, y: 0, angle: 0, stuck: 0 }));
     }
+    this.springControls.reset();
     this.scene = scene; this.playback.reset();
     this.minimapStage = { ...scene.stage, entities: scene.entities.filter((_, i) => scene.fixed[i]).map((e) => ({
       position: { x: e.x, y: e.y }, type: 'static', shape: e.shape,
@@ -98,6 +104,7 @@ export class LanView {
     if (frame.raceId !== this.scene?.raceId || frame.revision !== this.scene.revision) return;
     if (frame.state === 'finished' && this.state !== 'finished' && this.recording)
       this.recordStop = setTimeout(() => this.stopRecording(), 1800);
+    this.springControls.setStatuses(frame.springs ?? []);
     this.state = frame.state; this.playback.push(frame);
   }
   private viewScale() {
@@ -174,6 +181,7 @@ export class LanView {
     }
     ctx.restore();
     this.renderMinimap(entities, elapsed, cam);
+    this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h);
     ctx.textAlign = 'right'; ctx.font = '12px sans-serif'; ctx.fillStyle = '#728393';
     ctx.fillText((balls.length - active.length) + ' / ' + balls.length + ' 도착', w - 24, h - 20);
     if (this.recording) {

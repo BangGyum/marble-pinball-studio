@@ -93,13 +93,19 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
       winners: race.winners.map((b) => b.id) };
   }
   function broadcast() {
-    const data = JSON.stringify(frame());
-    for (const ws of clients.keys()) if (ws.bufferedAmount < 256 * 1024) send(ws, data);
+    const snapshot = frame(), hasSprings = race.stage.entities?.some(e => e.shape.spring);
+    const data = JSON.stringify(snapshot);
+    for (const [ws, client] of clients) if (ws.bufferedAmount < 256 * 1024)
+      send(ws, hasSprings ? { ...snapshot, springs: race.springStatuses(client.session) } : data);
   }
   function execute(session, msg) {
     requireThat(typeof msg.raceId === 'string' && msg.raceId === raceId, '경기가 바뀌었어요. 최신 화면에서 다시 시도해 주세요.');
-    const keys = { configure: ['settings'], start: [], pause: [], reset: [], speed: ['value'], boost: ['active'] };
+    const keys = { configure: ['settings'], start: [], pause: [], reset: [], speed: ['value'], boost: ['active'], spring: ['index'] };
     requireThat(Object.hasOwn(keys, msg.type) && allowedKeys(msg, ['type', 'requestId', 'raceId', ...keys[msg.type]]), '허용되지 않은 요청입니다.');
+    if (msg.type === 'spring') {
+      requireThat(Number.isInteger(msg.index) && race.activateSpring(msg.index, session), '작동 가능한 스프링을 선택하고 쿨타임과 복귀가 끝난 후 다시 눌러 주세요.');
+      return;
+    }
     requireThat(session.role === 'host', '관람자는 경기를 조작할 수 없습니다.');
     if (msg.type === 'configure') {
       requireThat(race.state !== 'running' && race.state !== 'paused', '진행 중인 경기는 먼저 다시 준비해 주세요.');
@@ -200,7 +206,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
         if (session.results.size > 64) session.results.delete(session.results.keys().next().value);
         send(ws, result); broadcast();
       });
-      send(ws, scene); send(ws, frame()); send(ws, identity(session));
+      send(ws, scene); send(ws, { ...frame(), springs: race.springStatuses(session) }); send(ws, identity(session));
     });
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });

@@ -154,6 +154,15 @@ export function validateStage(value: unknown): StageDef {
     if (e.props.oscillation !== undefined && (!e.props.oscillation || e.type !== 'kinematic' ||
       !finite(e.props.oscillation.amplitude, 0.01, 1.5) || !finite(e.props.oscillation.period, 1, 30)))
       throw new Error('왕복 장치의 각도 또는 주기가 올바르지 않아요.');
+    if (sh && 'spring' in sh && (sh.type !== 'box' || !sh.spring || e.type !== 'kinematic' ||
+      sh.sensor || sh.hidden || sh.boostSpeed !== undefined || e.props.angularVelocity !== 0 ||
+      e.props.oscillation || e.props.sliding || e.props.timedGate || e.props.spinCycle ||
+      (e.props.life !== undefined && e.props.life !== -1) ||
+      !finite(sh.spring.distance, 0.2, 5) || !finite(sh.spring.direction, -Math.PI * 2, Math.PI * 2)))
+      throw new Error('스프링은 이동 거리 0.2~5의 조작 가능한 네모 장치여야 해요.');
+    if (sh?.type === 'box' && sh.spring?.cooldown !== undefined &&
+      (!sh.spring.cooldown || !['shared','personal'].includes(sh.spring.cooldown.scope) || !finite(sh.spring.cooldown.seconds, 1, 120)))
+      throw new Error('스프링 쿨타임은 공통 또는 개인별이며 1~120초 사이여야 해요.');
     const gate = e.props.timedGate;
     const slide = e.props.sliding;
     if (slide !== undefined && (!slide || e.type !== 'kinematic' || e.props.angularVelocity !== 0 ||

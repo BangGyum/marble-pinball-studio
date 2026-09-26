@@ -40,6 +40,20 @@ export function drawEntities(
     ctx.shadowBlur = glow ? (shape.type === 'polyline' ? 7 : 13) : 0;
     if (shape.type === 'box') {
       ctx.rotate(shape.rotation);
+      if (shape.spring) {
+        ctx.shadowBlur = glow ? 8 : 0;
+        const springMetal = ctx.createLinearGradient(0, -shape.height, 0, shape.height);
+        springMetal.addColorStop(0, '#448596'); springMetal.addColorStop(.4, '#17313c'); springMetal.addColorStop(1, '#0b1a24');
+        ctx.fillStyle = springMetal; ctx.fillRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);
+        ctx.strokeStyle = color; ctx.lineWidth = 0.08 + 1 / scale;
+        ctx.strokeRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);
+        ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = '600 ' + Math.max(0.28, 10 / scale) + 'px sans-serif';
+        ctx.fillText('SPACE', 0, 0);
+        ctx.rotate(shape.spring.direction - e.angle - shape.rotation);
+        ctx.beginPath();ctx.moveTo(0.9,-0.24);ctx.lineTo(1.25,0);ctx.lineTo(0.9,0.24);ctx.stroke();
+        ctx.restore();return;
+      }
       if (shape.boostSpeed !== undefined) {
         ctx.fillStyle = '#251c0ddd';
         ctx.fillRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);

@@ -15,6 +15,8 @@ export type Frame = {
   angles: number[]; winners: number[]; connected: number; speed: number; playbackRate: number;
   positions?: [entityIndex: number, x: number, y: number][];
   bridgeIds?: number[];
+  // Per-recipient real-time cooldown remaining in milliseconds, and physical return lock.
+  springs?: [index: number, remainingMs: number, busy: boolean][];
   // Remaining marbles were trapped and ranked by depth.
   stalled?: boolean;
 };
@@ -25,6 +27,7 @@ export type Command = { requestId: string; raceId: string } & (
   | { type: 'start' | 'pause' | 'reset' }
   | { type: 'speed'; value: number }
   | { type: 'boost'; active: boolean }
+  | { type: 'spring'; index: number }
 );
 export type ServerMessage = Scene | Frame | Identity
   | { type: 'result'; requestId: string; ok: boolean; error?: string };

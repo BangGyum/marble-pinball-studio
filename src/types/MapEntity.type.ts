@@ -17,6 +17,7 @@ export interface EntityShapeBase {
 export interface EntityBoxShape extends EntityShapeBase {
   type: 'box';
   boostSpeed?: number;
+  spring?: { distance: number; direction: number; cooldown?: { scope: 'shared' | 'personal'; seconds: number } };
   width: number;
   height: number;
   rotation: number;

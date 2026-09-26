@@ -1,3 +1,4 @@
+import { springLab } from './spring-lab';
 import { roundhouse } from './roundhouse';
 import { neonJunction } from './neon-junction';
 import { pipelineRun } from './pipeline-run';
@@ -74,6 +75,7 @@ export const stages: StageDef[] = [
   neonCrossway,
   switchbackExpress,
   roundhouse,
+  springLab,
 ];
 
 export const DEFAULT_MAP_INDEX = stages.indexOf(neonJunction);

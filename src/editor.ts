@@ -6,7 +6,7 @@ import { drawMapArt } from './map-art';
 import { drawWind } from './wind-render';
 import { el, toast, message } from './ui';
 
-type Tool = 'select' | 'wall' | 'freehand' | 'pin' | 'bumper' | 'ramp' | 'rotor' | 'boost';
+type Tool = 'select' | 'wall' | 'freehand' | 'pin' | 'bumper' | 'ramp' | 'rotor' | 'boost' | 'spring';
 type Point = { x: number; y: number };
 type EditorActions = {
   list: () => SavedMap[];
@@ -23,6 +23,7 @@ const HELP: Record<Tool, string> = {
   bumper: '배치할 곳을 클릭하세요. 구슬을 튕겨 내는 범퍼가 만들어집니다.',
   ramp: '클릭해서 반사판을 배치한 뒤 속성에서 기울기를 바꾸세요.',
   rotor: '클릭해서 회전 장애물을 배치하세요. 회전 속도를 바꿀 수 있어요.',
+  spring: '스프링을 배치하세요. 경기 중 클릭해 선택하고 SPACE로 작동하며, 거리와 방향을 바꿀 수 있어요.',
   boost: '클릭해서 부스터를 배치하세요. 화살표 방향과 부스트 속도를 바꿀 수 있어요. 0°는 오른쪽, 90°는 아래쪽입니다.',
 };
 export class Editor {
@@ -192,6 +193,10 @@ export class Editor {
       'prop-bounce',
       'prop-spin',
       'prop-boost',
+      'prop-spring-distance',
+      'prop-spring-direction',
+      'prop-spring-scope',
+      'prop-spring-seconds',
       'prop-color',
     ])
       el(id).addEventListener('change', () => this.updateProperty(id));
@@ -315,7 +320,7 @@ export class Editor {
     const circle = this.tool === 'pin' || this.tool === 'bumper';
     const entity: MapEntity = {
       position: p,
-      type: this.tool === 'rotor' ? 'kinematic' : 'static',
+      type: this.tool === 'rotor' || this.tool === 'spring' ? 'kinematic' : 'static',
       shape: circle
         ? {
             type: 'circle',
@@ -325,10 +330,11 @@ export class Editor {
         : {
             type: 'box',
             width: this.tool === 'rotor' ? 2 : 2.5,
-            height: this.tool === 'boost' ? 1 : 0.15,
+            height: this.tool === 'spring' ? 0.45 : this.tool === 'boost' ? 1 : 0.15,
             rotation: this.tool === 'boost' ? Math.PI / 2 : this.tool === 'ramp' ? 0.3 : 0,
             color: this.tool === 'boost' ? '#ffc653' : '#65efda',
             ...(this.tool === 'boost' ? { boostSpeed: 35 } : {}),
+            ...(this.tool === 'spring' ? { spring: { distance: 1.2, direction: -Math.PI / 2, cooldown: { scope: 'personal', seconds: 10 } } } : {}),
           },
       props: {
         density: 1,
@@ -458,7 +464,7 @@ export class Editor {
     const e = JSON.parse(JSON.stringify(original)) as MapEntity;
     const input = el<HTMLInputElement>(id),
       v = Number(input.value);
-    if (id !== 'prop-color' && (!input.checkValidity() || !Number.isFinite(v))) {
+    if (id !== 'prop-color' && id !== 'prop-spring-scope' && (!input.checkValidity() || !Number.isFinite(v))) {
       toast('속성 값을 확인해 주세요.');
       this.syncFields();
       return;
@@ -469,11 +475,18 @@ export class Editor {
     else if (id === 'prop-bounce') e.props.restitution = v;
     else if (id === 'prop-spin') {
       e.props.angularVelocity = (v * Math.PI) / 180;
-      e.type = v || e.props.oscillation || e.props.timedGate || e.props.spinCycle || e.props.sliding ? 'kinematic' : 'static';
+      e.type = v || e.props.oscillation || e.props.timedGate || e.props.spinCycle || e.props.sliding || (e.shape.type === 'box' && e.shape.spring) ? 'kinematic' : 'static';
     } else if (e.shape.type === 'box') {
       if (id === 'prop-width') e.shape.width = v / 2;
       if (id === 'prop-height') e.shape.height = v / 2;
       if (id === 'prop-angle') e.shape.rotation = (v * Math.PI) / 180;
+      if (e.shape.spring && (id === 'prop-spring-scope' || id === 'prop-spring-seconds')) {
+        const cooldown = e.shape.spring.cooldown ?? { scope: 'personal', seconds: 10 };
+        e.shape.spring.cooldown = id === 'prop-spring-scope'
+          ? { ...cooldown, scope: input.value as 'shared' | 'personal' } : { ...cooldown, seconds: v };
+      }
+      if (id === 'prop-spring-distance' && e.shape.spring) e.shape.spring.distance = v;
+      if (id === 'prop-spring-direction' && e.shape.spring) e.shape.spring.direction = v * Math.PI / 180;
       if (id === 'prop-boost' && e.shape.boostSpeed !== undefined) e.shape.boostSpeed = v;
     } else if (e.shape.type === 'circle' && id === 'prop-radius') e.shape.radius = v;
     try {
@@ -497,8 +510,10 @@ export class Editor {
     el('box-properties').hidden = e?.shape.type !== 'box';
     el('circle-properties').hidden = e?.shape.type !== 'circle';
     const boost = e?.shape.type === 'box' && e.shape.boostSpeed !== undefined;
+    const spring = e?.shape.type === 'box' && !!e.shape.spring;
+    el('spring-properties').hidden = !spring;
     el('boost-properties').hidden = !boost;
-    el<HTMLInputElement>('prop-spin').disabled = boost || !!e?.props.timedGate || !!e?.props.sliding;
+    el<HTMLInputElement>('prop-spin').disabled = boost || spring || !!e?.props.timedGate || !!e?.props.sliding;
     el<HTMLInputElement>('prop-bounce').disabled = boost;
     el<HTMLButtonElement>('undo').disabled = !this.history.length;
     el<HTMLButtonElement>('redo').disabled = !this.future.length;
@@ -512,6 +527,10 @@ export class Editor {
     el<HTMLInputElement>('prop-color').value =
       color.length === 4 ? '#' + [...color.slice(1)].map((c) => c + c).join('') : color;
     if (e.shape.type === 'box') {
+      if (e.shape.spring) {
+        el<HTMLSelectElement>('prop-spring-scope').value = e.shape.spring.cooldown?.scope ?? 'personal';
+        put('prop-spring-seconds', e.shape.spring.cooldown?.seconds ?? 10);
+        put('prop-spring-distance', e.shape.spring.distance); put('prop-spring-direction', e.shape.spring.direction * 180 / Math.PI); }
       if (boost) put('prop-boost', e.shape.boostSpeed!);
       put('prop-width', e.shape.width * 2);
       put('prop-height', e.shape.height * 2);

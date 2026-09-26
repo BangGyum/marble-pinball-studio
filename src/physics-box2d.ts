@@ -12,7 +12,7 @@ export class Box2dPhysics implements IPhysics {
   private world!: Box2D.b2World;
   private vector!: Box2D.b2Vec2;
   private marbleMap: Record<number, Box2D.b2Body> = {};
-  private entities: ({ body: Box2D.b2Body; moving: boolean; sliding?: MapEntity['props']['sliding']; oscillation?: MapEntity['props']['oscillation']; timedGate?: MapEntity['props']['timedGate']; spinCycle?: MapEntity['props']['spinCycle']; spin: number } & MapEntityState)[] = [];
+  private entities: ({ body: Box2D.b2Body; moving: boolean; springAt?: number; sliding?: MapEntity['props']['sliding']; oscillation?: MapEntity['props']['oscillation']; timedGate?: MapEntity['props']['timedGate']; spinCycle?: MapEntity['props']['spinCycle']; spin: number } & MapEntityState)[] = [];
   private motionTime = 0;
   private randomizeStart = false;
   private vortex: StageDef['vortex'];
@@ -25,6 +25,7 @@ export class Box2dPhysics implements IPhysics {
   // Moving obstacle poses (x, angle) before the latest step, for drawing between steps.
   private previousPoses = new Float64Array(0);
   private previousCount = -1;
+  private previousY = new Float64Array(0);
 
   async init() {
     this.Box2D = await Box2DFactory();
@@ -57,7 +58,7 @@ export class Box2dPhysics implements IPhysics {
     this.collisionSubsteps = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.backing) ? 16 : 4;
     this.createEntities(
       (stage.entities ?? []).map((entity) =>
-        this.randomizeStart && !entity.props.oscillation && !entity.props.timedGate && !entity.props.sliding && entity.position.y < 28 && entity.type === 'kinematic' && entity.shape.type === 'box'
+        this.randomizeStart && !entity.props.oscillation && !entity.props.timedGate && !entity.props.sliding && !(entity.shape.type === 'box' && entity.shape.spring) && entity.position.y < 28 && entity.type === 'kinematic' && entity.shape.type === 'box'
           ? { ...entity, shape: { ...entity.shape, rotation: entity.shape.rotation + Math.random() * Math.PI * 2 } }
           : entity
       )
@@ -230,22 +231,37 @@ export class Box2dPhysics implements IPhysics {
     // A breakable obstacle removed in the last step shifts indices; draw that frame unblended.
     const previous = blend < 1 && this.previousCount === this.entities.length ? this.previousPoses : undefined;
     return this.entities.map((e, i) => {
-      let x = e.sliding ? e.body.GetPosition().x : e.x, angle = e.body.GetAngle();
+      const spring = e.shape.type === 'box' && e.shape.spring;
+      let x = e.sliding || spring ? e.body.GetPosition().x : e.x, y = spring ? e.body.GetPosition().y : e.y, angle = e.body.GetAngle();
       if (previous && e.moving) {
         x = previous[i * 2] + (x - previous[i * 2]) * blend;
+        y = this.previousY[i] + (y - this.previousY[i]) * blend;
         angle = previous[i * 2 + 1] + (angle - previous[i * 2 + 1]) * blend;
       }
-      return { x, y: e.y, angle, shape: e.shape, life: e.life };
+      return { x, y, angle, shape: e.shape, life: e.life };
     });
   }
   private recordPoses() {
     if (this.previousPoses.length < this.entities.length * 2) this.previousPoses = new Float64Array(this.entities.length * 2);
+    if (this.previousY.length < this.entities.length) this.previousY = new Float64Array(this.entities.length);
     this.entities.forEach((e, i) => {
+      this.previousY[i] = e.body.GetPosition().y;
       if (!e.moving) return;
-      this.previousPoses[i * 2] = e.sliding ? e.body.GetPosition().x : e.x;
+      this.previousPoses[i * 2] = e.sliding || (e.shape.type === 'box' && e.shape.spring) ? e.body.GetPosition().x : e.x;
       this.previousPoses[i * 2 + 1] = e.body.GetAngle();
     });
     this.previousCount = this.entities.length;
+  }
+  isSpringBusy(index: number) {
+    const e = this.entities[index];
+    return !!e && e.springAt !== undefined && this.motionTime - e.springAt < 1;
+  }
+  activateSpring(index: number) {
+    const e = this.entities[index];
+    if (!e || e.shape.type !== 'box' || !e.shape.spring ||
+      (e.springAt !== undefined && this.motionTime - e.springAt < 1)) return false;
+    e.springAt = this.motionTime;
+    return true;
   }
   start() {
     for (const body of Object.values(this.marbleMap)) {
@@ -311,6 +327,16 @@ export class Box2dPhysics implements IPhysics {
     for (let i = 0; i < this.collisionSubsteps; i++) {
       const dt = seconds / this.collisionSubsteps;
       this.motionTime += dt;
+      for (const e of this.entities) if (e.shape.type === 'box' && e.shape.spring) {
+        const spring = e.shape.spring;
+        const t = e.springAt === undefined ? 1 : Math.min(1, this.motionTime - e.springAt);
+        // Fast 120ms stroke, eased return; move through Box2D so marbles receive the impact.
+        const fraction = t < 0.12 ? Math.sin(t / 0.12 * Math.PI / 2) : Math.pow((1 - t) / 0.88, 2);
+        const p = e.body.GetPosition(), amount = spring.distance * fraction;
+        this.vector.Set((e.x + Math.cos(spring.direction) * amount - p.x) / dt,
+          (e.y + Math.sin(spring.direction) * amount - p.y) / dt);
+        e.body.SetLinearVelocity(this.vector);
+      }
       for (const e of this.entities) if (e.sliding) {
         const target = e.x + e.sliding.amplitude * Math.sin(this.motionTime * Math.PI * 2 / e.sliding.period + e.sliding.phase);
         this.vector.Set((target - e.body.GetPosition().x) / dt, 0);

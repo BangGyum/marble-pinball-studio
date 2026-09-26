@@ -195,6 +195,7 @@ el('start').addEventListener('click', () => {
 });
 el('pause').addEventListener('click', () => void run({ type: 'pause' }));
 el('speed').addEventListener('change', () => void run({ type: 'speed', value: Number(el<HTMLSelectElement>('speed').value) }));
+view.onSpring = (index) => { if (online) void run({ type: 'spring', index }); };
 view.onBoost = (active) => {
   if (!active) {
     if (boostTimer) { clearInterval(boostTimer); boostTimer = undefined; if (online) void run({ type: 'boost', active: false }); }

@@ -25,6 +25,8 @@ export interface IPhysics {
   // blend < 1 mixes moving obstacles back toward their pose before the last step.
   getEntities(blend?: number): MapEntityState[];
 
+  activateSpring(index: number): boolean;
+
   start(): void;
 
   step(deltaSeconds: number): void;

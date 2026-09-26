@@ -93,7 +93,7 @@ for (const file of ['src/index.ts', 'src/lan/client.ts']) {
 }
 assert.equal(stages[DEFAULT_MAP_INDEX].title, '네온 분기점');
 console.log('PASS shared initial map is neon junction');
-assert.equal(stages.length, 14, 'the built-in map list includes switchback express and roundhouse, and excludes retired maps');
+assert.equal(stages.length, 15, 'the built-in map list includes switchback express, roundhouse and spring lab, and excludes retired maps');
 assert.ok(stages.some(stage => stage.title === '네온 크로스웨이'));
 assert.ok(stages.some(stage => stage.title === '회전 차고지'));
 assert.ok(!stages.some(stage => ['역풍 엘리베이터', '돌풍 갈림길'].includes(stage.title)),

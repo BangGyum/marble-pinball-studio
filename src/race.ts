@@ -1,3 +1,4 @@
+import { SpringCooldowns } from './spring-cooldowns';
 import { Box2dPhysics } from './physics-box2d';
 import type { StageDef } from './data/maps';
 import { shuffled, type WinnerOrder } from './model';
@@ -37,6 +38,20 @@ const STALL_LIMIT_SECONDS = 300;
 // One simulation, shared by the standalone browser and the authoritative LAN server.
 export class Race {
   readonly physics = new Box2dPhysics();
+  readonly springCooldowns = new SpringCooldowns();
+  private springPlayer = {};
+  activateSpring(index: number, player: object = this.springPlayer) {
+    if (this.state !== 'running' || !Number.isInteger(index)) return false;
+    const shape = this.physics.getEntities()[index]?.shape;
+    if (shape?.type !== 'box' || !shape.spring || this.springCooldowns.remaining(shape, player) > 0 ||
+      !this.physics.activateSpring(index)) return false;
+    this.springCooldowns.consume(shape, player);
+    return true;
+  }
+  springStatuses(player: object = this.springPlayer): [number, number, boolean][] {
+    return this.physics.getEntities().flatMap((e, i) => e.shape.type === 'box' && e.shape.spring
+      ? [[i, Math.ceil(this.springCooldowns.remaining(e.shape, player)), this.physics.isSpringBusy(i)] as [number, number, boolean]] : []);
+  }
   state: 'ready' | 'running' | 'paused' | 'finished' = 'ready';
   stage!: StageDef;
   balls: Ball[] = [];
@@ -59,6 +74,7 @@ export class Race {
   private trapSeconds = 60;
 
   prepare(stage: StageDef, names: string[]) {
+    this.springCooldowns.reset();
     this.state = 'ready';
     this.stage = stage;
     this.arrivals = [];

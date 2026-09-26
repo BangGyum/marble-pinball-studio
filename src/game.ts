@@ -1,3 +1,4 @@
+import { SpringControls } from './spring-controls';
 import { Race } from './race';
 import type { StageDef } from './data/maps';
 import { drawEntities } from './draw';
@@ -34,8 +35,10 @@ export class Game extends Race {
   private minimap = { x: 18, y: 20, w: 115, h: 400, scale: 4 };
   private frameId = 0;
   private renderCache = new RenderCache();
+  private springControls: SpringControls;
   constructor(readonly canvas: HTMLCanvasElement) {
     super();
+    this.springControls = new SpringControls(canvas, index => this.activateSpring(index), () => this.state === 'running');
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     new ResizeObserver(() => this.resize()).observe(canvas);
     const followMinimap = (e: PointerEvent) => {
@@ -51,6 +54,7 @@ export class Game extends Race {
       this.fastForward = false;
     };
     canvas.addEventListener('pointerdown', (e) => {
+      if (this.springControls.select(e)) { this.fastForward = false; return; }
       followMinimap(e);
       if (e.pointerType === 'mouse' && e.button === 0 && this.state === 'running') {
         this.fastForward = true;
@@ -95,6 +99,7 @@ export class Game extends Race {
     this.accumulator = 0;
     this.stepped = false;
     this.manual = null;
+    this.springControls.reset();
     super.prepare(stage, names);
     const rows = Math.ceil(names.length / 10);
     const spawnOffset = (stage.spawnX ?? 12.85) - 12.85;
@@ -284,6 +289,8 @@ export class Game extends Race {
     }
     ctx.restore();
     this.renderMinimap(entities, blend);
+    this.springControls.setStatuses(this.springStatuses());
+    this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h);
     ctx.textAlign = 'right';
     ctx.font = '12px sans-serif';
     ctx.fillStyle = '#728393';
