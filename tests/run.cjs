@@ -83,6 +83,8 @@ async function run() {
   const game = Object.create(Game.prototype);
   Object.assign(game, {
     physics,
+    springControls: { reset() {} },
+    springCooldowns: { reset() {} },
     state: 'ready',
     arrivals: [],
     balls: [],
