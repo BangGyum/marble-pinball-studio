@@ -150,7 +150,7 @@ export class LanView {
     });
     ctx.save(); ctx.translate(w * .56 - cam.x * scale, h * .43 - cam.y * scale); ctx.scale(scale, scale);
     drawMapArt(ctx, scene.stage, scale);
-    drawEntities(ctx, scene.stage.exitBridge ? entities.filter(e => e.shape.collisionLayer !== 2) : entities, scale, -1, true, view, !!scene.stage.art);
+    drawEntities(ctx, scene.stage.exitBridge ? entities.filter(e => e.shape.collisionLayer !== 2) : entities, scale, -1, true, view, !!scene.stage.art, scene.stage.art?.style === 'reversal-ladder');
     if (scene.stage.vortex) {
       const wind = scene.stage.vortex;
       ctx.shadowBlur = 0; ctx.strokeStyle = '#64f4e050'; ctx.lineWidth = 1.5 / scale;
@@ -181,7 +181,7 @@ export class LanView {
     }
     ctx.restore();
     this.renderMinimap(entities, elapsed, cam);
-    this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h);
+    this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h, scene.stage);
     ctx.textAlign = 'right'; ctx.font = '12px sans-serif'; ctx.fillStyle = '#728393';
     ctx.fillText((balls.length - active.length) + ' / ' + balls.length + ' 도착', w - 24, h - 20);
     if (this.recording) {

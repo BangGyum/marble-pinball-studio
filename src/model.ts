@@ -167,7 +167,8 @@ export function validateStage(value: unknown): StageDef {
     const slide = e.props.sliding;
     if (slide !== undefined && (!slide || e.type !== 'kinematic' || e.props.angularVelocity !== 0 ||
       e.props.oscillation || gate || e.props.spinCycle || (e.props.life !== undefined && e.props.life !== -1) ||
-      !finite(slide.amplitude, 0.1, 20) || !finite(slide.period, 1, 30) || !finite(slide.phase, -60, 60)))
+      !finite(slide.amplitude, 0.1, 20) || !finite(slide.period, 1, 30) || !finite(slide.phase, -60, 60) ||
+      (slide.direction !== undefined && !finite(slide.direction, -Math.PI * 2, Math.PI * 2))))
       throw new Error('이동 발판의 거리와 주기를 확인해 주세요.');
     if (gate !== undefined && (!gate || e.type !== 'kinematic' || e.props.oscillation ||
       e.props.angularVelocity !== 0 || (e.props.life !== undefined && e.props.life !== -1) ||

@@ -1,0 +1,44 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
+require.extensions['.ts']=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,f);
+const {SpringControls}=require('../src/spring-controls.ts'),{reversalLadder}=require('../src/data/reversal-ladder.ts'),{springLab}=require('../src/data/spring-lab.ts');
+let keydown,blurred=0,activated=[];
+global.window={addEventListener:(type,fn)=>{if(type==='keydown')keydown=fn;}};
+global.document={activeElement:{blur:()=>blurred++},querySelector:()=>null};
+const canvas={getBoundingClientRect:()=>({left:80,top:40,width:1000})};
+const controls=new SpringControls(canvas,i=>activated.push(i),()=>true);
+const labels=[],ctx=new Proxy({measureText:t=>({width:t.length*7}),fillText:t=>labels.push(t)},{get:(o,k)=>k in o?o[k]:()=>{}});
+const poses=stage=>stage.entities.map(e=>({x:e.position.x,y:e.position.y,angle:0,life:-1,shape:e.shape}));
+const click=(x,y,scale=15,button=0,pointerType='mouse')=>controls.select({clientX:80+25+x*scale,clientY:40-70+y*scale,button,pointerType});
+let entities=poses(reversalLadder);
+const springs=entities.flatMap((e,i)=>e.shape.spring?[i]:[]);
+for(const scale of [7,24])for(const i of springs){
+  const e=entities[i],d=e.shape.spring.direction;
+  controls.draw(ctx,entities,25,-70,scale,900,reversalLadder);
+  // A click on the visible coil missed the narrow physical plate before this fix.
+  assert.equal(click(e.x-Math.cos(d)*1.3,e.y-Math.sin(d)*1.3,scale),true,'coil body selects at different zoom levels');
+  assert.equal(controls.selected,i);
+  assert.equal(click(e.x,e.y,scale),true,'plate remains selectable');
+  assert.equal(click(e.x-Math.cos(d)*1.3,e.y-Math.sin(d)*1.3,scale,0,'touch'),true,'touch selects the body');
+  keydown({code:'Space',repeat:false,target:{tagName:'CANVAS'},preventDefault(){}});
+  assert.equal(activated.at(-1),i,'selected body activates through Space');
+}
+const i=springs[0],original=entities[i],d=original.shape.spring.direction;
+entities=entities.map((e,n)=>n===i?{...e,x:e.x+Math.cos(d),y:e.y+Math.sin(d)}:e);
+controls.draw(ctx,entities,25,-70,15,900,reversalLadder);
+assert.equal(click(original.x-Math.cos(d)*1.3,original.y-Math.sin(d)*1.3),true,'body hit area stays at its base while the piston moves');
+assert.equal(click(entities[i].x,entities[i].y),true,'moving plate is also selectable');
+controls.setStatuses([[i,4900,false]]);labels.length=0;
+controls.draw(ctx,entities,25,-70,15,900,reversalLadder);
+assert.ok(labels.some(t=>t.includes('공통 · 남은 5초')),'countdown explicitly says remaining');
+const before=activated.length;
+keydown({code:'Space',repeat:false,target:{tagName:'CANVAS'},preventDefault(){}});
+assert.equal(activated.length,before,'body selection does not bypass cooldown');
+assert.equal(click(28,60),false,'empty space does not select a device');
+controls.reset();entities=poses(springLab);
+controls.draw(ctx,entities,25,-70,15,900,springLab);
+const lab=entities.findIndex(e=>e.shape.spring),plate=entities[lab];
+assert.equal(click(plate.x,plate.y),true,'ordinary spring controls still work');
+assert.equal(controls.selected,lab);
+assert.equal(click(plate.x,plate.y,15,2),false,'secondary click is ignored');
+assert.ok(blurred>0);
+console.log('PASS spring body/plate selection, zoom, touch, moving piston, cooldown and other maps');

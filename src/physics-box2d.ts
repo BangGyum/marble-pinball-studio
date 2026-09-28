@@ -146,7 +146,8 @@ export class Box2dPhysics implements IPhysics {
       }
       B.destroy(fixture);
       if (entity.props.sliding) {
-        this.vector.Set(entity.position.x + entity.props.sliding.amplitude * Math.sin(entity.props.sliding.phase), entity.position.y);
+        const slide = entity.props.sliding, offset = slide.amplitude * Math.sin(slide.phase), direction = slide.direction ?? 0;
+        this.vector.Set(entity.position.x + Math.cos(direction) * offset, entity.position.y + Math.sin(direction) * offset);
         body.SetTransform(this.vector, 0);
       }
       if (entity.props.timedGate) {
@@ -232,7 +233,7 @@ export class Box2dPhysics implements IPhysics {
     const previous = blend < 1 && this.previousCount === this.entities.length ? this.previousPoses : undefined;
     return this.entities.map((e, i) => {
       const spring = e.shape.type === 'box' && e.shape.spring;
-      let x = e.sliding || spring ? e.body.GetPosition().x : e.x, y = spring ? e.body.GetPosition().y : e.y, angle = e.body.GetAngle();
+      let x = e.sliding || spring ? e.body.GetPosition().x : e.x, y = e.sliding || spring ? e.body.GetPosition().y : e.y, angle = e.body.GetAngle();
       if (previous && e.moving) {
         x = previous[i * 2] + (x - previous[i * 2]) * blend;
         y = this.previousY[i] + (y - this.previousY[i]) * blend;
@@ -338,8 +339,10 @@ export class Box2dPhysics implements IPhysics {
         e.body.SetLinearVelocity(this.vector);
       }
       for (const e of this.entities) if (e.sliding) {
-        const target = e.x + e.sliding.amplitude * Math.sin(this.motionTime * Math.PI * 2 / e.sliding.period + e.sliding.phase);
-        this.vector.Set((target - e.body.GetPosition().x) / dt, 0);
+        const offset = e.sliding.amplitude * Math.sin(this.motionTime * Math.PI * 2 / e.sliding.period + e.sliding.phase);
+        const direction = e.sliding.direction ?? 0, p = e.body.GetPosition();
+        this.vector.Set((e.x + Math.cos(direction) * offset - p.x) / dt,
+          (e.y + Math.sin(direction) * offset - p.y) / dt);
         e.body.SetLinearVelocity(this.vector);
       }
       for (const e of this.entities) if (e.oscillation || e.timedGate) {

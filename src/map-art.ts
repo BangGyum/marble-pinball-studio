@@ -1,3 +1,4 @@
+import { drawLadderArt, drawLadderDevices } from './ladder-art';
 import { drawRoundhouseArt, drawRoundhouseTrains } from './roundhouse-art';
 import { drawExpressArt, drawExpressDevices } from './express-art';
 import type { StageDef } from './data/maps';
@@ -11,6 +12,7 @@ import type { MapEntityState } from './types/MapEntity.type';
 
 // Draw the elevated exit after the ground-level rings, including on both minimaps.
 export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number, cacheBackground = true) {
+  if (stage.art?.style === 'reversal-ladder') drawLadderDevices(ctx, stage, entities);
   if (stage.art?.style === 'roundhouse') drawRoundhouseTrains(ctx, entities);
   if (stage.art?.style === 'switchback-express') drawExpressDevices(ctx, entities);
   if (stage.art?.style === 'crossway') drawCrosswayDevices(ctx, entities);
@@ -48,6 +50,7 @@ export function drawMapArt(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number, cacheBackground = true
 ) {
   if (!stage.art) return;
+  if (stage.art.style === 'reversal-ladder') { drawLadderArt(ctx, stage, cacheBackground); return; }
   if (stage.art.style === 'roundhouse') { drawRoundhouseArt(ctx, stage); return; }
   if (stage.art.style === 'switchback-express') { drawExpressArt(ctx, stage, cacheBackground); return; }
   if (stage.art.style === 'crossway') { drawCrosswayArt(ctx, stage, cacheBackground); return; }

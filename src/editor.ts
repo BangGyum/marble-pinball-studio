@@ -2,7 +2,7 @@ import { blankStage, cloneStage, validateStage, type SavedMap } from './model';
 import type { StageDef } from './data/maps';
 import type { MapEntity } from './types/MapEntity.type';
 import { drawEntities } from './draw';
-import { drawMapArt } from './map-art';
+import { drawMapArt, drawMapOverlay } from './map-art';
 import { drawWind } from './wind-render';
 import { el, toast, message } from './ui';
 
@@ -546,7 +546,7 @@ export class Editor {
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     c.save();
     c.scale(SCALE, SCALE);
-    drawMapArt(c, this.stage, SCALE);
+    drawMapArt(c, this.stage, SCALE, this.stage.art?.style !== 'reversal-ladder');
     c.strokeStyle = '#23323d';
     c.lineWidth = 0.5 / SCALE;
     for (let x = 0; x <= (this.stage.width ?? 26); x++) {
@@ -581,7 +581,8 @@ export class Editor {
       shape: e.shape,
       life: e.props.life ?? -1,
     }));
-    drawEntities(c, entities, SCALE, this.selected, false, undefined, !!this.stage.art);
+    drawEntities(c, entities, SCALE, this.selected, false, undefined, !!this.stage.art, this.stage.art?.style === 'reversal-ladder');
+    if (this.stage.art?.style === 'reversal-ladder') drawMapOverlay(c, this.stage, entities, SCALE, false);
     drawWind(c, this.stage.windZones ?? [], 0, SCALE);
     c.setLineDash([0.5, 0.3]);
     c.strokeStyle = '#65efda';

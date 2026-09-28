@@ -7,11 +7,14 @@ export function drawEntities(
   selected = -1,
   glow = true,
   view?: ViewBounds,
-  glass = false
+  glass = false,
+  customDevices = false
 ) {
   entities.forEach((e, i) => {
     const shape = e.shape;
     if (shape.hidden && i !== selected) return;
+    // A map overlay can supply the complete spring/boost skin, including at minimap scale.
+    if (customDevices && shape.type === 'box' && (shape.spring || shape.boostSpeed !== undefined) && i !== selected) return;
     let bounds: ViewBounds | undefined;
     if (view) {
       // Conservative viewport in the entity's local coordinates, including the glow.

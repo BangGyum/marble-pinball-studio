@@ -1,3 +1,4 @@
+import { drawLadderArt } from './ladder-art';
 import type { Ball } from './game';
 import type { StageDef } from './data/maps';
 import type { MapEntityState } from './types/MapEntity.type';
@@ -47,7 +48,8 @@ export class RenderCache {
 
   drawMinimap(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number, dpr: number) {
     if (typeof OffscreenCanvas === 'undefined' || scale <= 0) {
-      drawEntities(ctx, entities, scale, -1, false);
+      if (stage.art?.style === 'reversal-ladder') drawLadderArt(ctx, stage, false);
+      drawEntities(ctx, entities, scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
       return;
     }
     let cached = this.minimap;
@@ -61,11 +63,12 @@ export class RenderCache {
       );
       const mapCtx = canvas.getContext('2d')!;
       mapCtx.scale(scale * dpr, scale * dpr);
-      drawEntities(mapCtx, entities.filter((e) => fixed.has(e.shape)), scale, -1, false);
+      if (stage.art?.style === 'reversal-ladder') drawLadderArt(mapCtx, stage, false);
+      drawEntities(mapCtx, entities.filter((e) => fixed.has(e.shape)), scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
       cached = this.minimap = { stage, scale, dpr, canvas, fixed };
     }
     ctx.drawImage(cached.canvas, 0, 0, cached.canvas.width / (scale * dpr), cached.canvas.height / (scale * dpr));
     // Rotors and breakable obstacles stay live, above the fixed map layer.
-    drawEntities(ctx, entities.filter((e) => !cached.fixed.has(e.shape)), scale, -1, false);
+    drawEntities(ctx, entities.filter((e) => !cached.fixed.has(e.shape)), scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
   }
 }

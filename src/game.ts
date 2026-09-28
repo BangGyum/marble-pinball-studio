@@ -239,7 +239,7 @@ export class Game extends Race {
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
     drawMapArt(ctx, this.stage, scale);
-    drawEntities(ctx, this.stage.exitBridge ? entities.filter(e => e.shape.collisionLayer !== 2) : entities, scale, -1, true, view, !!this.stage.art);
+    drawEntities(ctx, this.stage.exitBridge ? entities.filter(e => e.shape.collisionLayer !== 2) : entities, scale, -1, true, view, !!this.stage.art, this.stage.art?.style === 'reversal-ladder');
     if (this.stage.vortex) {
       const wind = this.stage.vortex;
       ctx.shadowBlur = 0;
@@ -290,7 +290,7 @@ export class Game extends Race {
     ctx.restore();
     this.renderMinimap(entities, blend);
     this.springControls.setStatuses(this.springStatuses());
-    this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h);
+    this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h, this.stage);
     ctx.textAlign = 'right';
     ctx.font = '12px sans-serif';
     ctx.fillStyle = '#728393';

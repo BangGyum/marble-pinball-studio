@@ -7,6 +7,7 @@ import { drawMarble } from './marble-art';
 import { el } from './ui';
 
 const details: Record<string, [string, string, string]> = {
+  '역전 사다리': ['스프링 · 역전', '금속 경사로 네 단과 왕복 열차. 스프링을 선택하고 SPACE로 순위를 뒤집어 보세요.', '#ebc689'],
   '스프링 놀이터': ['클릭 · 조작', '장치를 클릭해 선택하고 SPACE! 구슬을 밀어내며 1초 만에 돌아오는 스프링.', '#7fe3ff'],
   '회전 차고지': ['기차 · 순환', '반대로 도는 두 기차를 피해, 열린 출구로 탈출하는 순환 철도.', '#bfe5a3'],
   '네온 분기점': ['다섯 갈래', '서로 다른 다섯 파이프, 마지막 항아리에서 만나는 반전.', '#65efda'],
@@ -41,7 +42,7 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
   // Draw once at thumbnail resolution; keep the full-resolution game caches untouched.
   drawMapArt(ctx, stage, scale, false);
   drawEntities(ctx, stage.exitBridge ? entities.filter(e => e.shape.collisionLayer !== 2) : entities,
-    scale, -1, true, undefined, !!stage.art);
+    scale, -1, true, undefined, !!stage.art, stage.art?.style === 'reversal-ladder');
   drawWind(ctx, stage.windZones ?? [], 1, scale);
   drawMapOverlay(ctx, stage, entities, scale, false);
   ctx.shadowBlur = 0;

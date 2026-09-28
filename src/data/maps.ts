@@ -1,3 +1,4 @@
+import { reversalLadder } from './reversal-ladder';
 import { springLab } from './spring-lab';
 import { roundhouse } from './roundhouse';
 import { neonJunction } from './neon-junction';
@@ -15,7 +16,7 @@ import { switchbackExpress } from './switchback-express';
 import { desireJar } from './desire-jar';
 import type { MapEntity } from '../types/MapEntity.type';
 
-export const ART_STYLES = ['roundhouse', 'rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway', 'switchback-express'] as const;
+export const ART_STYLES = ['reversal-ladder', 'roundhouse', 'rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway', 'switchback-express'] as const;
 
 export type WindZone = {
   dutyCycle?: number;
@@ -76,6 +77,7 @@ export const stages: StageDef[] = [
   switchbackExpress,
   roundhouse,
   springLab,
+  reversalLadder,
 ];
 
 export const DEFAULT_MAP_INDEX = stages.indexOf(neonJunction);

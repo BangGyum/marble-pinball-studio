@@ -44,7 +44,7 @@ export type EntityPhysicalProps = {
   restitution: number;
   angularVelocity: number;
   oscillation?: { amplitude: number; period: number };
-  sliding?: { amplitude: number; period: number; phase: number };
+  sliding?: { amplitude: number; period: number; phase: number; direction?: number };
   timedGate?: { period: number; openFor: number; phase: number; angle: number; releaseAfter?: number };
   spinCycle?: { period: number; runFor: number; phase: number; idleSpeed: number };
   life?: number;
