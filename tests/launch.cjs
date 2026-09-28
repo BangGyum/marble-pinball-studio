@@ -18,7 +18,7 @@ async function run() {
   const physics = new Box2dPhysics();
   await physics.init();
   const game = Object.create(Game.prototype);
-  Object.assign(game, { physics, recorder: { stop() {} }, render() {} });
+  Object.assign(game, { physics, springControls: { reset() {} }, springCooldowns: { reset() {} }, recorder: { stop() {} }, render() {} });
   const original = JSON.stringify(neonJunction);
   const names = Array.from({ length: 49 }, (_, i) => String(i));
   game.prepare(neonJunction, names);

@@ -75,7 +75,7 @@ async function run() {
     shake(id);
   };
   const game = Object.create(Game.prototype);
-  Object.assign(game, { physics, recorder: { stop() {} }, render() {}, onFinish() {} });
+  Object.assign(game, { physics, springControls: { reset() {} }, springCooldowns: { reset() {} }, recorder: { stop() {} }, render() {}, onFinish() {} });
   const usedPipes = new Set();
   for (const count of [1, 4, 8, 12, 30, 49]) {
     shakes = 0;

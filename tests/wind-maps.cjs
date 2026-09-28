@@ -23,7 +23,7 @@ const random = (initial) => {
 async function simulate(physics, stage, count, initial, limit = 120) {
   Math.random = random(initial);
   const game = Object.create(Game.prototype);
-  Object.assign(game, { physics, recorder: { stop() {} }, render() {}, onFinish() {} });
+  Object.assign(game, { physics, springControls: { reset() {} }, springCooldowns: { reset() {} }, recorder: { stop() {} }, render() {}, onFinish() {} });
   game.prepare(stage, Array.from({ length: count }, (_, i) => String(i)));
   assert.ok(game.balls.every((ball) => Math.abs(ball.x - (stage.spawnX ?? 12.85)) < 3),
     'every marble starts inside the map-specific inlet');

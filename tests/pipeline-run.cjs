@@ -42,7 +42,7 @@ Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 429
   const physics = new Box2dPhysics();
   await physics.init();
   const game = Object.create(Game.prototype);
-  Object.assign(game, { physics, recorder: { stop() {} }, render() {}, onFinish() {} });
+  Object.assign(game, { physics, springControls: { reset() {} }, springCooldowns: { reset() {} }, recorder: { stop() {} }, render() {}, onFinish() {} });
   let bumpers = [],
     hits = [],
     bodies = new Map();
