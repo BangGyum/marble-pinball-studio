@@ -1,0 +1,214 @@
+{
+  "date": "2026-09-29",
+  "notes": "Native browser RAF remained approximately 60Hz. The 120FPS target is a diagnostic threshold, not an emulated or measured 120Hz display. Full frame CPU includes Race.advance and canvas rendering, excludes rankings DOM/recording/GPU presentation. Each run uses 100 marbles, 2s warmup and 12s measurement.",
+  "runs": [
+    {
+      "map": "스위치백 익스프레스",
+      "count": 100,
+      "mode": "run",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1.75,
+      "seconds": 12,
+      "fps": 59.751,
+      "frame": {
+        "mean": 16.736,
+        "p95": 16.9,
+        "max": 66.7
+      },
+      "slowFrames": 1,
+      "renders": 717,
+      "render": {
+        "mean": 1.772,
+        "p95": 2.4,
+        "max": 3.3
+      },
+      "physics": {
+        "mean": 4.233,
+        "p95": 5.7,
+        "max": 7.3
+      },
+      "entityReads": 717,
+      "sprites": 0,
+      "simulatedSeconds": 11.833,
+      "state": "running",
+      "targetFps": 120,
+      "targetFrameMs": 8.333,
+      "activeSeconds": 12,
+      "activeFps": 59.751,
+      "activeFrame": {
+        "mean": 16.736,
+        "p95": 16.9,
+        "max": 66.7
+      },
+      "activeSlowFrameThresholdMs": 12.5,
+      "activeSlowFrames": 717,
+      "frameWork": {
+        "mean": 6.19,
+        "p95": 10.4,
+        "max": 13.4
+      },
+      "workOverBudget": 76
+    },
+    {
+      "map": "스위치백 익스프레스",
+      "count": 100,
+      "mode": "zoom",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1.75,
+      "seconds": 12,
+      "fps": 59.584,
+      "frame": {
+        "mean": 16.783,
+        "p95": 16.8,
+        "max": 50
+      },
+      "slowFrames": 4,
+      "renders": 715,
+      "render": {
+        "mean": 1.992,
+        "p95": 4.1,
+        "max": 32.5
+      },
+      "physics": {
+        "mean": 4.176,
+        "p95": 5.8,
+        "max": 8.1
+      },
+      "entityReads": 715,
+      "sprites": 1297,
+      "simulatedSeconds": 11.95,
+      "state": "running",
+      "targetFps": 120,
+      "targetFrameMs": 8.333,
+      "activeSeconds": 12,
+      "activeFps": 59.584,
+      "activeFrame": {
+        "mean": 16.783,
+        "p95": 16.8,
+        "max": 50
+      },
+      "activeSlowFrameThresholdMs": 12.5,
+      "activeSlowFrames": 715,
+      "frameWork": {
+        "mean": 6.383,
+        "p95": 9.5,
+        "max": 38.8
+      },
+      "workOverBudget": 64
+    },
+    {
+      "map": "스위치백 익스프레스",
+      "count": 100,
+      "mode": "run",
+      "speed": 4,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1.75,
+      "seconds": 12,
+      "fps": 59.667,
+      "frame": {
+        "mean": 16.76,
+        "p95": 16.9,
+        "max": 50.1
+      },
+      "slowFrames": 2,
+      "renders": 716,
+      "render": {
+        "mean": 1.674,
+        "p95": 2.4,
+        "max": 35.8
+      },
+      "physics": {
+        "mean": 2.775,
+        "p95": 4.8,
+        "max": 9.5
+      },
+      "entityReads": 716,
+      "sprites": 0,
+      "simulatedSeconds": 30.9,
+      "state": "running",
+      "targetFps": 120,
+      "targetFrameMs": 8.333,
+      "activeSeconds": 12,
+      "activeFps": 59.667,
+      "activeFrame": {
+        "mean": 16.76,
+        "p95": 16.9,
+        "max": 50.1
+      },
+      "activeSlowFrameThresholdMs": 12.5,
+      "activeSlowFrames": 716,
+      "frameWork": {
+        "mean": 9.091,
+        "p95": 11.5,
+        "max": 44.4
+      },
+      "workOverBudget": 470
+    },
+    {
+      "map": "네온 모래시계",
+      "count": 100,
+      "mode": "run",
+      "speed": 4,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1.75,
+      "seconds": 12,
+      "fps": 60,
+      "frame": {
+        "mean": 16.667,
+        "p95": 17,
+        "max": 19.6
+      },
+      "slowFrames": 0,
+      "renders": 380,
+      "render": {
+        "mean": 0.719,
+        "p95": 1,
+        "max": 2.2
+      },
+      "physics": {
+        "mean": 1.637,
+        "p95": 4,
+        "max": 22.4
+      },
+      "entityReads": 380,
+      "sprites": 0,
+      "simulatedSeconds": 17.05,
+      "state": "finished",
+      "targetFps": 120,
+      "targetFrameMs": 8.333,
+      "activeSeconds": 5.3,
+      "activeFps": 60.002,
+      "activeFrame": {
+        "mean": 16.666,
+        "p95": 16.9,
+        "max": 17.7
+      },
+      "activeSlowFrameThresholdMs": 12.5,
+      "activeSlowFrames": 318,
+      "frameWork": {
+        "mean": 6.23,
+        "p95": 9.4,
+        "max": 23.3
+      },
+      "workOverBudget": 60
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<title>핀볼 프레임 진단</title>
+<style>
+body { margin: 16px; background: #0b1119; color: #d9e5ef; font: 14px system-ui; }
+canvas { display: block; width: 1000px; height: 600px; max-width: 100%; }
+form { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+pre { white-space: pre-wrap; }
+</style>
+<form>
+  <label>맵 <select name="map" id="map"></select></label>
+  <label>구슬 <input name="count" id="count" type="number" min="1" max="300" value="200" style="width:70px"></label>
+  <label>상태 <select name="mode" id="mode"><option value="run">경기</option><option value="zoom">경기 중 확대</option><option value="idle">대기</option></select></label>
+  <label>배속 <select name="speed" id="speed"><option>1</option><option>4</option></select></label>
+  <label>진단 목표 <select name="target" id="target"><option value="60">60FPS</option><option value="120" selected>120FPS</option></select></label>
+  <button name="start" value="1">14초 측정</button>
+</form>
+<p id="status">준비 중</p>
+<p>진단 목표는 결과 판정 기준입니다. 실제 화면 갱신은 모니터·브라우저 주사율을 따릅니다.</p>
+<canvas id="game"></canvas>
+<pre id="result"></pre>
+<script type="module" src="./performance.ts"></script>
+</html>

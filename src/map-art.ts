@@ -9,14 +9,15 @@ import { drawHourglassArt } from './hourglass-art';
 import { drawCanyonArt, drawCanyonDevices } from './canyon-art';
 import { drawEntities } from './draw';
 import type { MapEntityState } from './types/MapEntity.type';
+import type { ViewBounds } from './art-visibility';
 
 // Draw the elevated exit after the ground-level rings, including on both minimaps.
-export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number, cacheBackground = true) {
-  if (stage.art?.style === 'reversal-ladder') drawLadderDevices(ctx, stage, entities);
-  if (stage.art?.style === 'roundhouse') drawRoundhouseTrains(ctx, entities);
-  if (stage.art?.style === 'switchback-express') drawExpressDevices(ctx, entities);
-  if (stage.art?.style === 'crossway') drawCrosswayDevices(ctx, entities);
-  if (stage.art?.style === 'fracture-canyon') drawCanyonDevices(ctx, entities, scale);
+export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number, cacheBackground = true, view?: ViewBounds) {
+  if (stage.art?.style === 'reversal-ladder') drawLadderDevices(ctx, stage, entities, view);
+  if (stage.art?.style === 'roundhouse') drawRoundhouseTrains(ctx, entities, view);
+  if (stage.art?.style === 'switchback-express') drawExpressDevices(ctx, entities, view);
+  if (stage.art?.style === 'crossway') drawCrosswayDevices(ctx, entities, view);
+  if (stage.art?.style === 'fracture-canyon') drawCanyonDevices(ctx, entities, scale, view);
   if (!stage.exitBridge) return;
   ctx.save();
   if (stage.art?.style === 'orbital-lock') {
@@ -26,7 +27,7 @@ export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, e
     ctx.beginPath(); ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
     ctx.fillStyle = '#10232f'; ctx.fill();
   }
-  drawEntities(ctx, entities.filter(e => e.shape.collisionLayer === 2), scale, -1, scale > 3, undefined, !!stage.art);
+  drawEntities(ctx, entities.filter(e => e.shape.collisionLayer === 2), scale, -1, scale > 3, view, !!stage.art);
   ctx.restore();
 }
 

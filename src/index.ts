@@ -1,22 +1,20 @@
 import { stages, DEFAULT_MAP_INDEX, type StageDef } from './data/maps';
 import { Game } from './game';
-import { parseNames, readSavedMaps, saveMaps, winningRange, type WinnerOrder, type SavedMap } from './model';
+import { parseNames, winningRange, type WinnerOrder } from './model';
+import { MapLibrary } from './map-library';
 import { Recorder } from './recorder';
 import { el, toast, message, STALLED_MESSAGE } from './ui';
 import { Editor } from './editor';
 import { Rankings } from './rankings';
 import { MapGallery } from './map-gallery';
 
-let saved: SavedMap[] = [];
+const library = new MapLibrary(stages);
 try {
-  saved = readSavedMaps(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));
+  library.load(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));
 } catch {
   toast('저장된 맵을 읽지 못했어요. 브라우저의 저장소 설정을 확인해 주세요.');
 }
-const allMaps = () => [
-  ...stages.map((stage, i) => ({ id: `builtin-${i}`, stage })),
-  ...saved,
-];
+const allMaps = () => library.list();
 const game = new Game(el<HTMLCanvasElement>('game'));
 game.setVisible(false);
 const rankings = new Rankings();
@@ -72,7 +70,7 @@ function showGame() {
   if (!galleryView.hidden) galleryScroll = window.scrollY;
   galleryView.hidden = true;
   gameView.hidden = false;
-  game.setVisible(true);
+  game.setVisible(!el<HTMLDialogElement>('editor-dialog').open);
   el('gallery-resume').hidden = false;
   window.scrollTo(0, 0);
   el('maps-open').focus({ preventScroll: true });
@@ -242,11 +240,9 @@ game
 
 const editor = new Editor({
   list: allMaps,
+  onOpenChange(open) { game.setVisible(!open && !gameView.hidden); },
   save(stage, id) {
-    const nextId = id && !id.startsWith('builtin-') ? id : crypto.randomUUID();
-    const next = [...saved.filter((m) => m.id !== nextId), { id: nextId, stage }];
-    saveMaps(localStorage, next);
-    saved = next;
+    const nextId = library.save(localStorage, stage, id);
     currentStage = stage;
     refreshMaps(nextId);
     showGame();
@@ -254,9 +250,7 @@ const editor = new Editor({
     return nextId;
   },
   remove(id) {
-    const next = saved.filter((m) => m.id !== id);
-    saveMaps(localStorage, next);
-    saved = next;
+    library.remove(localStorage, id);
     if (mapSelect.value === id) {
       currentStage = stages[DEFAULT_MAP_INDEX];
       refreshMaps('builtin-' + DEFAULT_MAP_INDEX);

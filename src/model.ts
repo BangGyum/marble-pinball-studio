@@ -1,11 +1,22 @@
-import { ART_STYLES, type StageDef } from './data/maps';
+import { ART_STYLES, type StageDef } from './stage-def';
 import type { MapEntity } from './types/MapEntity.type';
+import { MAX_WALL_GRID_ENTRIES, wallGridCost } from './wall-guard';
 
 export type WinnerOrder = 'asc' | 'desc';
 export type SavedMap = { id: string; stage: StageDef };
 export const MAPS_KEY = 'marble-pinball.maps.v1';
 export const MAPS_BACKUP_PREFIX = MAPS_KEY + '.recovery.';
 export const MAX_MARBLES = 300;
+export const MAX_MAP_FILE_BYTES = 1_000_000;
+// Older exports include indentation; validate the normalized map separately after reading.
+export const MAX_MAP_IMPORT_BYTES = 2_000_000;
+export const MAX_MAP_FIXTURES = 10_000;
+const mapFile = (stage: StageDef) => ({ format: 'marble-pinball-map', version: 1, stage });
+export function exportMap(stage: StageDef) {
+  const data = mapFile(validateStage(stage));
+  const pretty = JSON.stringify(data, null, 2);
+  return new TextEncoder().encode(pretty).byteLength <= MAX_MAP_FILE_BYTES ? pretty : JSON.stringify(data);
+}
 export function parseNames(text: string): string[] {
   const names: string[] = [];
   for (const entry of text
@@ -129,6 +140,7 @@ export function validateStage(value: unknown): StageDef {
         throw new Error('회전 바람 설정이 올바르지 않아요.');
     } else throw new Error('알 수 없는 바람 종류예요.');
   }
+  let fixtures = 0;
   for (const e of s.entities) {
     if (
       !e ||
@@ -224,8 +236,14 @@ export function validateStage(value: unknown): StageDef {
         }
       }
     } else throw new Error('지원하지 않는 장애물이에요.');
+    fixtures += sh.type === 'polyline' && !sh.solid ? (sh.points.length - 1) * (sh.backing ? 2 : 1) : 1;
+    if (fixtures > MAX_MAP_FIXTURES) throw new Error('맵의 충돌 형상이 너무 많아요. 벽의 점이나 장애물 수를 줄여 주세요.');
   }
-  return { ...cloneStage(s), title: s.title.trim(), zoomY: s.goalY - 5 };
+  if (wallGridCost(s) > MAX_WALL_GRID_ENTRIES) throw new Error('벽 검사 범위가 너무 커요. 긴 벽이나 장애물 수를 줄여 주세요.');
+  const normalized = { ...cloneStage(s), title: s.title.trim(), zoomY: s.goalY - 5 };
+  if (new TextEncoder().encode(JSON.stringify(mapFile(normalized))).byteLength > MAX_MAP_FILE_BYTES)
+    throw new Error('맵 데이터는 1MB 이하로 줄여 주세요.');
+  return normalized;
 }
 export function readSavedMaps(storage: Pick<Storage, 'getItem'>, onInvalid?: (count: number) => void): SavedMap[] {
   const raw = storage.getItem(MAPS_KEY);

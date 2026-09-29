@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs'), ts = require('typescript'), vm = require('node:vm');
+const fs = require('node:fs'), ts = require('typescript');
 require.extensions['.ts'] = (m, f) => m._compile(ts.transpileModule(fs.readFileSync(f, 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
 }).outputText, f);
@@ -51,46 +51,36 @@ assert.throws(() => saveMaps(healthy, [bad]));
 assert.deepEqual(readSavedMaps(healthy), [good], 'invalid edits must not damage existing maps');
 console.log('PASS partial map recovery, original backups, failed backups, repeated recovery and invalid saves');
 
-// Exercise the actual map-list and editor callbacks in both frontends without touching browser storage.
-for (const file of ['src/index.ts', 'src/lan/client.ts']) {
-  const text = fs.readFileSync(file, 'utf8');
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.ES2022, true);
-  const declarations = source.statements.filter(ts.isVariableStatement).flatMap(s => [...s.declarationList.declarations]);
-  const allMaps = declarations.find(d => d.name.getText(source) === 'allMaps').getText(source);
-  const editor = declarations.find(d => d.name.getText(source) === 'editor').initializer.arguments[0].getText(source);
-  const store = storageFor();
-  const ctx = { stages, DEFAULT_MAP_INDEX, saved: [], customStage: undefined, currentStage: stages[DEFAULT_MAP_INDEX],
-    mapSelect: { value: '' }, localStorage: store, saveMaps, crypto: require('node:crypto'),
-    refreshMaps(id) { if (id !== undefined) ctx.mapSelect.value = id; }, prepare() {}, showGame() {},
-    prepareUI() { ctx.transmitted = vm.runInContext('allMaps().find(m => m.id === mapSelect.value)?.stage', ctx); },
-  };
-  vm.createContext(ctx);
-  vm.runInContext(ts.transpileModule('const ' + allMaps + '; const actions = ' + editor + ';', {
-    compilerOptions: { target: ts.ScriptTarget.ES2022 },
-  }).outputText, ctx);
-  const pipeline = stages.findIndex(s => s.title === '네온 파이프라인');
-  ctx.edited = { ...stages[pipeline], goalY: 220 };
-  ctx.mapSelect.value = 'builtin-' + pipeline;
-  vm.runInContext('actions.save(edited, mapSelect.value)', ctx);
-  const savedId = ctx.mapSelect.value;
-  assert.ok(!savedId.startsWith('builtin-'));
-  ctx.edited = { ...ctx.edited, goalY: 210 };
-  vm.runInContext('actions.save(edited, mapSelect.value)', ctx);
-  assert.equal(ctx.mapSelect.value, savedId);
-  assert.equal(ctx.saved.length, 1, file + ': re-edit must update the same map');
-  ctx.saved = readSavedMaps(store);
-  assert.equal(vm.runInContext('allMaps().find(m => m.id === mapSelect.value).stage.goalY', ctx), 210);
-  assert.equal(vm.runInContext('allMaps().find(m => m.id === "builtin-' + pipeline + '").stage.goalY', ctx), stages[pipeline].goalY);
-  if (file.includes('/lan/')) assert.equal(ctx.transmitted.goalY, 210, 'LAN must send the saved selection');
-  ctx.saved.push({ id: 'legacy', stage: { ...ctx.edited, goalY: 200 } });
-  assert.equal(vm.runInContext('allMaps().filter(m => !m.id.startsWith("builtin-")).length', ctx), 2,
-    'existing same-title maps remain accessible by ID');
-  vm.runInContext('actions.remove("legacy")', ctx);
-  assert.equal(ctx.mapSelect.value, savedId, 'deleting another map must preserve selection');
-  vm.runInContext('actions.remove(mapSelect.value)', ctx);
-  assert.equal(ctx.mapSelect.value, 'builtin-' + DEFAULT_MAP_INDEX);
-  console.log('PASS ' + file + ': save, re-edit, reload, duplicate titles and removal');
-}
+// Both frontends use the same persistence/list implementation; exercise it directly.
+const { MapLibrary } = require('../src/map-library.ts');
+const store = storageFor();
+const library = new MapLibrary(stages);
+library.load(store);
+const pipeline = stages.findIndex(s => s.title === '네온 파이프라인');
+let edited = { ...stages[pipeline], goalY: 220 };
+const savedId = library.save(store, edited, 'builtin-' + pipeline);
+assert.ok(!savedId.startsWith('builtin-'));
+edited = { ...edited, goalY: 210 };
+assert.equal(library.save(store, edited, savedId), savedId);
+assert.equal(library.list().filter(m => !m.id.startsWith('builtin-')).length, 1);
+library.load(store);
+assert.equal(library.list().find(m => m.id === savedId).stage.goalY, 210);
+assert.equal(library.list().find(m => m.id === 'builtin-' + pipeline).stage.goalY, stages[pipeline].goalY);
+const duplicateId = library.save(store, { ...edited, goalY: 200 }, null);
+assert.notEqual(duplicateId, savedId, 'same-title maps keep separate identities');
+assert.equal(library.list().filter(m => !m.id.startsWith('builtin-')).length, 2);
+assert.equal(library.list(edited).at(-1).id, 'preview');
+assert.ok(!library.list().some(m => m.id === 'preview'), 'preview never enters the saved list');
+const denyWrites = { getItem: store.getItem, setItem() { throw new Error('QuotaExceededError'); } };
+assert.throws(() => library.save(denyWrites, { ...edited, goalY: 190 }, savedId));
+assert.equal(library.list().find(m => m.id === savedId).stage.goalY, 210, 'failed save leaves in-memory state intact');
+assert.throws(() => library.remove(denyWrites, savedId));
+assert.ok(library.list().some(m => m.id === savedId));
+library.remove(store, duplicateId);
+assert.ok(library.list().some(m => m.id === savedId), 'removing another map preserves the selected map');
+library.remove(store, savedId);
+assert.equal(library.list().length, stages.length);
+console.log('PASS shared library save/re-edit/reload/duplicate titles/preview/removal and failed writes');
 assert.equal(stages[DEFAULT_MAP_INDEX].title, '네온 분기점');
 console.log('PASS shared initial map is neon junction');
 assert.equal(stages.length, 16, 'the built-in map list includes reversal ladder and excludes retired maps');

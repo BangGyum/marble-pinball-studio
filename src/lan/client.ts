@@ -4,9 +4,11 @@ import { Rankings } from '../rankings';
 import { Editor } from '../editor';
 import { Recorder } from '../recorder';
 import { stages, DEFAULT_MAP_INDEX, type StageDef } from '../data/maps';
-import { parseNames, winningRange, readSavedMaps, saveMaps, type SavedMap, type WinnerOrder } from '../model';
+import { parseNames, winningRange, type WinnerOrder } from '../model';
+import { MapLibrary } from '../map-library';
 import { el, toast, message, STALLED_MESSAGE } from '../ui';
 import type { Command, Frame, Identity, Info, Scene, ServerMessage, Settings } from './protocol';
+import { serializeCommand } from './protocol';
 
 const view = new LanView(el<HTMLCanvasElement>('game'));
 const rankings = new Rankings((id) => selectBall(view.focusedBallId === id ? null : id));
@@ -17,17 +19,14 @@ const isLocal = ['127.0.0.1', 'localhost'].includes(location.hostname);
 let socket: WebSocket | undefined, scene: Scene | undefined, frame: Frame | undefined;
 let identity: Identity = { type: 'identity', role: 'viewer' };
 let info: Info, online = false, retry = 0, sequence = 0, uiUpdate = 0;
-let preferredPicks = 2, customStage: StageDef | undefined, saved: SavedMap[] = [];
+let preferredPicks = 2, customStage: StageDef | undefined;
+const library = new MapLibrary(stages);
 let inputTimer: ReturnType<typeof setTimeout>, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
 try {
-  saved = readSavedMaps(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));
+  library.load(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));
 } catch { toast('저장된 맵을 읽지 못했어요.'); }
-const allMaps = () => [
-  ...stages.map((stage, i) => ({ id: 'builtin-' + i, stage })),
-  ...saved,
-  ...(customStage ? [{ id: 'preview', stage: customStage }] : []),
-];
+const allMaps = () => library.list(customStage);
 function refreshMaps(selected = mapSelect.value) {
   mapSelect.replaceChildren(...allMaps().map((m) => new Option(
     (m.id.startsWith('builtin-') ? '' : m.id === 'preview' ? '미리보기 · ' : '내 맵 · ') + m.stage.title, m.id)));
@@ -94,9 +93,10 @@ function command(input: InputCommand) {
   return new Promise<void>((resolve, reject) => {
     if (!online || !scene || socket?.readyState !== WebSocket.OPEN) return reject(new Error('서버에 다시 연결될 때까지 기다려 주세요.'));
     const requestId = requestPrefix + '_' + ++sequence;
+    const data = serializeCommand({ ...input, requestId, raceId: scene.raceId });
     const timer = setTimeout(() => { pending.delete(requestId); reject(new Error('응답을 확인하지 못했어요. 현재 경기 상태를 확인해 주세요.')); }, 5000);
     pending.set(requestId, { resolve, reject, timer });
-    socket.send(JSON.stringify({ ...input, requestId, raceId: scene.raceId }));
+    socket.send(data);
   });
 }
 const run = (input: InputCommand) => command(input).catch((error) => toast(message(error)));
@@ -195,7 +195,7 @@ el('start').addEventListener('click', () => {
 });
 el('pause').addEventListener('click', () => void run({ type: 'pause' }));
 el('speed').addEventListener('change', () => void run({ type: 'speed', value: Number(el<HTMLSelectElement>('speed').value) }));
-view.onSpring = (index) => { if (online) void run({ type: 'spring', index }); };
+view.onSpring = (index) => { if (online && scene) void run({ type: 'spring', index, revision: scene.revision }); };
 view.onBoost = (active) => {
   if (!active) {
     if (boostTimer) { clearInterval(boostTimer); boostTimer = undefined; if (online) void run({ type: 'boost', active: false }); }
@@ -220,17 +220,16 @@ document.addEventListener('keydown', (event) => { if (event.key === 'Escape') { 
 el('address').addEventListener('change', setAddress);
 
 const editor = new Editor({
-  list: () => [...stages.map((stage, i) => ({ id: 'builtin-' + i, stage })), ...saved],
+  list: () => library.list(),
+  onOpenChange(open) { view.setVisible(!open); },
   save(stage, id) {
-    const nextId = id && !id.startsWith('builtin-') ? id : crypto.randomUUID();
-    const next = [...saved.filter((m) => m.id !== nextId), { id: nextId, stage }];
-    saveMaps(localStorage, next); saved = next; customStage = undefined;
+    const nextId = library.save(localStorage, stage, id); customStage = undefined;
     refreshMaps(nextId);
     void prepareUI(true); return nextId;
   },
   remove(id) {
     const selected = mapSelect.value;
-    const next = saved.filter((m) => m.id !== id); saveMaps(localStorage, next); saved = next;
+    library.remove(localStorage, id);
     refreshMaps(selected === id ? 'builtin-' + DEFAULT_MAP_INDEX : selected); void prepareUI();
   },
   play(stage) { customStage = stage; refreshMaps('preview'); void prepareUI(true); },

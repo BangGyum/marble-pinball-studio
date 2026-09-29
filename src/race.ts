@@ -1,5 +1,6 @@
 import { SpringCooldowns } from './spring-cooldowns';
 import { Box2dPhysics } from './physics-box2d';
+import type { IPhysics } from './IPhysics';
 import type { StageDef } from './data/maps';
 import { shuffled, type WinnerOrder } from './model';
 import { WallGuard, WALL_GUARD_MAX_SPEED } from './wall-guard';
@@ -37,7 +38,7 @@ const STALL_LIMIT_SECONDS = 300;
 
 // One simulation, shared by the standalone browser and the authoritative LAN server.
 export class Race {
-  readonly physics = new Box2dPhysics();
+  readonly physics: IPhysics = new Box2dPhysics();
   readonly springCooldowns = new SpringCooldowns();
   private springPlayer = {};
   activateSpring(index: number, player: object = this.springPlayer) {
@@ -48,8 +49,8 @@ export class Race {
     this.springCooldowns.consume(shape, player);
     return true;
   }
-  springStatuses(player: object = this.springPlayer): [number, number, boolean][] {
-    return this.physics.getEntities().flatMap((e, i) => e.shape.type === 'box' && e.shape.spring
+  springStatuses(player: object = this.springPlayer, entities = this.physics.getEntities()): [number, number, boolean][] {
+    return entities.flatMap((e, i) => e.shape.type === 'box' && e.shape.spring
       ? [[i, Math.ceil(this.springCooldowns.remaining(e.shape, player)), this.physics.isSpringBusy(i)] as [number, number, boolean]] : []);
   }
   state: 'ready' | 'running' | 'paused' | 'finished' = 'ready';

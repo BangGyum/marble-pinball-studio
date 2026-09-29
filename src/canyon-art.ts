@@ -1,9 +1,10 @@
 import type { StageDef } from './data/maps';
+import { backgroundCache } from './background-cache';
+import { visibleArt, type ViewBounds } from './art-visibility';
 import type { MapEntityState } from './types/MapEntity.type';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 type Point = [number, number];
-const cache = new WeakMap<StageDef, { canvas: OffscreenCanvas; textured: boolean }>();
 const path = (ctx: Context, points: Point[]) => {
   ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
 };
@@ -69,16 +70,7 @@ export function drawCanyonArt(ctx: Context, stage: StageDef, cacheBackground = t
     : document.getElementById('canyon-rock-texture') as HTMLImageElement | null;
   const textured = !!texture?.complete && !!texture.naturalWidth;
   if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paintCanyon(ctx, stage, textured ? texture! : undefined); return; }
-  let stored = cache.get(stage);
-  if (!stored || stored.textured !== textured) {
-    const density = 20, width = stage.width ?? 64, height = stage.goalY + 39;
-    const canvas = new OffscreenCanvas(Math.ceil(width * density), Math.ceil(height * density));
-    const c = canvas.getContext('2d')!;
-    c.scale(density, density); c.translate(0, 32);
-    paintCanyon(c, stage, textured ? texture! : undefined);
-    stored = { canvas, textured }; cache.set(stage, stored);
-  }
-  ctx.drawImage(stored.canvas, 0, -32, stage.width ?? 64, stage.goalY + 39);
+  backgroundCache.draw(ctx, stage, 'canyon/' + textured, { x: 0, y: -32, width: stage.width ?? 64, height: stage.goalY + 39, density: 20 }, target => paintCanyon(target, stage, textured ? texture! : undefined));
 }
 
 function bridgeDeck(ctx: Context, a: Point, b: Point, color: string) {
@@ -96,9 +88,10 @@ function bridgeDeck(ctx: Context, a: Point, b: Point, color: string) {
   ctx.restore();
 }
 
-export function drawCanyonDevices(ctx: Context, entities: MapEntityState[], scale: number) {
+export function drawCanyonDevices(ctx: Context, entities: MapEntityState[], scale: number, view?: ViewBounds) {
   ctx.save(); ctx.shadowBlur = 0;
   for (const e of entities) {
+    if (!visibleArt(e, view)) continue;
     const s = e.shape;
     if (s.hidden) continue;
     ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);

@@ -2,6 +2,7 @@ import type { StageDef } from '../data/maps';
 import type { WinnerOrder } from '../model';
 import type { MapEntityState } from '../types/MapEntity.type';
 export const LAN_PORT = 43190;
+export const MAX_LAN_MESSAGE_BYTES = 1024 * 1024;
 export type Settings = { names: string; mapId: number; order: WinnerOrder; picks: number; stage?: StageDef };
 export type Scene = {
   type: 'scene'; raceId: string; revision: number; stage: StageDef; settings: Settings;
@@ -27,7 +28,15 @@ export type Command = { requestId: string; raceId: string } & (
   | { type: 'start' | 'pause' | 'reset' }
   | { type: 'speed'; value: number }
   | { type: 'boost'; active: boolean }
-  | { type: 'spring'; index: number }
+  | { type: 'spring'; index: number; revision: number }
 );
+export type CommandResult = { type: 'result'; requestId: string; ok: boolean; error?: string };
 export type ServerMessage = Scene | Frame | Identity
-  | { type: 'result'; requestId: string; ok: boolean; error?: string };
+  | CommandResult;
+
+export function serializeCommand(command: Command): string {
+  const data = JSON.stringify(command);
+  if (new TextEncoder().encode(data).byteLength > MAX_LAN_MESSAGE_BYTES)
+    throw new Error('경기 설정이 너무 커서 전송할 수 없어요. 맵이나 참가자 이름의 크기를 줄여 주세요.');
+  return data;
+}

@@ -1,0 +1,483 @@
+{
+  "baseline": "315c63d",
+  "viewport": [
+    1100,
+    900
+  ],
+  "notes": "각 조건 2초 워밍업+12초 측정. 순위 DOM/녹화 제외. 최초 차고지 비교 및 roundhouse-final/repeat의 current는 제외된 배경 캐시 후보. 최종 차고지는 roundhouse-vector-final. 다른 맵의 current는 최종 적용된 코드.",
+  "runs": [
+    {
+      "version": "baseline",
+      "map": "회전 차고지",
+      "count": 200,
+      "mode": "run",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 59.918,
+      "frame": {
+        "mean": 16.69,
+        "p95": 16.9,
+        "max": 33.3
+      },
+      "slowFrames": 1,
+      "renders": 719,
+      "render": {
+        "mean": 1.782,
+        "p95": 2.7,
+        "max": 4.5
+      },
+      "physics": {
+        "mean": 6.381,
+        "p95": 10.3,
+        "max": 15.6
+      },
+      "entityReads": 1438,
+      "sprites": 5,
+      "simulatedSeconds": 10.9,
+      "state": "running"
+    },
+    {
+      "version": "current",
+      "map": "회전 차고지",
+      "count": 200,
+      "mode": "run",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 60.001,
+      "frame": {
+        "mean": 16.667,
+        "p95": 16.9,
+        "max": 18
+      },
+      "slowFrames": 0,
+      "renders": 720,
+      "render": {
+        "mean": 1.592,
+        "p95": 2.7,
+        "max": 3.9
+      },
+      "physics": {
+        "mean": 4.826,
+        "p95": 7.4,
+        "max": 10.3
+      },
+      "entityReads": 720,
+      "sprites": 5,
+      "simulatedSeconds": 11.583,
+      "state": "running"
+    },
+    {
+      "version": "baseline",
+      "map": "스위치백 익스프레스",
+      "count": 200,
+      "mode": "zoom",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 54.584,
+      "frame": {
+        "mean": 18.32,
+        "p95": 33.3,
+        "max": 100
+      },
+      "slowFrames": 51,
+      "renders": 655,
+      "render": {
+        "mean": 4.078,
+        "p95": 15.4,
+        "max": 37.3
+      },
+      "physics": {
+        "mean": 4.399,
+        "p95": 6.9,
+        "max": 10.1
+      },
+      "entityReads": 1310,
+      "sprites": 11027,
+      "simulatedSeconds": 11.35,
+      "state": "running"
+    },
+    {
+      "version": "current",
+      "map": "스위치백 익스프레스",
+      "count": 200,
+      "mode": "zoom",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 59.751,
+      "frame": {
+        "mean": 16.736,
+        "p95": 16.9,
+        "max": 50.1
+      },
+      "slowFrames": 2,
+      "renders": 717,
+      "render": {
+        "mean": 3.897,
+        "p95": 6.4,
+        "max": 26.7
+      },
+      "physics": {
+        "mean": 7.514,
+        "p95": 11.3,
+        "max": 12.9
+      },
+      "entityReads": 717,
+      "sprites": 1392,
+      "simulatedSeconds": 10.333,
+      "state": "running"
+    },
+    {
+      "version": "baseline",
+      "map": "네온 분기점",
+      "count": 300,
+      "mode": "idle",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 60.001,
+      "frame": {
+        "mean": 16.666,
+        "p95": 16.8,
+        "max": 17.1
+      },
+      "slowFrames": 0,
+      "renders": 720,
+      "render": {
+        "mean": 2.489,
+        "p95": 3.2,
+        "max": 10.8
+      },
+      "physics": {
+        "mean": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "entityReads": 1440,
+      "sprites": 0,
+      "simulatedSeconds": 0,
+      "state": "ready"
+    },
+    {
+      "version": "current",
+      "map": "네온 분기점",
+      "count": 300,
+      "mode": "idle",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 59.917,
+      "frame": {
+        "mean": 16.69,
+        "p95": 16.9,
+        "max": 33
+      },
+      "slowFrames": 1,
+      "renders": 113,
+      "render": {
+        "mean": 3.717,
+        "p95": 5.1,
+        "max": 5.7
+      },
+      "physics": {
+        "mean": 0,
+        "p95": 0,
+        "max": 0
+      },
+      "entityReads": 113,
+      "sprites": 0,
+      "simulatedSeconds": 0,
+      "state": "ready"
+    },
+    {
+      "version": "baseline",
+      "map": "네온 분기점",
+      "count": 300,
+      "mode": "run",
+      "speed": 4,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 59.666,
+      "frame": {
+        "mean": 16.76,
+        "p95": 16.9,
+        "max": 52.7
+      },
+      "slowFrames": 3,
+      "renders": 716,
+      "render": {
+        "mean": 1.178,
+        "p95": 1.8,
+        "max": 2.5
+      },
+      "physics": {
+        "mean": 6.244,
+        "p95": 13.2,
+        "max": 57.2
+      },
+      "entityReads": 1432,
+      "sprites": 119,
+      "simulatedSeconds": 17.567,
+      "state": "running"
+    },
+    {
+      "version": "current",
+      "map": "네온 분기점",
+      "count": 300,
+      "mode": "run",
+      "speed": 4,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 59.917,
+      "frame": {
+        "mean": 16.69,
+        "p95": 16.9,
+        "max": 33.4
+      },
+      "slowFrames": 1,
+      "renders": 719,
+      "render": {
+        "mean": 1.034,
+        "p95": 1.8,
+        "max": 3
+      },
+      "physics": {
+        "mean": 3.533,
+        "p95": 6.7,
+        "max": 12.6
+      },
+      "entityReads": 719,
+      "sprites": 129,
+      "simulatedSeconds": 25.95,
+      "state": "running"
+    },
+    {
+      "version": "baseline",
+      "trial": "roundhouse-final",
+      "map": "회전 차고지",
+      "count": 200,
+      "mode": "run",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 59.917,
+      "frame": {
+        "mean": 16.69,
+        "p95": 17,
+        "max": 33.2
+      },
+      "slowFrames": 1,
+      "renders": 719,
+      "render": {
+        "mean": 1.367,
+        "p95": 2.1,
+        "max": 3
+      },
+      "physics": {
+        "mean": 5.233,
+        "p95": 7.8,
+        "max": 10.6
+      },
+      "entityReads": 1438,
+      "sprites": 5,
+      "simulatedSeconds": 11.067,
+      "state": "running"
+    },
+    {
+      "version": "current",
+      "trial": "roundhouse-final",
+      "map": "회전 차고지",
+      "count": 200,
+      "mode": "run",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 59.998,
+      "frame": {
+        "mean": 16.667,
+        "p95": 16.9,
+        "max": 19.5
+      },
+      "slowFrames": 0,
+      "renders": 720,
+      "render": {
+        "mean": 2.589,
+        "p95": 4,
+        "max": 5.8
+      },
+      "physics": {
+        "mean": 7.074,
+        "p95": 10.1,
+        "max": 12.6
+      },
+      "entityReads": 720,
+      "sprites": 5,
+      "simulatedSeconds": 10.567,
+      "state": "running"
+    },
+    {
+      "version": "current",
+      "trial": "roundhouse-repeat",
+      "map": "회전 차고지",
+      "count": 200,
+      "mode": "run",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 59.668,
+      "frame": {
+        "mean": 16.759,
+        "p95": 16.9,
+        "max": 49.9
+      },
+      "slowFrames": 3,
+      "renders": 716,
+      "render": {
+        "mean": 2.65,
+        "p95": 3.7,
+        "max": 17.6
+      },
+      "physics": {
+        "mean": 8.062,
+        "p95": 11.1,
+        "max": 39.6
+      },
+      "entityReads": 716,
+      "sprites": 8,
+      "simulatedSeconds": 9.767,
+      "state": "running"
+    },
+    {
+      "version": "baseline",
+      "trial": "roundhouse-repeat",
+      "map": "회전 차고지",
+      "count": 200,
+      "mode": "run",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 60.002,
+      "frame": {
+        "mean": 16.666,
+        "p95": 17.3,
+        "max": 19.3
+      },
+      "slowFrames": 0,
+      "renders": 720,
+      "render": {
+        "mean": 2.103,
+        "p95": 3.1,
+        "max": 5
+      },
+      "physics": {
+        "mean": 7.429,
+        "p95": 10.8,
+        "max": 12.8
+      },
+      "entityReads": 1440,
+      "sprites": 3,
+      "simulatedSeconds": 9.983,
+      "state": "running"
+    },
+    {
+      "version": "current",
+      "trial": "roundhouse-vector-final",
+      "map": "회전 차고지",
+      "count": 200,
+      "mode": "run",
+      "speed": 1,
+      "seed": 123456,
+      "cssSize": [
+        1000,
+        600
+      ],
+      "dpr": 1,
+      "seconds": 12,
+      "fps": 59.999,
+      "frame": {
+        "mean": 16.667,
+        "p95": 16.9,
+        "max": 18.1
+      },
+      "slowFrames": 0,
+      "renders": 720,
+      "render": {
+        "mean": 1.281,
+        "p95": 1.8,
+        "max": 2.8
+      },
+      "physics": {
+        "mean": 4.578,
+        "p95": 6.7,
+        "max": 10.2
+      },
+      "entityReads": 720,
+      "sprites": 5,
+      "simulatedSeconds": 11.567,
+      "state": "running"
+    }
+  ]
+}

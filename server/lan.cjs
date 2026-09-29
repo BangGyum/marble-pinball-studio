@@ -5,34 +5,53 @@ const os = require('node:os');
 const { randomBytes, randomUUID } = require('node:crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 // This Box2D build loads local WASM through Node's fs path, not global fetch.
-global.fetch = undefined;
+Reflect.deleteProperty(globalThis, 'fetch');
 const { Race } = require('../.lan-build/race.js');
 const { stages, DEFAULT_MAP_INDEX } = require('../.lan-build/data/maps.js');
 const { parseNames, winningRange, validateStage } = require('../.lan-build/model.js');
-const { LAN_PORT } = require('../.lan-build/lan/protocol.js');
+const { LAN_PORT, MAX_LAN_MESSAGE_BYTES } = require('../.lan-build/lan/protocol.js');
+/** @typedef {import('../src/lan/protocol').Settings} Settings */
+/** @typedef {import('../src/lan/protocol').Scene} Scene */
+/** @typedef {import('../src/lan/protocol').Frame} Frame */
+/** @typedef {import('../src/lan/protocol').Command} Command */
+/** @typedef {import('../src/lan/protocol').CommandResult} CommandResult */
+/** @typedef {{ token: string, role: 'host' | 'viewer', touched: number, results: Map<string, CommandResult> }} Session */
+/** @typedef {import('../src/types/MapEntity.type').MapEntityState} MapEntityState */
 const loopback = (ip) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip);
 const round = (n) => Math.round(n * 1000) / 1000;
 const allowedKeys = (value, keys) => value && typeof value === 'object' && !Array.isArray(value)
   && Object.keys(value).every((key) => keys.includes(key));
 const requireThat = (condition, message) => { if (!condition) throw new Error(message); };
 
-async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
+async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNow = () => performance.now() } = {}) {
   const race = new Race();
   await race.physics.init();
+  /** @type {Settings} */
   let settings = { names: '', mapId: DEFAULT_MAP_INDEX, order: 'desc', picks: 2 };
-  let raceId, revision = 0, scene, seq = 0;
-  let accumulator = 0, lastTick = performance.now();
-  let speed = 1, boostOwner = null, boostUntil = 0;
-  const sessions = new Map(), clients = new Map(), attempts = new Map();
+  /** @type {string} */
+  let raceId;
+  /** @type {Scene} */
+  let scene;
+  let revision = 0, seq = 0;
+  let accumulator = 0, lastTick = simulationNow();
+  let speed = 1, boostUntil = 0;
+  /** @type {Session | null} */
+  let boostOwner = null;
+  /** @type {Map<string, Session>} */
+  const sessions = new Map();
+  /** @type {Map<import('ws').WebSocket, { session: Session, alive: boolean, count: number, window: number }>} */
+  const clients = new Map();
+  const attempts = new Map();
   const publicDir = path.resolve(__dirname, '../.lan-dist');
   const interfaces = Object.entries(os.networkInterfaces()).flatMap(([name, entries]) =>
-    entries.filter((entry) => entry.family === 'IPv4' && !entry.internal)
+    (entries ?? []).filter((entry) => entry.family === 'IPv4' && !entry.internal)
       .map((entry) => ({ name, address: entry.address })));
   interfaces.sort((a, b) => Number(/virtual|vethernet|wsl|vpn/i.test(a.name)) - Number(/virtual|vethernet|wsl|vpn/i.test(b.name)));
   let actualPort = port;
   const allowedHosts = () => new Set(['127.0.0.1', 'localhost', ...interfaces.map((i) => i.address)]
     .map((address) => `${address}:${actualPort}`));
   const validOrigin = (req) => allowedHosts().has(req.headers.host) && req.headers.origin === `http://${req.headers.host}`;
+  /** @returns {import('../src/lan/protocol').Info} */
   const info = () => ({
     maps: stages.map((s, id) => ({ id, title: s.title })),
     addresses: (interfaces.length ? interfaces : [{ name: '이 PC에서만 접속 가능', address: '127.0.0.1' }])
@@ -40,6 +59,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
   });
   const sessionOf = (req) => {
     const token = /(?:^|;\s*)pinball_session=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie ?? '')?.[1];
+    if (!token) return null;
     const session = sessions.get(token);
     if (!session || Date.now() - session.touched > 12 * 3600_000) return null;
     if (session.role === 'host' && !loopback(req.socket.remoteAddress)) return null;
@@ -56,11 +76,13 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(value));
   };
+  /** @param {import('ws').WebSocket} ws @param {import('../src/lan/protocol').ServerMessage | string} value */
   const send = (ws, value) => {
     if (ws.readyState !== WebSocket.OPEN) return;
     if (ws.bufferedAmount > 1024 * 1024) return ws.terminate();
     ws.send(typeof value === 'string' ? value : JSON.stringify(value));
   };
+  /** @param {Session} session @returns {import('../src/lan/protocol').Identity} */
   const identity = (session) => ({ type: 'identity', role: session.role });
   function makeScene(entities = race.physics.getEntities()) {
     const fixed = new Set((race.stage.entities ?? []).filter((e) => e.type === 'static' && (e.props.life ?? -1) <= 0).map((e) => e.shape));
@@ -79,9 +101,14 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
   function playbackRate() {
     return speed * (boostOwner && performance.now() < boostUntil ? 2 : 1) * race.finishSlowdown();
   }
-  function frame() {
-    const entities = race.physics.getEntities();
+  /** @param {MapEntityState[]} entities */
+  function syncScene(entities) {
     if (entities.length !== scene.entities.length) makeScene(entities);
+  }
+  /** @returns {Frame} */
+  function frame(entities = race.physics.getEntities()) {
+    syncScene(entities);
+    /** @type {NonNullable<Frame['positions']>} */
     const positions = entities.flatMap((e, i) => e.x !== scene.entities[i].x || e.y !== scene.entities[i].y
       ? [[i, round(e.x), round(e.y)]] : []);
     return { type: 'frame', raceId, revision, seq: ++seq, time: performance.now(), elapsed: race.elapsed,
@@ -93,16 +120,22 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
       winners: race.winners.map((b) => b.id) };
   }
   function broadcast() {
-    const snapshot = frame(), hasSprings = race.stage.entities?.some(e => e.shape.spring);
+    const entities = race.physics.getEntities();
+    const snapshot = frame(entities), hasSprings = entities.some(e => e.shape.type === 'box' && e.shape.spring);
     const data = JSON.stringify(snapshot);
     for (const [ws, client] of clients) if (ws.bufferedAmount < 256 * 1024)
-      send(ws, hasSprings ? { ...snapshot, springs: race.springStatuses(client.session) } : data);
+      send(ws, hasSprings ? { ...snapshot, springs: race.springStatuses(client.session, entities) } : data);
   }
+  /** @param {Session} session @param {Command} msg */
   function execute(session, msg) {
     requireThat(typeof msg.raceId === 'string' && msg.raceId === raceId, '경기가 바뀌었어요. 최신 화면에서 다시 시도해 주세요.');
-    const keys = { configure: ['settings'], start: [], pause: [], reset: [], speed: ['value'], boost: ['active'], spring: ['index'] };
+    /** @satisfies {{ [Type in Command['type']]: (keyof (Command & { type: Type }))[] }} */
+    const keys = { configure: ['settings'], start: [], pause: [], reset: [], speed: ['value'], boost: ['active'], spring: ['index', 'revision'] };
     requireThat(Object.hasOwn(keys, msg.type) && allowedKeys(msg, ['type', 'requestId', 'raceId', ...keys[msg.type]]), '허용되지 않은 요청입니다.');
     if (msg.type === 'spring') {
+      // A contact may have removed an obstacle since the last scheduled snapshot.
+      syncScene(race.physics.getEntities());
+      requireThat(Number.isInteger(msg.revision) && msg.revision === revision, '맵 장치가 바뀌었어요. 최신 화면에서 스프링을 다시 선택해 주세요.');
       requireThat(Number.isInteger(msg.index) && race.activateSpring(msg.index, session), '작동 가능한 스프링을 선택하고 쿨타임과 복귀가 끝난 후 다시 눌러 주세요.');
       return;
     }
@@ -142,8 +175,8 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
-    if (!allowedHosts().has(req.headers.host)) return json(res, 403, { error: '허용되지 않은 접속 주소입니다.' });
-    const url = new URL(req.url, `http://${req.headers.host}`);
+    if (!allowedHosts().has(req.headers.host ?? '')) return json(res, 403, { error: '허용되지 않은 접속 주소입니다.' });
+    const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
     if (req.method === 'POST' && ['/api/session', '/api/host-session'].includes(url.pathname)) {
       if (!validOrigin(req)) return json(res, 403, { error: '접속 출처를 확인할 수 없습니다.' });
       const isHost = url.pathname === '/api/host-session';
@@ -175,7 +208,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
     if (req.method === 'HEAD') return res.end();
     fs.createReadStream(target).on('error', () => res.destroy()).pipe(res);
   });
-  const wss = new WebSocketServer({ noServer: true, maxPayload: 1024 * 1024, perMessageDeflate: false });
+  const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_LAN_MESSAGE_BYTES, perMessageDeflate: false });
   server.on('upgrade', (req, socket, head) => {
     const session = sessionOf(req);
     if (req.url !== '/live' || !validOrigin(req) || !session || clients.size >= 128) {
@@ -199,26 +232,28 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
           return ws.close(1008, 'Invalid request ID');
         const prior = session.results.get(msg.requestId);
         if (prior) return send(ws, prior);
+        /** @type {CommandResult} */
         let result;
         try { execute(session, msg); result = { type: 'result', requestId: msg.requestId, ok: true }; }
-        catch (error) { result = { type: 'result', requestId: msg.requestId, ok: false, error: error.message }; }
+        catch (error) { result = { type: 'result', requestId: msg.requestId, ok: false, error: error instanceof Error ? error.message : String(error) }; }
         session.results.set(msg.requestId, result);
-        if (session.results.size > 64) session.results.delete(session.results.keys().next().value);
+        if (session.results.size > 64) session.results.delete(/** @type {string} */ (session.results.keys().next().value));
         send(ws, result); broadcast();
       });
-      send(ws, scene); send(ws, { ...frame(), springs: race.springStatuses(session) }); send(ws, identity(session));
+      const entities = race.physics.getEntities(), snapshot = frame(entities);
+      send(ws, scene); send(ws, { ...snapshot, springs: race.springStatuses(session, entities) }); send(ws, identity(session));
     });
   });
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, resolve); });
-  actualPort = server.address().port;
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, () => resolve(undefined)); });
+  actualPort = /** @type {import('node:net').AddressInfo} */ (server.address()).port;
   const timer = setInterval(() => {
-    const now = performance.now(), delta = Math.min((now - lastTick) / 1000, 0.1);
+    const tickStarted = performance.now(), now = simulationNow(), delta = Math.min((now - lastTick) / 1000, 0.1);
     lastTick = now;
     if (race.state !== 'running') { accumulator = 0; return; }
     const rate = playbackRate();
     accumulator += delta * rate;
     let steps = 0;
-    while (accumulator >= 1 / 60 && race.state === 'running' && steps < Math.max(6, Math.ceil(rate * 2)) && performance.now() - now < 12) {
+    while (accumulator >= 1 / 60 && race.state === 'running' && steps < Math.max(6, Math.ceil(rate * 2)) && performance.now() - tickStarted < 12) {
       race.advance(); accumulator -= 1 / 60; steps++;
     }
     // Keep collision steps fixed; shed overdue wall time instead of starving connections.
@@ -238,7 +273,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0' } = {}) {
       for (const ws of clients.keys()) ws.terminate();
       wss.close();
       await new Promise((resolve) => server.close(resolve));
-      race.physics.clearMarbles(); race.physics.clear();
+      race.physics.dispose();
     },
   };
 }

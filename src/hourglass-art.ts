@@ -1,22 +1,13 @@
 import type { StageDef } from './data/maps';
+import { backgroundCache } from './background-cache';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-const backgrounds = new WeakMap<StageDef, Map<number, OffscreenCanvas>>();
 
 export function drawHourglassArt(ctx: Context, stage: StageDef, cacheBackground = true) {
   if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
   const t = ctx.getTransform(), resolution = Math.min(24, Math.max(8, Math.ceil(Math.hypot(t.a, t.b) / 8) * 8));
-  let textures = backgrounds.get(stage);
-  if (!textures) { textures = new Map(); backgrounds.set(stage, textures); }
-  let canvas = textures.get(resolution);
   const width = (stage.width ?? 64) + 4, height = stage.goalY + 36;
-  if (!canvas) {
-    canvas = new OffscreenCanvas(Math.ceil(width * resolution), Math.ceil(height * resolution));
-    const background = canvas.getContext('2d')!;
-    background.setTransform(resolution, 0, 0, resolution, 2 * resolution, 32 * resolution);
-    paint(background, stage); textures.set(resolution, canvas);
-  }
-  ctx.drawImage(canvas, -2, -32, width, height);
+  backgroundCache.draw(ctx, stage, 'hourglass', { x: -2, y: -32, width, height, density: resolution }, target => paint(target, stage));
 }
 
 function paint(ctx: Context, stage: StageDef) {

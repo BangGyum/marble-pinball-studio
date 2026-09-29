@@ -1,10 +1,39 @@
-import type { StageDef } from './data/maps';
+import type { StageDef } from './stage-def';
 
 const CELL = 2;
 // A marble whose path wraps half-way around a sharp wall tip travels at least π·r (≈0.79) in one step.
 // Below this distance a straight chord through a wall can only mean the marble went through it.
 const MAX_PATH = 0.6;
 const key = (cx: number, cy: number) => (cx + 2048) * 4096 + cy + 2048;
+export const MAX_WALL_GRID_ENTRIES = 100_000;
+
+function forEachWall(stage: StageDef, visit: (ax: number, ay: number, bx: number, by: number, layer: number) => void) {
+  for (const entity of stage.entities ?? []) {
+    const s = entity.shape;
+    if (entity.type !== 'static' || s.sensor || (entity.props.life ?? -1) > 0 || s.type === 'circle') continue;
+    const { x, y } = entity.position, layer = s.collisionLayer ?? 1;
+    if (s.type === 'polyline') {
+      for (let i = 1; i < s.points.length; i++) {
+        const a = s.points[i - 1], b = s.points[i];
+        visit(x + a[0], y + a[1], x + b[0], y + b[1], layer);
+      }
+    } else if (s.boostSpeed === undefined) {
+      const cos = Math.cos(s.rotation), sin = Math.sin(s.rotation);
+      const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) =>
+        [x + u * s.width * cos - v * s.height * sin, y + u * s.width * sin + v * s.height * cos]);
+      corners.forEach((a, i) => { const b = corners[(i + 1) % 4]; visit(a[0], a[1], b[0], b[1], layer); });
+    }
+  }
+}
+
+// Conservative linear bound, including cells touching a grid edge or corner.
+export function wallGridCost(stage: StageDef) {
+  let entries = 0;
+  forEachWall(stage, (ax, ay, bx, by) => {
+    if (ax !== bx || ay !== by) entries += 4 * (Math.ceil(Math.abs(bx - ax) / CELL) + Math.ceil(Math.abs(by - ay) / CELL) + 2);
+  });
+  return entries;
+}
 
 // Static walls bucketed on a coarse grid. The solver can squeeze a slow marble through a wall
 // under pressure; continuous collision only protects fast ones.
@@ -13,36 +42,27 @@ export class WallGuard {
   private cells = new Map<number, number[]>();
 
   constructor(stage: StageDef) {
-    for (const entity of stage.entities ?? []) {
-      const s = entity.shape;
-      // Moving and breakable obstacles change shape over time; pins have no edges to cross.
-      if (entity.type !== 'static' || s.sensor || (entity.props.life ?? -1) > 0 || s.type === 'circle') continue;
-      const { x, y } = entity.position, layer = s.collisionLayer ?? 1;
-      if (s.type === 'polyline') {
-        for (let i = 1; i < s.points.length; i++) {
-          const a = s.points[i - 1], b = s.points[i];
-          this.add(x + a[0], y + a[1], x + b[0], y + b[1], layer);
-        }
-      } else if (s.boostSpeed === undefined) {
-        const cos = Math.cos(s.rotation), sin = Math.sin(s.rotation);
-        const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) =>
-          [x + u * s.width * cos - v * s.height * sin, y + u * s.width * sin + v * s.height * cos]);
-        corners.forEach((a, i) => { const b = corners[(i + 1) % 4]; this.add(a[0], a[1], b[0], b[1], layer); });
-      }
-    }
+    if (wallGridCost(stage) > MAX_WALL_GRID_ENTRIES) throw new Error('벽 검사 범위가 너무 커요. 긴 벽이나 장애물 수를 줄여 주세요.');
+    forEachWall(stage, (ax, ay, bx, by, layer) => this.add(ax, ay, bx, by, layer));
   }
 
   private add(ax: number, ay: number, bx: number, by: number, layer: number) {
     if (ax === bx && ay === by) return;
     const index = this.segments.length;
     this.segments.push(ax, ay, bx, by, layer);
-    for (let cx = Math.floor(Math.min(ax, bx) / CELL); cx <= Math.floor(Math.max(ax, bx) / CELL); cx++)
-      for (let cy = Math.floor(Math.min(ay, by) / CELL); cy <= Math.floor(Math.max(ay, by) / CELL); cy++) {
+    const dx = bx - ax, dy = by - ay, epsilon = 1e-9;
+    // Clip the line to each column, visiting only its covered rows instead of the entire AABB.
+    for (let cx = Math.floor((Math.min(ax, bx) - epsilon) / CELL); cx <= Math.floor((Math.max(ax, bx) + epsilon) / CELL); cx++) {
+      const t0 = dx ? (cx * CELL - ax) / dx : 0, t1 = dx ? ((cx + 1) * CELL - ax) / dx : 1;
+      const lo = Math.max(0, Math.min(1, Math.min(t0, t1))), hi = Math.max(0, Math.min(1, Math.max(t0, t1)));
+      const y0 = ay + dy * lo, y1 = ay + dy * hi;
+      for (let cy = Math.floor((Math.min(y0, y1) - epsilon) / CELL); cy <= Math.floor((Math.max(y0, y1) + epsilon) / CELL); cy++) {
         const k = key(cx, cy);
         const list = this.cells.get(k);
         if (list) list.push(index);
         else this.cells.set(k, [index]);
       }
+    }
   }
 
   // True when the straight move from (ax, ay) to (bx, by) passes through a wall of this collision layer.

@@ -1,4 +1,5 @@
 import type { StageDef } from './data/maps';
+import { visibleArt, type ViewBounds } from './art-visibility';
 import type { MapEntityState } from './types/MapEntity.type';
 import { yards } from './data/roundhouse';
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
@@ -35,8 +36,9 @@ export function drawRoundhouseArt(ctx:Ctx,_stage:StageDef){
  for(let row=0;row<2;row++)for(let col=0;col<8;col++){ctx.fillStyle=(row+col)%2?'#13231f':'#f4e5c2';ctx.fillRect(21.8+col*0.55,98+row*0.55,0.55,0.55);}
  ctx.restore();
 }
-export function drawRoundhouseTrains(ctx: CanvasRenderingContext2D, entities: MapEntityState[]) {
+export function drawRoundhouseTrains(ctx: CanvasRenderingContext2D, entities: MapEntityState[], view?: ViewBounds) {
   for (const entity of entities) {
+    if (!visibleArt(entity, view)) continue;
     if (entity.shape.type !== 'polyline' || !entity.shape.solid || !entity.shape.hidden) continue;
     const corners = entity.shape.points;
     const phase = Math.atan2(corners[0][1] + corners[2][1], corners[0][0] + corners[2][0]);

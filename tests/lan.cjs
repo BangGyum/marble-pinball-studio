@@ -3,6 +3,7 @@ const http = require('node:http');
 const { WebSocket } = require('ws');
 const { createLanServer } = require('../server/lan.cjs');
 const { DEFAULT_MAP_INDEX, stages } = require('../.lan-build/data/maps.js');
+const { MAX_LAN_MESSAGE_BYTES, serializeCommand } = require('../.lan-build/lan/protocol.js');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function request(port, route, { method = 'GET', cookie, host = `127.0.0.1:${port}`, origin = `http://${host}`, address = '127.0.0.1' } = {}) {
@@ -31,7 +32,8 @@ async function connect(port, cookie, options = {}) {
   };
   client.command = async (msg, id = `request_${++nextId}`) => {
     const start = client.messages.length;
-    ws.send(JSON.stringify({ raceId: client.scene.raceId, ...msg, requestId: id }));
+    ws.send(JSON.stringify({ raceId: client.scene.raceId,
+      ...(msg.type === 'spring' ? { revision: client.scene.revision } : {}), ...msg, requestId: id }));
     let result;
     await client.until(() => result = client.messages.slice(start).find((m) => m.type === 'result' && m.requestId === id));
     return result;
@@ -42,10 +44,25 @@ async function connect(port, cookie, options = {}) {
 }
 
 (async () => {
-  const app = await createLanServer({ port: 0 });
+  const frozenTime = performance.now();
+  let realtime = false;
+  // Functional assertions advance physics explicitly; socket latency must not move a spring meanwhile.
+  const app = await createLanServer({ port: 0, simulationNow: () => realtime ? performance.now() : frozenTime });
   const clients = [];
   try {
     const port = app.port;
+    const serialized = serializeCommand({ type: 'start', requestId: 'size_check', raceId: 'race' });
+    assert.equal(JSON.parse(serialized).type, 'start');
+    const emptyCommand = { type: 'configure', requestId: 'size_check', raceId: 'race',
+      settings: { names: '', mapId: 0, order: 'asc', picks: 1 } };
+    const sizeAtLimit = { ...emptyCommand, settings: { ...emptyCommand.settings,
+      names: 'x'.repeat(MAX_LAN_MESSAGE_BYTES - Buffer.byteLength(serializeCommand(emptyCommand))) } };
+    assert.equal(Buffer.byteLength(serializeCommand(sizeAtLimit)), MAX_LAN_MESSAGE_BYTES, 'exact message byte limit is accepted');
+    assert.throws(() => serializeCommand({ ...sizeAtLimit, settings: { ...sizeAtLimit.settings, names: sizeAtLimit.settings.names + 'x' } }),
+      /너무 커서 전송할 수 없어요/, 'one extra byte is rejected');
+    assert.throws(() => serializeCommand({ type: 'configure', requestId: 'size_check', raceId: 'race',
+      settings: { names: '가'.repeat(Math.ceil(MAX_LAN_MESSAGE_BYTES / 3)), mapId: 0, order: 'asc', picks: 1 } }),
+    /너무 커서 전송할 수 없어요/, 'UTF-8 message size is rejected before opening a pending request');
     assert.equal(app.info().maps[0].title, '네온 잭팟', 'map order must never overwrite a different map title');
     const guestSession = await request(port, '/api/session', { method: 'POST' });
     const guest2Session = await request(port, '/api/session', { method: 'POST' });
@@ -55,6 +72,13 @@ async function connect(port, cookie, options = {}) {
     assert.deepEqual(JSON.parse(guestSession.body), { type: 'identity', role: 'viewer' });
     const host = await connect(port, hostSession.cookie), guest = await connect(port, guestSession.cookie), guest2 = await connect(port, guest2Session.cookie);
     clients.push(host, guest, guest2);
+    const oversized = await connect(port, guestSession.cookie); clients.push(oversized);
+    let oversizedCode;
+    oversized.ws.once('close', code => { oversizedCode = code; });
+    oversized.ws.send(JSON.stringify({ ...sizeAtLimit, settings: { ...sizeAtLimit.settings, names: sizeAtLimit.settings.names + 'x' } }));
+    await oversized.until(() => oversizedCode !== undefined);
+    assert.ok([1006, 1009].includes(oversizedCode), 'oversized payload closes the connection before command handling');
+    assert.equal(app.race.state, 'ready');
     assert.equal((await request(port, '/api/host-session', { method: 'POST', origin: 'https://evil.example' })).status, 403);
     assert.equal((await request(port, '/api/session', { method: 'POST', host: `evil.example:${port}` })).status, 403);
     assert.equal((await request(port, '/api/qr', { cookie: guestSession.cookie })).status, 404);
@@ -227,6 +251,7 @@ async function connect(port, cookie, options = {}) {
     assert.equal(guest2.scene.fixed[springIndex],false,'spring remains a live obstacle');
     assert.equal((await guest2.command({type:'spring',index:springIndex})).ok,false,'not before start');
     await host.command({type:'start'});
+    assert.equal((await guest2.command({type:'spring',index:springIndex,revision:undefined})).ok,false,'spring request requires its scene revision');
     assert.equal((await guest2.command({type:'spring',index:springIndex})).ok,true,'viewer can activate marked spring');
     assert.equal((await resumed.command({type:'spring',index:springIndex})).ok,false,'global cooldown stops simultaneous repeats');
     assert.equal((await guest2.command({type:'spring',index:0})).ok,false,'walls cannot be activated');
@@ -265,6 +290,35 @@ async function connect(port, cookie, options = {}) {
     assert.ok(reconnected.frame.springs.every(s=>s[1]===0&&!s[2]),'new race clears both cooldown scopes');
     app.race.springCooldowns.now=()=>Date.now();
     console.log('PASS LAN per-session cooldowns, independent devices, reconnect preservation, actual time and reset');
+
+    const spring = (x) => ({ position: { x, y: 4 }, type: 'kinematic',
+      shape: { type: 'box', width: 1, height: .1, rotation: 0, spring: { distance: 1, direction: 0 } },
+      props: { density: 1, restitution: 0, angularVelocity: 0 } });
+    const changingStage = { title: '파괴 장치와 스프링', goalY: 60, zoomY: 55, entities: [
+      { position: { x: 0, y: 0 }, type: 'static', shape: { type: 'circle', radius: .2 },
+        props: { density: 1, restitution: 1, angularVelocity: 0, life: 1 } },
+      spring(5), spring(10),
+      { position: { x: 50, y: 0 }, type: 'static', shape: { type: 'polyline', points: [[0, 0], [0, 1]], rotation: 0, backing: .1 },
+        props: { density: 1, restitution: 0, angularVelocity: 0 } },
+    ] };
+    await host.command({ type: 'configure', settings: { ...settings, names: '회귀 검증', picks: 1, stage: changingStage } });
+    await guest2.until(() => guest2.scene.stage.title === changingStage.title);
+    const staleRevision = guest2.scene.revision;
+    await host.command({ type: 'start' });
+    app.race.physics.placeMarble(0, -.6, 0);
+    app.race.physics.vector.Set(10, 0);
+    app.race.physics.marbleMap[0].SetLinearVelocity(app.race.physics.vector);
+    app.race.advance();
+    assert.equal(app.race.physics.getEntities().length, 3, 'actual contact removes the leading obstacle');
+    assert.equal(app.race.physics.getEntities()[1].x, 10, 'old spring index now points at a different device');
+    assert.equal((await guest2.command({ type: 'spring', index: 1, revision: staleRevision })).ok, false,
+      'delayed spring request cannot activate a different device after entity removal');
+    assert.equal(app.race.physics.isSpringBusy(1), false, 'rejected stale index leaves the other spring untouched');
+    await guest2.until(() => guest2.scene.revision > staleRevision);
+    assert.equal((await guest2.command({ type: 'spring', index: 0 })).ok, true, 'latest scene can still activate the intended spring');
+    assert.equal(app.race.physics.isSpringBusy(0), true);
+    await host.command({ type: 'reset' });
+    console.log('PASS delayed spring revision rejection after real obstacle removal and refreshed activation');
     assert.equal((await host.command({ type: 'configure', settings: { ...settings, names: '', picks: 0 } })).ok, true);
     assert.equal(host.scene.balls.length, 0);
     assert.equal((await host.command({ type: 'start' })).ok, false);
@@ -277,6 +331,7 @@ async function connect(port, cookie, options = {}) {
       clients.push(await connect(port, session.cookie));
     }
     const watchers = clients.filter((c) => c.ws.readyState === WebSocket.OPEN);
+    realtime = true;
     await host.command({ type: 'start' });
     const firstSeqs = watchers.map((c) => c.frame.seq), firstBytes = watchers.map((c) => c.bytes);
     const wallStart = performance.now(), elapsedStart = app.race.elapsed;

@@ -1,27 +1,17 @@
 import type { StageDef } from './data/maps';
+import { backgroundCache } from './background-cache';
 import { orbitalRings, orbitalTransfers } from './data/orbital-lock';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-const backgrounds = new WeakMap<StageDef, Map<number, OffscreenCanvas>>();
-const bridges = new WeakMap<StageDef, Map<number, OffscreenCanvas>>();
 export function drawOrbitalArt(ctx: Context, stage: StageDef, layer: 1 | 2 = 1, cacheBackground = true) {
-  const paint = layer === 2 ? paintOrbitalBridge : paintOrbitalArt, cache = layer === 2 ? bridges : backgrounds;
+  const paint = layer === 2 ? paintOrbitalBridge : paintOrbitalArt;
   if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
   const transform = ctx.getTransform();
   // Bucket zoom levels and cap texture size; camera movement only blits this static scenery.
   const resolution = Math.min(24, Math.max(8, Math.ceil(Math.hypot(transform.a, transform.b) / 8) * 8));
-  let textures = cache.get(stage);
-  if (!textures) { textures = new Map(); cache.set(stage, textures); }
-  let canvas = textures.get(resolution);
   const width = (stage.width ?? 64) + 4, height = stage.goalY + 36;
-  if (!canvas) {
-    canvas = new OffscreenCanvas(Math.ceil(width * resolution), Math.ceil(height * resolution));
-    const background = canvas.getContext('2d')!;
-    background.setTransform(resolution, 0, 0, resolution, 2 * resolution, 32 * resolution);
-    paint(background, stage);
-    textures.set(resolution, canvas);
-  }
-  ctx.drawImage(canvas, -2, -32, width, height);
+  // Two main layers and the minimap bridge must fit together in the shared 24M pixel budget.
+  backgroundCache.draw(ctx, stage, 'orbital/' + layer, { x: -2, y: -32, width, height, density: resolution, maxPixels: 8 * 1024 * 1024 }, target => paint(target, stage));
 }
 
 function paintOrbitalBridge(ctx: Context, stage: StageDef) {

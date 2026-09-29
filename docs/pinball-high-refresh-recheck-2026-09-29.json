@@ -1,0 +1,54 @@
+{
+  "date": "2026-09-29",
+  "test": "100 marbles, switchback express, 1x, 1000x600 CSS pixels, DPR 1.75, 2s warmup and 12s measurement, browser RAF approximately 60Hz",
+  "map": "스위치백 익스프레스",
+  "count": 100,
+  "mode": "run",
+  "speed": 1,
+  "seed": 123456,
+  "cssSize": [
+    1000,
+    600
+  ],
+  "dpr": 1.75,
+  "seconds": 12,
+  "fps": 59.416,
+  "frame": {
+    "mean": 16.83,
+    "p95": 17.1,
+    "max": 116.7
+  },
+  "slowFrames": 2,
+  "renders": 713,
+  "render": {
+    "mean": 2.044,
+    "p95": 3.2,
+    "max": 7.2
+  },
+  "physics": {
+    "mean": 4.492,
+    "p95": 6,
+    "max": 118
+  },
+  "entityReads": 713,
+  "sprites": 0,
+  "simulatedSeconds": 11.85,
+  "state": "running",
+  "targetFps": 120,
+  "targetFrameMs": 8.333,
+  "activeSeconds": 12,
+  "activeFps": 59.416,
+  "activeFrame": {
+    "mean": 16.83,
+    "p95": 17.1,
+    "max": 116.7
+  },
+  "activeSlowFrameThresholdMs": 12.5,
+  "activeSlowFrames": 713,
+  "frameWork": {
+    "mean": 6.716,
+    "p95": 10.2,
+    "max": 120.5
+  },
+  "workOverBudget": 97
+}

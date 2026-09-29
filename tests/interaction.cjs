@@ -410,18 +410,18 @@ const firstBitmap = bitmaps.at(-1), firstCall = canvasCalls.at(-1);
 cachedBall.x += 2;
 cachedBall.y += 4;
 cache.drawBall(cacheCtx, cachedBall, 40, 1.75);
-assert.equal(bitmaps.length, 1, 'moving a marble reuses its bitmap');
-assert.equal(canvasCalls.at(-1)[2] - firstCall[2], 2);
-assert.equal(canvasCalls.at(-1)[3] - firstCall[3], 4);
+assert.equal(bitmaps.length, 2, 'moving a marble reuses its marble and label bitmaps');
+assert.ok(Math.abs(canvasCalls.at(-1)[2] - firstCall[2] - 2) < 1e-12);
+assert.ok(Math.abs(canvasCalls.at(-1)[3] - firstCall[3] - 4) < 1e-12);
 assert.equal(firstBitmap.calls.filter(c => c[0] === 'fillText').length, 1, 'text rasterizes only once');
-for (const [scale, dpr, name, color] of [
-  [80, 1.75, '한글 이름', '#aaffff'], [80, 2, '한글 이름', '#aaffff'],
-  [80, 2, '새 이름', '#aaffff'], [80, 2, '새 이름', '#ffaaaa'],
+for (const [scale, dpr, name, color, created] of [
+  [80, 1.75, '한글 이름', '#aaffff', 2], [80, 2, '한글 이름', '#aaffff', 2],
+  [80, 2, '새 이름', '#aaffff', 1], [80, 2, '새 이름', '#ffaaaa', 2],
 ]) {
   const oldCount = bitmaps.length;
   Object.assign(cachedBall, { name, color });
   cache.drawBall(cacheCtx, cachedBall, scale, dpr);
-  assert.equal(bitmaps.length, oldCount + 1, 'zoom/DPR/name/color invalidate the sprite');
+  assert.equal(bitmaps.length, oldCount + created, 'zoom/DPR/name/color invalidate affected sprites');
 }
 const fixedShape = { type: 'circle', radius: 1 };
 const movingShape = { type: 'box', width: 2, height: 0.2, rotation: 0 };

@@ -1,8 +1,9 @@
 import type { StageDef } from './data/maps';
+import { backgroundCache } from './background-cache';
+import { visibleArt, type ViewBounds } from './art-visibility';
 import type { MapEntityState } from './types/MapEntity.type';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
-const cache = new WeakMap<StageDef, OffscreenCanvas>();
 const tau = Math.PI * 2;
 const chrome = (ctx: Context, x: number, y: number, radius: number) => {
   const fill = ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
@@ -71,17 +72,13 @@ function paint(ctx: Context, stage: StageDef) {
 
 export function drawCrosswayArt(ctx: Context, stage: StageDef, cacheBackground = true) {
   if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
-  let canvas = cache.get(stage);
-  if (!canvas) {
-    const density = 18; canvas = new OffscreenCanvas((stage.width ?? 64) * density, (stage.goalY + 35) * density);
-    const c = canvas.getContext('2d')!; c.scale(density, density); c.translate(0, 30); paint(c, stage); cache.set(stage, canvas);
-  }
-  ctx.drawImage(canvas, 0, -30, stage.width ?? 64, stage.goalY + 35);
+  backgroundCache.draw(ctx, stage, 'crossway', { x: 0, y: -30, width: stage.width ?? 64, height: stage.goalY + 35, density: 18 }, target => paint(target, stage));
 }
 
-export function drawCrosswayDevices(ctx: Context, entities: MapEntityState[]) {
+export function drawCrosswayDevices(ctx: Context, entities: MapEntityState[], view?: ViewBounds) {
   ctx.save(); ctx.shadowBlur = 0;
   for (const e of entities) {
+    if (!visibleArt(e, view)) continue;
     const s = e.shape;
     if (s.hidden || (s.type !== 'circle' && !(s.type === 'polyline' && s.solid))) continue;
     ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);

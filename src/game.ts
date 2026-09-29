@@ -25,6 +25,9 @@ export class Game extends Race {
   private recordStop: ReturnType<typeof setTimeout> | undefined;
   private last = 0;
   private lastRender = 0;
+  private lastFrameDraw = -Infinity;
+  private renderDirty = true;
+  private cameraMoving = false;
   private accumulator = 0;
   // Blending needs a step taken since the last start, pause or resume.
   private stepped = false;
@@ -42,6 +45,7 @@ export class Game extends Race {
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     new ResizeObserver(() => this.resize()).observe(canvas);
     const followMinimap = (e: PointerEvent) => {
+      this.renderDirty = true;
       const r = canvas.getBoundingClientRect(),
         x = e.clientX - r.left,
         y = e.clientY - r.top,
@@ -54,7 +58,7 @@ export class Game extends Race {
       this.fastForward = false;
     };
     canvas.addEventListener('pointerdown', (e) => {
-      if (this.springControls.select(e)) { this.fastForward = false; return; }
+      if (this.springControls.select(e)) { this.fastForward = false; this.renderDirty = true; return; }
       followMinimap(e);
       if (e.pointerType === 'mouse' && e.button === 0 && this.state === 'running') {
         this.fastForward = true;
@@ -121,6 +125,7 @@ export class Game extends Race {
     this.startRace(range, order);
   }
   pause() {
+    this.renderDirty = true;
     this.fastForward = false;
     super.pause();
     this.accumulator = 0;
@@ -128,10 +133,12 @@ export class Game extends Race {
   }
   follow() {
     this.manual = null;
+    this.renderDirty = true;
   }
   setZoom(value: number) {
     if (!Number.isFinite(value)) return;
     this.zoom = Math.max(0.35, Math.min(3, value));
+    this.renderDirty = true;
     this.onZoomChange(this.zoom);
   }
   setVisible(visible: boolean) {
@@ -159,6 +166,7 @@ export class Game extends Race {
     const r = this.canvas.getBoundingClientRect();
     this.width = Math.max(1, r.width);
     this.height = Math.max(1, r.height);
+    this.renderDirty = true;
     // ResizeObserver runs after RAF. Keep the previous bitmap until the next render.
   }
   private frame(now: number) {
@@ -172,13 +180,15 @@ export class Game extends Race {
     if (this.state === 'running') {
       this.accumulator += delta * this.speed * (this.fastForward ? 2 : 1) * this.finishSlowdown();
       const physicsStart = performance.now();
+      // Leave room for rendering at high refresh rates: 6ms at 60Hz, 3ms at 120Hz.
+      const physicsBudget = Math.min(6, delta * 1000 * 0.36);
       const maxSteps = Math.max(1, Math.ceil(this.speed * (this.fastForward ? 2 : 1) * 2));
       let steps = 0;
       while (
         this.accumulator >= 1 / 60 &&
         this.state === 'running' &&
         steps < maxSteps &&
-        (steps === 0 || performance.now() - physicsStart < 6)
+        (steps === 0 || performance.now() - physicsStart < physicsBudget)
       ) {
         this.advance();
         this.accumulator -= 1 / 60;
@@ -188,7 +198,11 @@ export class Game extends Race {
       // Under load the race slows down instead of creating a catch-up workload next frame.
       if (this.accumulator >= 1 / 60) this.accumulator %= 1 / 60;
     }
-    this.render();
+    if (this.state === 'running' || this.recording || this.renderDirty || this.cameraMoving ||
+      (this.winners.length && now - this.winnerAt < 1400) || now - this.lastFrameDraw >= 100) {
+      this.lastFrameDraw = now; this.renderDirty = false;
+      this.render();
+    }
     this.frameId = requestAnimationFrame((t) => this.frame(t));
   }
   advance() {
@@ -222,10 +236,12 @@ export class Game extends Race {
     const active = this.racing();
     const target = this.focusBall(active);
     const scale = this.viewScale();
+    this.cameraMoving = false;
     if (this.state !== 'ready' && target && !this.manual) {
       // Same easing as 0.06 / 0.13 per frame at 60Hz, independent of the display refresh rate.
       this.camera.x += (at(target.px, target.x) - this.camera.x) * (1 - Math.pow(0.94, dt * 60));
       this.camera.y += (at(target.py, target.y) - this.camera.y) * (1 - Math.pow(0.87, dt * 60));
+      this.cameraMoving = Math.abs(at(target.px, target.x) - this.camera.x) + Math.abs(at(target.py, target.y) - this.camera.y) > 0.01;
     }
     const cam = this.manual ?? this.camera;
     const view = {
@@ -255,7 +271,7 @@ export class Game extends Race {
       }
     }
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
-    drawMapOverlay(ctx, this.stage, entities, scale);
+    drawMapOverlay(ctx, this.stage, entities, scale, true, view);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = '#65efda';
     ctx.lineWidth = 2 / scale;
@@ -289,7 +305,7 @@ export class Game extends Race {
     }
     ctx.restore();
     this.renderMinimap(entities, blend);
-    this.springControls.setStatuses(this.springStatuses());
+    this.springControls.setStatuses(this.springStatuses(undefined, entities));
     this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h, this.stage);
     ctx.textAlign = 'right';
     ctx.font = '12px sans-serif';

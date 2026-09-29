@@ -1,4 +1,4 @@
-import { blankStage, cloneStage, validateStage, type SavedMap } from './model';
+import { blankStage, cloneStage, validateStage, exportMap, MAX_MAP_IMPORT_BYTES, type SavedMap } from './model';
 import type { StageDef } from './data/maps';
 import type { MapEntity } from './types/MapEntity.type';
 import { drawEntities } from './draw';
@@ -13,6 +13,7 @@ type EditorActions = {
   save: (stage: StageDef, id: string | null) => string;
   remove: (id: string) => void;
   play: (stage: StageDef) => void;
+  onOpenChange?: (open: boolean) => void;
 };
 const SCALE = 25;
 const HELP: Record<Tool, string> = {
@@ -55,6 +56,7 @@ export class Editor {
     });
     this.canvas.addEventListener('lostpointercapture', () => this.cancelDrag());
     this.canvas.addEventListener('pointercancel', () => this.cancelDrag());
+    this.dialog.addEventListener('close', () => this.actions.onOpenChange?.(false));
     this.dialog.addEventListener('keydown', (e) => {
       if ((e.target as HTMLElement).matches('input,textarea,select')) return;
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -115,7 +117,7 @@ export class Editor {
       try {
         const stage = validateStage(this.stage);
         const url = URL.createObjectURL(
-          new Blob([JSON.stringify({ format: 'marble-pinball-map', version: 1, stage }, null, 2)], {
+          new Blob([exportMap(stage)], {
             type: 'application/json',
           })
         );
@@ -136,7 +138,7 @@ export class Editor {
         file = input.files?.[0];
       if (!file) return;
       try {
-        if (file.size > 2_000_000) throw new Error('맵 파일은 2MB 이하로 가져와 주세요.');
+        if (file.size > MAX_MAP_IMPORT_BYTES) throw new Error('맵 파일은 2MB 이하로 가져와 주세요.');
         const data = JSON.parse(await file.text());
         if (data.format !== 'marble-pinball-map' || data.version !== 1)
           throw new Error('바울 핀볼에서 내보낸 맵 파일을 선택해 주세요.');
@@ -214,6 +216,7 @@ export class Editor {
     } else if (!this.hasDraft) this.load(blankStage(), null);
     this.refreshLibrary();
     this.dialog.showModal();
+    this.actions.onOpenChange?.(true);
     this.render();
   }
   private load(stage: StageDef, id: string | null) {

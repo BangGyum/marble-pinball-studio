@@ -1,10 +1,12 @@
 import type { StageDef } from './data/maps';
+import { backgroundCache } from './background-cache';
+import { visibleArt, type ViewBounds } from './art-visibility';
 import { expressGates, expressTracks, type Railway } from './data/switchback-express';
 import type { MapEntityState } from './types/MapEntity.type';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 type Point = [number, number];
-const tau = Math.PI * 2, cache = new WeakMap<StageDef, OffscreenCanvas>();
+const tau = Math.PI * 2;
 function path(ctx: Context, points: Point[]) {
   ctx.beginPath(); ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p));
 }
@@ -165,18 +167,12 @@ function paint(ctx: Context, stage: StageDef) {
 }
 export function drawExpressArt(ctx: Context, stage: StageDef, cacheBackground = true) {
   if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
-  let canvas = cache.get(stage);
-  if (!canvas) {
-    const density = 36;
-    canvas = new OffscreenCanvas((stage.width ?? 64) * density, (stage.goalY + 35) * density);
-    const target = canvas.getContext('2d')!; target.scale(density, density); target.translate(0, 30);
-    paint(target, stage); cache.set(stage, canvas);
-  }
-  ctx.drawImage(canvas, 0, -30, stage.width ?? 64, stage.goalY + 35);
+  backgroundCache.draw(ctx, stage, 'express', { x: 0, y: -30, width: stage.width ?? 64, height: stage.goalY + 35, density: 36 }, target => paint(target, stage));
 }
-export function drawExpressDevices(ctx: Context, entities: MapEntityState[]) {
+export function drawExpressDevices(ctx: Context, entities: MapEntityState[], view?: ViewBounds) {
   ctx.save();
   for (const e of entities) {
+    if (!visibleArt(e, view)) continue;
     const shape = e.shape;
     if (shape.type === 'box' && shape.boostSpeed === undefined) {
       ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle + shape.rotation);
@@ -218,6 +214,7 @@ export function drawExpressDevices(ctx: Context, entities: MapEntityState[]) {
     }
   }
   for (const gate of expressGates) {
+    if (view && (gate.x + 10 < view.left || gate.x + 3 > view.right || gate.y + 7 < view.top || gate.y - 3 > view.bottom)) continue;
     const live = entities.find(e => e.x === gate.x && e.y === gate.y && e.shape.type === 'polyline');
     const open = Math.abs(live?.angle ?? 0) > 0.75, x = gate.x + 6.5, y = gate.y + 1.5;
     ctx.fillStyle = '#72858b'; ctx.fillRect(x - 0.1, y, 0.2, 3.6);

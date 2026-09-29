@@ -9,40 +9,48 @@ type Sprite = { canvas: OffscreenCanvas; width: number; height: number; left: nu
 
 export class RenderCache {
   private balls = new WeakMap<Ball, { key: string; sprite: Sprite }>();
+  private labels = new WeakMap<Ball, { key: string; sprite: Sprite }>();
   private minimap?: { stage: StageDef; scale: number; dpr: number; canvas: OffscreenCanvas; fixed: Set<MapEntityState['shape']> };
 
   drawBall(ctx: CanvasRenderingContext2D, ball: Ball, scale: number, dpr: number, x = ball.x, y = ball.y) {
     // Older browsers can keep using the vector renderer.
     if (typeof OffscreenCanvas === 'undefined') return false;
-    const key = `${scale}/${dpr}/${ball.color}/${ball.name}`;
+    // Rasterize in small resolution buckets; continuous zoom reuses these bitmaps.
+    const resolution = Math.ceil(scale / 8) * 8;
+    const key = `${resolution}/${dpr}/${ball.color}`;
     let cached = this.balls.get(ball);
     if (!cached || cached.key !== key) {
-      const canvas = new OffscreenCanvas(1, 1);
+      const radius = resolution * 0.25, edge = Math.ceil(radius + 14);
+      const canvas = new OffscreenCanvas(Math.ceil(edge * 2 * dpr), Math.ceil(edge * 2 * dpr));
       const spriteCtx = canvas.getContext('2d')!;
-      const font = Math.min(17, Math.max(12, scale * 0.24));
-      spriteCtx.font = `${font}px sans-serif`;
-      const text = spriteCtx.measureText(ball.name);
-      const radius = scale * 0.25;
-      const left = Math.ceil(Math.max(radius + 14, text.width / 2 + 4));
-      const top = Math.ceil(Math.max(radius + 14, font - scale * 0.55 + 4));
-      const width = left * 2;
-      const height = top + Math.ceil(Math.max(radius + 14, scale * 0.55 + font + 4));
-      canvas.width = Math.ceil(width * dpr);
-      canvas.height = Math.ceil(height * dpr);
-      spriteCtx.setTransform(dpr, 0, 0, dpr, left * dpr, top * dpr);
+      spriteCtx.setTransform(dpr, 0, 0, dpr, edge * dpr, edge * dpr);
       drawMarble(spriteCtx, 0, 0, radius, ball.color);
+      cached = { key, sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left: edge, top: edge } };
+      this.balls.set(ball, cached);
+    }
+    const marble = cached.sprite;
+    ctx.drawImage(marble.canvas, x - marble.left / resolution, y - marble.top / resolution, marble.width / resolution, marble.height / resolution);
+    // Labels keep the original 12–17 CSS pixel policy, independently of marble zoom.
+    const font = Math.min(17, Math.max(12, scale * 0.24)), rasterFont = Math.ceil(font);
+    const labelKey = `${rasterFont}/${dpr}/${ball.color}/${ball.name}`;
+    let label = this.labels.get(ball);
+    if (!label || label.key !== labelKey) {
+      const canvas = new OffscreenCanvas(1, 1), spriteCtx = canvas.getContext('2d')!;
+      spriteCtx.font = `${rasterFont}px sans-serif`;
+      const left = Math.ceil(spriteCtx.measureText(ball.name).width / 2 + 4), top = rasterFont + 4;
+      canvas.width = Math.ceil(left * 2 * dpr); canvas.height = Math.ceil((top + 8) * dpr);
+      spriteCtx.setTransform(dpr, 0, 0, dpr, left * dpr, top * dpr);
       spriteCtx.fillStyle = ball.color;
-      spriteCtx.font = `${font}px sans-serif`;
+      spriteCtx.font = `${rasterFont}px sans-serif`;
       spriteCtx.textAlign = 'center';
       spriteCtx.strokeStyle = '#050a10';
       spriteCtx.lineWidth = 3;
-      spriteCtx.strokeText(ball.name, 0, scale * 0.55);
-      spriteCtx.fillText(ball.name, 0, scale * 0.55);
-      cached = { key, sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left, top } };
-      this.balls.set(ball, cached);
+      spriteCtx.strokeText(ball.name, 0, 0); spriteCtx.fillText(ball.name, 0, 0);
+      label = { key: labelKey, sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left, top } };
+      this.labels.set(ball, label);
     }
-    const s = cached.sprite;
-    ctx.drawImage(s.canvas, x - s.left / scale, y - s.top / scale, s.width / scale, s.height / scale);
+    const s = label.sprite, labelScale = font / rasterFont / scale;
+    ctx.drawImage(s.canvas, x - s.left * labelScale, y + 0.55 - s.top * labelScale, s.width * labelScale, s.height * labelScale);
     return true;
   }
 

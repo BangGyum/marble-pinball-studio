@@ -1,9 +1,10 @@
 import type { StageDef } from './data/maps';
+import { backgroundCache } from './background-cache';
+import { visibleArt, type ViewBounds } from './art-visibility';
 import type { MapEntityState } from './types/MapEntity.type';
 
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 type Point = [number,number];
-const cache = new WeakMap<StageDef,OffscreenCanvas>();
 function path(ctx:Ctx,points:Point[]) {
   ctx.beginPath();ctx.moveTo(...points[0]);for(const p of points.slice(1))ctx.lineTo(...p);
 }
@@ -122,12 +123,7 @@ function paint(ctx:Ctx,stage:StageDef) {
 }
 export function drawLadderArt(ctx:Ctx,stage:StageDef,cacheBackground=true) {
   if(!cacheBackground||typeof OffscreenCanvas==='undefined'){paint(ctx,stage);return;}
-  let image=cache.get(stage);
-  if(!image){
-    const resolution=22;image=new OffscreenCanvas((stage.width??56)*resolution,(stage.goalY+8)*resolution);
-    const context=image.getContext('2d')!;context.scale(resolution,resolution);context.translate(0,2);paint(context,stage);cache.set(stage,image);
-  }
-  ctx.drawImage(image,0,-2,stage.width??56,stage.goalY+8);
+  backgroundCache.draw(ctx,stage,'ladder',{x:0,y:-2,width:stage.width??56,height:stage.goalY+8,density:22},target=>paint(target,stage));
 }
 // Rendering and pointer selection share this stationary housing, separate from the moving piston.
 export function ladderSpringHousing(origin:{x:number;y:number},direction:number) {
@@ -197,9 +193,10 @@ function train(ctx:Ctx,e:MapEntityState) {
   for(let x=-1.1;x<1.2;x+=0.33){ctx.fillStyle='#142025';ctx.fillRect(x,top+0.05,0.17,h*0.08);}
   ctx.restore();
 }
-export function drawLadderDevices(ctx:Ctx,stage:StageDef,entities:MapEntityState[]) {
+export function drawLadderDevices(ctx:Ctx,stage:StageDef,entities:MapEntityState[],view?:ViewBounds) {
   ctx.save();ctx.shadowBlur=0;
   for(const [index,e] of entities.entries()) {
+    if(!visibleArt(e,view,6+(e.shape.type==='box'?e.shape.spring?.distance??0:0)))continue;
     const sh=e.shape,definition=stage.entities?.[index];
     if(definition?.props.sliding){train(ctx,e);continue;}
     if(sh.type!=='box')continue;

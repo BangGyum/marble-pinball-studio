@@ -4,6 +4,8 @@ import type { MapEntityState } from './types/MapEntity.type';
 export interface IPhysics {
   init(): Promise<void>;
 
+  dispose(): void;
+
   clear(): void;
 
   clearMarbles(): void;
@@ -22,10 +24,14 @@ export interface IPhysics {
 
   placeMarble(id: number, x: number, y: number): void;
 
+  isMarbleOnBridge(id: number): boolean;
+
   // blend < 1 mixes moving obstacles back toward their pose before the last step.
   getEntities(blend?: number): MapEntityState[];
 
   activateSpring(index: number): boolean;
+
+  isSpringBusy(index: number): boolean;
 
   start(): void;
 
