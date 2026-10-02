@@ -24,6 +24,7 @@ global.ResizeObserver = class { observe() {} };
 const ctx = context(), canvas = { getContext: () => ctx, addEventListener() {}, getBoundingClientRect: () => ({ width: 1000, height: 600 }) };
 const { BackgroundCache } = require('../src/background-cache.ts');
 const { RenderCache } = require('../src/render-cache.ts');
+const { drawEntities } = require('../src/draw.ts');
 const { drawRoundhouseArt } = require('../src/roundhouse-art.ts');
 const { drawOrbitalArt } = require('../src/orbital-art.ts');
 const { orbitalLock } = require('../src/data/orbital-lock.ts');
@@ -74,6 +75,26 @@ for (const scale of [24, 48, 60, 90]) {
   assert.ok(Math.abs(rasterFont * factor - font) < 1e-10, 'label CSS font size follows the original clamp exactly');
 }
 console.log('PASS continuous zoom cache reuse and unchanged 12–17px label sizing');
+
+const zoomContext = context(), glowDraws = [];
+for (const method of ['stroke', 'fill', 'fillRect', 'strokeRect', 'fillText']) {
+  zoomContext[method] = () => glowDraws.push(zoomContext.shadowBlur);
+}
+const zoomEntities = [
+  { type: 'polyline', points: [[0, 0], [4, 0]], rotation: 0 },
+  { type: 'circle', radius: 1 },
+  { type: 'box', width: 2, height: 1, rotation: 0 },
+  { type: 'box', width: 2, height: 1, rotation: 0, spring: { direction: 0, distance: 1 } },
+  { type: 'box', width: 2, height: 1, rotation: 0, boostSpeed: 20 },
+].map(shape => ({ x: 0, y: 0, angle: 0, life: -1, shape }));
+drawEntities(zoomContext, zoomEntities, 14, -1, true, undefined, true);
+assert.ok(glowDraws.length > 0 && glowDraws.every(blur => blur === 0), 'zoomed-out walls and devices avoid live shadow blur');
+const wideDrawCount = glowDraws.length;
+glowDraws.length = 0;
+drawEntities(zoomContext, zoomEntities, 40, -1, true, undefined, true);
+assert.equal(glowDraws.length, wideDrawCount, 'zooming out retains the wall and device geometry');
+assert.ok(glowDraws.some(blur => blur > 0), 'close views retain the original glow');
+console.log('PASS distant-view glow reduction with unchanged geometry and close-view glow');
 
 const roundhouse = { title: 'Test', width: 48, goalY: 100 };
 calls.length = 0; drawRoundhouseArt(ctx, roundhouse);

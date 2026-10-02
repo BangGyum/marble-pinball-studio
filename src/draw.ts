@@ -10,6 +10,8 @@ export function drawEntities(
   glass = false,
   customDevices = false
 ) {
+  // Small distant geometry keeps its bright edges without per-frame shadow filters.
+  glow = glow && scale >= 32;
   entities.forEach((e, i) => {
     const shape = e.shape;
     if (shape.hidden && i !== selected) return;
