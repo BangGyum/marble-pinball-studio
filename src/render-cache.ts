@@ -55,6 +55,8 @@ export class RenderCache {
   }
 
   drawMinimap(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number, dpr: number) {
+    // Elevated geometry is drawn by the overlay, with the same mouth clipping as the main view.
+    if (stage.exitBridge) entities = entities.filter(e => e.shape.collisionLayer !== 2);
     if (typeof OffscreenCanvas === 'undefined' || scale <= 0) {
       if (stage.art?.style === 'reversal-ladder') drawLadderArt(ctx, stage, false);
       drawEntities(ctx, entities, scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');

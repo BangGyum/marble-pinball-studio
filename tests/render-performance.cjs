@@ -96,6 +96,45 @@ assert.equal(glowDraws.length, wideDrawCount, 'zooming out retains the wall and 
 assert.ok(glowDraws.some(blur => blur > 0), 'close views retain the original glow');
 console.log('PASS distant-view glow reduction with unchanged geometry and close-view glow');
 
+const orbitalEntities = orbitalLock.entities.map(e => ({ x: e.position.x, y: e.position.y, angle: 0, life: -1, shape: e.shape }));
+const orbitalGeometry = JSON.stringify(orbitalLock);
+const railStrokes = [];
+const railContext = () => {
+  const c = context(), saved = [];
+  let path = [], outsideCore = false;
+  c.save = () => saved.push(outsideCore);
+  c.restore = () => { outsideCore = saved.pop(); };
+  c.beginPath = () => { path = []; };
+  for (const method of ['moveTo', 'lineTo', 'arc', 'rect']) c[method] = (...args) => path.push([method, ...args]);
+  c.clip = rule => {
+    if (rule === 'evenodd' && path.some(p => p[0] === 'arc' && p[1] === 32 && p[2] === 40 && p[3] === 8)) outsideCore = true;
+  };
+  c.stroke = () => {
+    const tip = path.find(p => p[0] === 'moveTo' && (p[1] === 30 || p[1] === 34) && p[2] === 46.7);
+    // Deck shadows may enter the core; the two wall strokes must not.
+    if (tip && !path.some(p => p[0] === 'lineTo' && p[1] === 64 - tip[1] && p[2] === 46.7)) railStrokes.push(outsideCore);
+  };
+  return c;
+};
+for (const scale of [40, 2]) {
+  for (const cached of [false, true]) {
+    const start = railStrokes.length, originalCanvas = global.OffscreenCanvas;
+    try {
+      global.OffscreenCanvas = cached ? class {
+        constructor(width, height) { this.width = width; this.height = height; }
+        getContext() { return railContext(); }
+      } : undefined;
+      const railCtx = railContext(), stage = { ...orbitalLock };
+      new RenderCache().drawMinimap(railCtx, stage, orbitalEntities, scale, 1);
+      drawMapOverlay(railCtx, stage, orbitalEntities, scale, cached);
+      assert.ok(railStrokes.length > start, 'exit walls remain visible outside the core');
+      assert.ok(railStrokes.slice(start).every(Boolean), 'main view and minimap never draw exit wall tips inside the pass-through core');
+    } finally { global.OffscreenCanvas = originalCanvas; }
+  }
+}
+assert.equal(JSON.stringify(orbitalLock), orbitalGeometry, 'clipping scenery preserves the collision geometry and bridge entry');
+console.log('PASS orbital exit wall clipping in cached and fallback views with unchanged physics geometry');
+
 const roundhouse = { title: 'Test', width: 48, goalY: 100 };
 calls.length = 0; drawRoundhouseArt(ctx, roundhouse);
 assert.ok(!calls.some(call => call[0] === 'drawImage'), 'roundhouse scenery retains its original vector drawing');

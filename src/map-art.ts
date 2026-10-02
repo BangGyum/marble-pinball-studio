@@ -4,7 +4,7 @@ import { drawExpressArt, drawExpressDevices } from './express-art';
 import type { StageDef } from './data/maps';
 import { drawCrosswayArt, drawCrosswayDevices } from './crossway-art';
 import { drawArcadeArt } from './arcade-art';
-import { drawOrbitalArt } from './orbital-art';
+import { clipOrbitalBridgeWalls, drawOrbitalArt } from './orbital-art';
 import { drawHourglassArt } from './hourglass-art';
 import { drawCanyonArt, drawCanyonDevices } from './canyon-art';
 import { drawEntities } from './draw';
@@ -27,6 +27,7 @@ export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, e
     ctx.beginPath(); ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
     ctx.fillStyle = '#10232f'; ctx.fill();
   }
+  if (stage.art?.style === 'orbital-lock') clipOrbitalBridgeWalls(ctx, stage);
   drawEntities(ctx, entities.filter(e => e.shape.collisionLayer === 2), scale, -1, scale > 3, view, !!stage.art);
   ctx.restore();
 }

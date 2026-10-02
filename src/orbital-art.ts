@@ -3,6 +3,15 @@ import { backgroundCache } from './background-cache';
 import { orbitalRings, orbitalTransfers } from './data/orbital-lock';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+// The elevated walls start outside the core; ground marbles pass through their hidden tips.
+export function clipOrbitalBridgeWalls(ctx: Context, stage: StageDef) {
+  const radius = orbitalRings[2].outer;
+  ctx.beginPath(); ctx.rect(-2, -32, (stage.width ?? 64) + 4, stage.goalY + 68);
+  ctx.moveTo(32 + radius, 40); ctx.arc(32, 40, radius, 0, Math.PI * 2);
+  ctx.clip('evenodd');
+}
+
 export function drawOrbitalArt(ctx: Context, stage: StageDef, layer: 1 | 2 = 1, cacheBackground = true) {
   const paint = layer === 2 ? paintOrbitalBridge : paintOrbitalArt;
   if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paint(ctx, stage); return; }
@@ -25,6 +34,7 @@ function paintOrbitalBridge(ctx: Context, stage: StageDef) {
   ctx.save(); ctx.translate(0.8, 1.1); deck();
   ctx.fillStyle = '#02060dd9'; ctx.shadowColor = '#000b'; ctx.shadowBlur = 12;
   ctx.lineWidth = 0.65; ctx.strokeStyle = '#02060d99'; ctx.fill(); ctx.stroke(); ctx.restore();
+  ctx.save(); clipOrbitalBridgeWalls(ctx, stage);
   for (const entity of stage.entities ?? []) {
     const shape = entity.shape;
     if (shape.type !== 'polyline' || shape.solid || shape.hidden || shape.collisionLayer !== 2) continue;
@@ -36,6 +46,7 @@ function paintOrbitalBridge(ctx: Context, stage: StageDef) {
     ctx.closePath(); ctx.fillStyle = '#153544'; ctx.fill();
     ctx.strokeStyle = '#427083'; ctx.lineWidth = 0.09; ctx.stroke();
   }
+  ctx.restore();
   deck();
   const surface = ctx.createLinearGradient(30, 0, 34, 0);
   surface.addColorStop(0, '#254656'); surface.addColorStop(0.18, '#163442');
@@ -132,6 +143,7 @@ function paintOrbitalArt(ctx: Context, stage: StageDef) {
 
 export function drawOrbitalRims(ctx: Context, stage: StageDef, layer: 1 | 2) {
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (layer === 2) clipOrbitalBridgeWalls(ctx, stage);
   ctx.strokeStyle = '#72ffe5'; ctx.shadowColor = '#35e6d1'; ctx.shadowBlur = 9; ctx.lineWidth = 0.4;
   for (const entity of stage.entities ?? []) {
     const shape = entity.shape;
