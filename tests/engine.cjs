@@ -210,7 +210,7 @@ console.log('PASS resumed motion, turning points, fresh trapping window, brief n
   console.log('PASS step blending for marbles and obstacles, resume and refresh-independent camera');
 }
 
-// Regression: on this seed a marble wedges beside the canyon's right bank and HEAD never finished.
+// Regression: the old right-bank pocket wedged a canyon marble on this seed.
 (async () => {
   const canyon = stages.find((stage) => stage.title === '균열 협곡');
   const race = new Race();
@@ -221,9 +221,22 @@ console.log('PASS resumed motion, turning points, fresh trapping window, brief n
   race.startRace([1, 2], 'asc');
   while (race.state === 'running' && race.elapsed < 400) race.advance();
   assert.equal(race.state, 'finished', 'a wedged marble must not keep the draw running forever');
-  assert.equal(race.finishReason, 'stalled');
+  assert.equal(race.finishReason, 'arrived', 'the repaired guide allows natural completion');
   assert.equal(race.arrivals.length, 100);
+  assert.ok(race.arrivals.every(ball => ball.y >= canyon.goalY), 'all marbles reach the real finish');
   assert.ok(race.elapsed < 200, `finished at ${race.elapsed.toFixed(1)}s`);
   race.physics.clearMarbles(); race.physics.clear();
-  console.log(`PASS wedged canyon marble ends the draw at ${race.elapsed.toFixed(1)}s`);
+  console.log(`PASS repaired canyon pocket finishes naturally at ${race.elapsed.toFixed(1)}s`);
+
+  // Keep native stall recovery covered without relying on a defect in a playable map.
+  race.prepare({ ...open, entities: [wall([[9.75, 2], [10.45, 2], [10.45, 8], [9.75, 8], [9.75, 2]],
+    { backing: 0.3 })] }, ['trapped']);
+  race.startRace([1, 1]);
+  while (race.state === 'running' && race.elapsed < 200) race.advance();
+  assert.equal(race.state, 'finished', 'an intentionally trapped marble must not run forever');
+  assert.equal(race.finishReason, 'stalled');
+  assert.equal(race.arrivals.length, 1);
+  assert.ok(race.arrivals[0].y < race.stage.goalY, 'the trapped marble is explicitly ranked without arriving');
+  race.physics.dispose();
+  console.log(`PASS native closed-pocket stall recovery at ${race.elapsed.toFixed(1)}s`);
 })().catch((error) => { console.error(error); process.exitCode = 1; });

@@ -59,7 +59,8 @@ export const fractureCanyon: StageDef = {
     bridge([14, 31], [29, 31 + 15 * 10 / 36]), hatch,
     bridge([35, 31 + 21 * 10 / 36], [50, 41]),
     bridge([50, 54], [14, 64]), bridge([14, 78], [43, 86.05]),
-    rail(curve([57.5, 25], [58, 29], [54, 33], [49, 35]), 0.6, purple),
+    // Join the guide to the outer rim so marbles cannot enter the dead-end gap behind it.
+    rail([[59, 18], ...curve([57.5, 25], [58, 29], [54, 33], [49, 35])], 0.6, purple),
     rail(curve([59, 44], [58, 48], [55, 50], [51, 52]), 0.6, purple),
     rail(curve([58, 65], [57, 69], [54, 73], [49, 75]), 0.6, purple),
     rail([[5, 26], [11, 29]], -0.6, green),

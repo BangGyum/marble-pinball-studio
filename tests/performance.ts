@@ -43,46 +43,48 @@ game.physics.step = (dt) => {
 };
 game.physics.getEntities = (blend) => { if (measuring) entityReads++; return entities(blend); };
 
-await game.init(stages[Number(map.value)], Array.from({ length: count }, (_, i) => '구슬 ' + String(i + 1).padStart(3, '0')));
-status.textContent = 'Game 캔버스 진단 · 고정 시드 · 워밍업 2초 + 측정 12초 · 순위 DOM/녹화 제외';
-if (params.has('start')) {
-  game.speed = speed;
-  if (mode !== 'idle') game.start([1, 1], false, 'asc');
-  const started = performance.now();
-  let previous = started, elapsedAtWarmup = 0;
-  let wasRunning = game.state === 'running';
-  const tick = (now: number) => {
-    if (mode === 'zoom') game.setZoom(1.5 + Math.sin((now - started) / 900) * .8);
-    if (now - started >= 2000 && !measuring) { measuring = true; previous = now; elapsedAtWarmup = game.elapsed; }
-    else if (measuring) {
-      intervals.push(now - previous);
-      if (wasRunning && game.state === 'running') activeIntervals.push(now - previous);
-    }
-    previous = now;
-    wasRunning = game.state === 'running';
-    if (now - started < 14000) { requestAnimationFrame(tick); return; }
-    measuring = false;
-    const stats = (values: number[]) => {
-      const sorted = [...values].sort((a, b) => a - b);
-      return { mean: values.reduce((a, b) => a + b, 0) / (values.length || 1), p95: sorted[Math.floor(sorted.length * .95)] ?? 0, max: sorted.at(-1) ?? 0 };
+// Parcel dev bundles wrap modules in synchronous functions, so initialize through a Promise.
+game.init(stages[Number(map.value)], Array.from({ length: count }, (_, i) => '구슬 ' + String(i + 1).padStart(3, '0'))).then(() => {
+  status.textContent = 'Game 캔버스 진단 · 고정 시드 · 워밍업 2초 + 측정 12초 · 순위 DOM/녹화 제외';
+  if (params.has('start')) {
+    game.speed = speed;
+    if (mode !== 'idle') game.start([1, 1], false, 'asc');
+    const started = performance.now();
+    let previous = started, elapsedAtWarmup = 0;
+    let wasRunning = game.state === 'running';
+    const tick = (now: number) => {
+      if (mode === 'zoom') game.setZoom(1.5 + Math.sin((now - started) / 900) * .8);
+      if (now - started >= 2000 && !measuring) { measuring = true; previous = now; elapsedAtWarmup = game.elapsed; }
+      else if (measuring) {
+        intervals.push(now - previous);
+        if (wasRunning && game.state === 'running') activeIntervals.push(now - previous);
+      }
+      previous = now;
+      wasRunning = game.state === 'running';
+      if (now - started < 14000) { requestAnimationFrame(tick); return; }
+      measuring = false;
+      const stats = (values: number[]) => {
+        const sorted = [...values].sort((a, b) => a - b);
+        return { mean: values.reduce((a, b) => a + b, 0) / (values.length || 1), p95: sorted[Math.floor(sorted.length * .95)] ?? 0, max: sorted.at(-1) ?? 0 };
+      };
+      const duration = intervals.reduce((a, b) => a + b, 0) / 1000;
+      const activeSeconds = activeIntervals.reduce((a, b) => a + b, 0) / 1000;
+      const output = {
+        map: stages[Number(map.value)].title, count, mode, speed, seed: 123456,
+        cssSize: [game.canvas.clientWidth, game.canvas.clientHeight], dpr: devicePixelRatio,
+        seconds: duration, fps: intervals.length / duration, frame: stats(intervals), slowFrames: intervals.filter(t => t > 25).length,
+        renders: renderTimes.length, render: stats(renderTimes), physics: stats(physicsTimes), entityReads, sprites,
+        simulatedSeconds: game.elapsed - elapsedAtWarmup, state: game.state,
+        targetFps, targetFrameMs: 1000 / targetFps,
+        activeSeconds, activeFps: activeSeconds ? activeIntervals.length / activeSeconds : null,
+        activeFrame: stats(activeIntervals), activeSlowFrameThresholdMs: 1000 / targetFps * 1.5,
+        activeSlowFrames: activeIntervals.filter(t => t > 1000 / targetFps * 1.5).length,
+        frameWork: stats(frameWork), workOverBudget: frameWork.filter(t => t > 1000 / targetFps).length,
+      };
+      game.setVisible(false);
+      status.textContent = '측정 완료';
+      result.textContent = JSON.stringify(output, (_, value) => typeof value === 'number' ? Number(value.toFixed(3)) : value, 2);
     };
-    const duration = intervals.reduce((a, b) => a + b, 0) / 1000;
-    const activeSeconds = activeIntervals.reduce((a, b) => a + b, 0) / 1000;
-    const output = {
-      map: stages[Number(map.value)].title, count, mode, speed, seed: 123456,
-      cssSize: [game.canvas.clientWidth, game.canvas.clientHeight], dpr: devicePixelRatio,
-      seconds: duration, fps: intervals.length / duration, frame: stats(intervals), slowFrames: intervals.filter(t => t > 25).length,
-      renders: renderTimes.length, render: stats(renderTimes), physics: stats(physicsTimes), entityReads, sprites,
-      simulatedSeconds: game.elapsed - elapsedAtWarmup, state: game.state,
-      targetFps, targetFrameMs: 1000 / targetFps,
-      activeSeconds, activeFps: activeSeconds ? activeIntervals.length / activeSeconds : null,
-      activeFrame: stats(activeIntervals), activeSlowFrameThresholdMs: 1000 / targetFps * 1.5,
-      activeSlowFrames: activeIntervals.filter(t => t > 1000 / targetFps * 1.5).length,
-      frameWork: stats(frameWork), workOverBudget: frameWork.filter(t => t > 1000 / targetFps).length,
-    };
-    game.setVisible(false);
-    status.textContent = '측정 완료';
-    result.textContent = JSON.stringify(output, (_, value) => typeof value === 'number' ? Number(value.toFixed(3)) : value, 2);
-  };
-  requestAnimationFrame(tick);
-}
+    requestAnimationFrame(tick);
+  }
+});

@@ -108,8 +108,9 @@ export const desireJar: StageDef = {
       shape: {
         type: 'polyline',
         rotation: 0,
+        // Back the return rim outward so rotating paddles cannot squeeze marbles through it.
+        backing: 2,
         points: [
-          [12, 85.8],
           [11, 86.4],
           [9, 87],
           [8, 87],
@@ -132,8 +133,8 @@ export const desireJar: StageDef = {
       shape: {
         type: 'polyline',
         rotation: 0,
+        backing: -2,
         points: [
-          [14, 85.8],
           [15, 86.4],
           [17, 87],
           [18, 87],
@@ -312,6 +313,27 @@ export const desireJar: StageDef = {
       type: 'kinematic',
       shape: { type: 'box', width: 2, height: 0.1, rotation: 0 },
       props: { density: 1, angularVelocity: 10, restitution: 0 },
+    },
+    // Keep the outlet lips unbacked: their outward normals point into the narrow exit.
+    {
+      type: 'static',
+      position: { x: 0, y: 0 },
+      props: { density: 1, angularVelocity: 0, restitution: 0 },
+      shape: {
+        type: 'polyline',
+        rotation: 0,
+        points: [[12, 85.8], [11, 86.4]],
+      },
+    },
+    {
+      type: 'static',
+      position: { x: 0, y: 0 },
+      props: { density: 1, angularVelocity: 0, restitution: 0 },
+      shape: {
+        type: 'polyline',
+        rotation: 0,
+        points: [[14, 85.8], [15, 86.4]],
+      },
     },
   ],
 };

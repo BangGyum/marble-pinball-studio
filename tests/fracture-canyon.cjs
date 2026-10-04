@@ -29,6 +29,26 @@ const near = (ball, points) => points.some((a, i) => {
   const physics = race.physics, B = physics.Box2D, random = Math.random, results = [];
   const contactIds = new Set();
   try {
+    // Marbles on the right route must not enter the narrowing gap behind the upper guide.
+    for (const speed of [1, 2, 8]) {
+      let seed = 271828;
+      Math.random = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+      race.prepare(stage, ['one', 'two']);
+      for (const [i, ball] of race.balls.entries()) {
+        const x = 57.1 + i * 0.3, y = 21.5 - i * 0.65;
+        physics.placeMarble(ball.id, x, y); ball.x = x; ball.y = y;
+      }
+      race.startRace([1, 2]);
+      for (const ball of race.balls) {
+        physics.vector.Set(speed, 0);
+        physics.marbleMap[ball.id].SetLinearVelocity(physics.vector);
+      }
+      while (race.state === 'running' && race.elapsed < 60) race.advance();
+      assert.equal(race.finishReason, 'arrived', `upper guide at speed ${speed}: no wedged or forced finish`);
+      assert.ok(race.arrivals.every(ball => ball.y >= stage.goalY && ball.x > 29 && ball.x < 35),
+        'both marbles reach the physical finish chute');
+    }
+    console.log('PASS canyon upper guide approach at 3 speeds without wedged marbles');
     for (const count of (process.argv[2] ? [Number(process.argv[2])] : [1, 20, 40])) {
       for (const initial of (process.argv[3] ? [Number(process.argv[3])] : [123456, 271828, 314159, 161803, 57721, 141421])) {
         let seed = initial;
