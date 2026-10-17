@@ -63,10 +63,11 @@ const gallery = new MapGallery((id) => {
   if (!selected) return;
   currentStage = selected.stage;
   mapSelect.value = id;
-  showGame();
+  showGame(true);
   prepare();
 });
-function showGame() {
+function showGame(fromMapSelection = false) {
+  if (!fromMapSelection) gallery.transition.cancel();
   if (!galleryView.hidden) galleryScroll = window.scrollY;
   gallery.intro.stop();
   galleryView.hidden = true;
@@ -77,6 +78,7 @@ function showGame() {
   el('maps-open').focus({ preventScroll: true });
 }
 el('maps-open').addEventListener('click', () => {
+  gallery.transition.cancel();
   resumeAfterGallery = game.state === 'running';
   if (resumeAfterGallery) game.pause();
   el('pause').textContent = game.state === 'paused' ? '계속하기' : '일시정지';
@@ -191,6 +193,7 @@ el('pause').addEventListener('click', () => {
 });
 function startRace() {
   if (!initialized) throw new Error('게임을 불러오는 중이에요.');
+  gallery.transition.finish();
   if (game.state === 'running' || game.state === 'paused') throw new Error('이미 진행 중인 경기가 있어요.');
   clearTimeout(inputTimer);
   const list = parseNames(names.value);
@@ -244,7 +247,10 @@ game
 const editor = new Editor({
   list: allMaps,
   onOpenChange(open) {
-    if (open) gallery.intro.stop();
+    if (open) {
+      gallery.intro.stop();
+      gallery.transition.cancel();
+    }
     game.setVisible(!open && !gameView.hidden);
   },
   save(stage, id) {

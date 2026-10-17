@@ -6,6 +6,7 @@ import { drawWind } from './wind-render';
 import { drawMarble } from './marble-art';
 import { el } from './ui';
 import { GalleryIntro } from './gallery-intro';
+import { MapTransition } from './map-transition';
 
 const details: Record<string, [string, string, string]> = {
   '역전 사다리': ['스프링 · 역전', '금속 경사로 네 단과 왕복 열차. 스프링을 선택하고 SPACE로 순위를 뒤집어 보세요.', '#ebc689'],
@@ -59,6 +60,7 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
 
 export class MapGallery {
   readonly intro = new GalleryIntro(el('map-gallery'));
+  readonly transition = new MapTransition(el('map-gallery'), el('game-view'));
   private grid = el('map-grid');
   private thumbnails = new WeakMap<StageDef, HTMLCanvasElement>();
   private stages = new WeakMap<HTMLCanvasElement, StageDef>();
@@ -82,7 +84,10 @@ export class MapGallery {
     });
     this.grid.addEventListener('click', (event) => {
       const card = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-map-id]');
-      if (card) select(card.dataset.mapId!);
+      if (card) {
+        this.intro.stop();
+        this.transition.play(card, () => select(card.dataset.mapId!));
+      }
     });
     el<HTMLImageElement>('canyon-rock-texture').addEventListener('load', () => {
       for (const canvas of this.grid.querySelectorAll<HTMLCanvasElement>('canvas[data-rendered]')) {
