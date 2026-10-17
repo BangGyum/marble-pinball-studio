@@ -1,3 +1,4 @@
+import { sceneColor } from './scene-theme';
 import type { WindZone } from './data/maps';
 import { windPower, windTravel } from './wind-power';
 
@@ -7,8 +8,8 @@ export function drawWind(ctx: CanvasRenderingContext2D, winds: WindZone[], time:
     const travelTime = windTravel(wind, time);
     ctx.save();
     ctx.lineWidth = Math.max(1.5 / scale, 0.045);
-    ctx.strokeStyle = '#72edee';
-    ctx.fillStyle = '#72edee';
+    ctx.strokeStyle = sceneColor('#72edee');
+    ctx.fillStyle = sceneColor('#72edee');
     ctx.globalAlpha = 0.15 + 0.4 * power;
     ctx.shadowBlur = 0;
     if (wind.type === 'vortex') {
@@ -45,20 +46,20 @@ export function drawWind(ctx: CanvasRenderingContext2D, winds: WindZone[], time:
         ctx.globalAlpha = 1;
         ctx.translate(fan.x, fan.y);
         ctx.rotate(angle + Math.PI / 2);
-        ctx.strokeStyle = '#c7a4ff';
-        ctx.fillStyle = '#392064';
-        ctx.shadowColor = '#af78ff';
+        ctx.strokeStyle = sceneColor('#c7a4ff');
+        ctx.fillStyle = sceneColor('#392064');
+        ctx.shadowColor = sceneColor('#af78ff');
         ctx.shadowBlur = scale > 8 ? 9 : 0;
         if (fan.front) {
           ctx.beginPath(); ctx.arc(0, 0, fan.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
           ctx.rotate(travelTime * 8);
-          ctx.strokeStyle = '#c384ff'; ctx.lineWidth = fan.radius * 0.23; ctx.lineCap = 'round';
+          ctx.strokeStyle = sceneColor('#c384ff'); ctx.lineWidth = fan.radius * 0.23; ctx.lineCap = 'round';
           for (let blade = 0; blade < 3; blade++) {
             const a = blade * Math.PI * 2 / 3;
             ctx.beginPath(); ctx.moveTo(0, 0);
             ctx.lineTo(Math.cos(a) * fan.radius * 0.78, Math.sin(a) * fan.radius * 0.78); ctx.stroke();
           }
-          ctx.fillStyle = '#ead6ff'; ctx.beginPath(); ctx.arc(0, 0, fan.radius * 0.16, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = sceneColor('#ead6ff'); ctx.beginPath(); ctx.arc(0, 0, fan.radius * 0.16, 0, Math.PI * 2); ctx.fill();
           ctx.restore();
           continue;
         }
@@ -71,7 +72,7 @@ export function drawWind(ctx: CanvasRenderingContext2D, winds: WindZone[], time:
         ctx.fill();
         ctx.stroke();
         ctx.shadowBlur = 0;
-        ctx.strokeStyle = '#e4d4ff';
+        ctx.strokeStyle = sceneColor('#e4d4ff');
         const rotation = 8 * travelTime;
         for (let blade = 0; blade < 6; blade++) {
           const a = rotation + blade * Math.PI / 3;
@@ -80,7 +81,7 @@ export function drawWind(ctx: CanvasRenderingContext2D, winds: WindZone[], time:
           ctx.lineTo(Math.cos(a) * fan.radius * 0.85, Math.sin(a) * fan.radius * 0.27);
           ctx.stroke();
         }
-        ctx.fillStyle = '#f1e6ff';
+        ctx.fillStyle = sceneColor('#f1e6ff');
         ctx.beginPath();
         ctx.arc(0, 0, 0.22, 0, Math.PI * 2);
         ctx.fill();

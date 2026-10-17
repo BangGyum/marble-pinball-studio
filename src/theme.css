@@ -89,7 +89,14 @@
 }
 [data-theme="beige"] .map-card:hover,
 [data-theme="beige"] .map-card:focus-visible { background: #fffdf8; border-color: #b49363; outline-color: #805329; box-shadow: 0 12px 28px #61432120; }
-[data-theme="beige"] .map-preview { border-color: #d9ccb9; }
+[data-theme="beige"] .map-preview { border-color: #d9ccb9; background: radial-gradient(ellipse at 50% 46%, #fff9ed, #e9dcc4 82%); }
+[data-theme="beige"] .map-preview::after { box-shadow: inset 0 0 40px #8b6a3320; }
+[data-theme="beige"] .map-card-number { color: #6f5f4e; }
+[data-theme="beige"] .map-card-tag { color: #654520; background: #faf5ecea; border-color: #c3aa84; }
+[data-theme="beige"] :is(#game, #editor-canvas) { background: #f4ede1; }
+[data-theme="beige"] .rankings li { color: #5c4934; text-shadow: 0 1px 3px #fff8eb, 0 0 5px #fff8eb; }
+[data-theme="beige"] .rankings li[data-finished="true"] { color: #38291b; }
+[data-theme="beige"] .ranking-color { border-color: #705a40; box-shadow: 0 1px 4px #705a4030; }
 [data-theme="beige"] .map-card-title { color: var(--text); }
 [data-theme="beige"] .map-card-action { color: #805329; border-color: var(--line); }
 [data-theme="beige"] .map-transition { color: color-mix(in srgb, var(--map-color) 25%, #493523); }

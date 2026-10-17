@@ -1,16 +1,19 @@
 import { toast } from './ui';
+import { setSceneTheme } from './scene-theme';
 
 export function initTheme() {
   const root = document.documentElement;
   const toggles = document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]');
   const apply = (beige: boolean) => {
     root.dataset.theme = beige ? 'beige' : 'dark';
+    setSceneTheme(beige ? 'beige' : 'dark');
     document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')!.content = beige ? '#f4ede1' : '#090c10';
     for (const toggle of toggles) {
       toggle.setAttribute('aria-checked', String(beige));
       toggle.title = beige ? '다크 테마로 전환' : '베이지 테마로 전환';
       toggle.querySelector('.theme-toggle-label')!.textContent = beige ? '베이지' : '다크';
     }
+    window.dispatchEvent(new Event('pinball-theme-change'));
   };
   // The head script restores the saved theme before the first paint.
   apply(root.dataset.theme === 'beige');

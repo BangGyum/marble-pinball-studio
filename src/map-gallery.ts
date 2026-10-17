@@ -7,6 +7,7 @@ import { drawMarble } from './marble-art';
 import { el } from './ui';
 import { GalleryIntro } from './gallery-intro';
 import { MapTransition } from './map-transition';
+import { getSceneTheme, sceneColor } from './scene-theme';
 
 const details: Record<string, [string, string, string]> = {
   '역전 사다리': ['스프링 · 역전', '금속 경사로 네 단과 왕복 열차. 스프링을 선택하고 SPACE로 순위를 뒤집어 보세요.', '#ebc689'],
@@ -48,7 +49,7 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
   drawWind(ctx, stage.windZones ?? [], 1, scale);
   drawMapOverlay(ctx, stage, entities, scale, false);
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = '#91f4de';
+  ctx.strokeStyle = sceneColor('#91f4de');
   ctx.lineWidth = 1 / scale;
   ctx.setLineDash([1.5 / scale, 2 / scale]);
   ctx.beginPath(); ctx.moveTo(0, stage.goalY); ctx.lineTo(width, stage.goalY); ctx.stroke();
@@ -56,6 +57,7 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
   ['#80f6de', '#ffd784', '#bdabff'].forEach((color, i) =>
     drawMarble(ctx, (stage.spawnX ?? 12.85) + (i - 1) * 0.85, 4, 0.4, color));
   canvas.dataset.rendered = 'true';
+  canvas.dataset.theme = getSceneTheme();
 }
 
 export class MapGallery {
@@ -73,6 +75,14 @@ export class MapGallery {
   }, { rootMargin: '240px' });
 
   constructor(select: (id: string) => void) {
+    window.addEventListener('pinball-theme-change', () => {
+      this.intro.stop();
+      this.observer.disconnect();
+      for (const canvas of this.grid.querySelectorAll('canvas')) {
+        canvas.removeAttribute('data-rendered');
+        this.observer.observe(canvas);
+      }
+    });
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.grid.addEventListener('pointermove', (event) => {
       if (event.pointerType !== 'mouse' || reduced.matches) return;
@@ -124,6 +134,7 @@ export class MapGallery {
         this.thumbnails.set(map.stage, canvas); this.stages.set(canvas, map.stage);
       }
       card.querySelector('.map-preview')!.append(canvas);
+      if (canvas.dataset.theme !== getSceneTheme()) canvas.removeAttribute('data-rendered');
       return card;
     });
     this.grid.replaceChildren(...cards);

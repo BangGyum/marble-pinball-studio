@@ -4,13 +4,14 @@ import type { StageDef } from './data/maps';
 import type { MapEntityState } from './types/MapEntity.type';
 import { drawEntities } from './draw';
 import { drawMarble } from './marble-art';
+import { getSceneTheme, type SceneTheme } from './scene-theme';
 
 type Sprite = { canvas: OffscreenCanvas; width: number; height: number; left: number; top: number };
 
 export class RenderCache {
   private balls = new WeakMap<Ball, { key: string; sprite: Sprite }>();
   private labels = new WeakMap<Ball, { key: string; sprite: Sprite }>();
-  private minimap?: { stage: StageDef; scale: number; dpr: number; canvas: OffscreenCanvas; fixed: Set<MapEntityState['shape']> };
+  private minimap?: { stage: StageDef; scale: number; dpr: number; theme: SceneTheme; canvas: OffscreenCanvas; fixed: Set<MapEntityState['shape']> };
 
   drawBall(ctx: CanvasRenderingContext2D, ball: Ball, scale: number, dpr: number, x = ball.x, y = ball.y) {
     // Older browsers can keep using the vector renderer.
@@ -32,7 +33,7 @@ export class RenderCache {
     ctx.drawImage(marble.canvas, x - marble.left / resolution, y - marble.top / resolution, marble.width / resolution, marble.height / resolution);
     // Labels keep the original 12–17 CSS pixel policy, independently of marble zoom.
     const font = Math.min(17, Math.max(12, scale * 0.24)), rasterFont = Math.ceil(font);
-    const labelKey = `${rasterFont}/${dpr}/${ball.color}/${ball.name}`;
+    const labelKey = `${getSceneTheme()}/${rasterFont}/${dpr}/${ball.color}/${ball.name}`;
     let label = this.labels.get(ball);
     if (!label || label.key !== labelKey) {
       const canvas = new OffscreenCanvas(1, 1), spriteCtx = canvas.getContext('2d')!;
@@ -40,10 +41,10 @@ export class RenderCache {
       const left = Math.ceil(spriteCtx.measureText(ball.name).width / 2 + 4), top = rasterFont + 4;
       canvas.width = Math.ceil(left * 2 * dpr); canvas.height = Math.ceil((top + 8) * dpr);
       spriteCtx.setTransform(dpr, 0, 0, dpr, left * dpr, top * dpr);
-      spriteCtx.fillStyle = ball.color;
+      spriteCtx.fillStyle = getSceneTheme() === 'beige' ? '#44382d' : ball.color;
       spriteCtx.font = `${rasterFont}px sans-serif`;
       spriteCtx.textAlign = 'center';
-      spriteCtx.strokeStyle = '#050a10';
+      spriteCtx.strokeStyle = getSceneTheme() === 'beige' ? '#fff8eb' : '#050a10';
       spriteCtx.lineWidth = 3;
       spriteCtx.strokeText(ball.name, 0, 0); spriteCtx.fillText(ball.name, 0, 0);
       label = { key: labelKey, sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left, top } };
@@ -63,7 +64,7 @@ export class RenderCache {
       return;
     }
     let cached = this.minimap;
-    if (!cached || cached.stage !== stage || cached.scale !== scale || cached.dpr !== dpr) {
+    if (!cached || cached.stage !== stage || cached.scale !== scale || cached.dpr !== dpr || cached.theme !== getSceneTheme()) {
       const fixed = new Set((stage.entities ?? [])
         .filter((e) => e.type === 'static' && (e.props.life ?? -1) <= 0)
         .map((e) => e.shape));
@@ -75,7 +76,7 @@ export class RenderCache {
       mapCtx.scale(scale * dpr, scale * dpr);
       if (stage.art?.style === 'reversal-ladder') drawLadderArt(mapCtx, stage, false);
       drawEntities(mapCtx, entities.filter((e) => fixed.has(e.shape)), scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
-      cached = this.minimap = { stage, scale, dpr, canvas, fixed };
+      cached = this.minimap = { stage, scale, dpr, theme: getSceneTheme(), canvas, fixed };
     }
     ctx.drawImage(cached.canvas, 0, 0, cached.canvas.width / (scale * dpr), cached.canvas.height / (scale * dpr));
     // Rotors and breakable obstacles stay live, above the fixed map layer.

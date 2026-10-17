@@ -1,3 +1,4 @@
+import { sceneColor } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { ladderSpringHousing } from './ladder-art';
 import type { MapEntityState } from './types/MapEntity.type';
@@ -69,8 +70,8 @@ export class SpringControls {
       if(e.shape.type!=='box'||!e.shape.spring)return;
       const label=this.label(i), px=x+e.x*scale, py=y+(e.y-e.shape.height)*scale-9;
       const width=ctx.measureText(label).width+14;
-      ctx.fillStyle='#0a1c26ed';ctx.fillRect(px-width/2,py-17,width,21);
-      ctx.fillStyle=e.shape.spring.cooldown?.scope==='shared'?'#ffd77c':'#aee9ed';ctx.fillText(label,px,py);
+      ctx.fillStyle=sceneColor('#0a1c26ed');ctx.fillRect(px-width/2,py-17,width,21);
+      ctx.fillStyle=sceneColor(e.shape.spring.cooldown?.scope==='shared'?'#ffd77c':'#aee9ed');ctx.fillText(label,px,py);
     });ctx.restore();
     const selected = entities[this.selected];
     ctx.save(); ctx.shadowBlur = 0;
@@ -79,16 +80,16 @@ export class SpringControls {
       const housing = this.housings.get(this.selected);
       if (housing) {
         ctx.save();ctx.translate(x+housing.x*scale,y+housing.y*scale);ctx.rotate(housing.angle);
-        ctx.strokeStyle='#fff3aa';ctx.lineWidth=2;
+        ctx.strokeStyle=sceneColor('#fff3aa');ctx.lineWidth=2;
         ctx.strokeRect(-housing.width*scale,-housing.height*scale,housing.width*2*scale,housing.height*2*scale);ctx.restore();
       }
       ctx.translate(x + selected.x * scale, y + selected.y * scale);ctx.rotate(selected.angle+s.rotation);
-      ctx.strokeStyle = '#fff3aa';ctx.lineWidth=2;ctx.setLineDash([5,3]);
+      ctx.strokeStyle = sceneColor('#fff3aa');ctx.lineWidth=2;ctx.setLineDash([5,3]);
       ctx.strokeRect(-(s.width+.18)*scale,-(s.height+.18)*scale,(s.width+.18)*2*scale,(s.height+.18)*2*scale);
     }
     ctx.restore();ctx.save();ctx.shadowBlur=0;ctx.textAlign='left';ctx.textBaseline='middle';
-    ctx.font='600 13px sans-serif';ctx.fillStyle='#10232ce8';ctx.fillRect(16,height-47,330,30);
-    ctx.fillStyle=this.selected<0?'#aee9ed':'#fff3aa';
+    ctx.font='600 13px sans-serif';ctx.fillStyle=sceneColor('#10232ce8');ctx.fillRect(16,height-47,330,30);
+    ctx.fillStyle=sceneColor(this.selected<0?'#aee9ed':'#fff3aa');
     const status = this.statuses.get(this.selected);
     const waiting = status?.busy || (status?.until ?? 0) > performance.now();
     ctx.fillText(this.selected<0?'스프링 장치 클릭 → SPACE로 밀어내기':this.running()?this.label(this.selected)+(waiting?' · 재사용 대기':' · SPACE로 발사'):'스프링 선택됨 · 경기 시작 후 SPACE',26,height-32);

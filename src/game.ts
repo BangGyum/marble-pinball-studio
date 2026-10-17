@@ -9,6 +9,7 @@ import { drawCelebration } from './celebration';
 import { Recorder } from './recorder';
 import { RenderCache } from './render-cache';
 import { drawMarble } from './marble-art';
+import { getSceneTheme, sceneColor } from './scene-theme';
 import type { MapEntityState } from './types/MapEntity.type';
 export type { Ball } from './race';
 export class Game extends Race {
@@ -43,6 +44,7 @@ export class Game extends Race {
     super();
     this.springControls = new SpringControls(canvas, index => this.activateSpring(index), () => this.state === 'running');
     this.ctx = canvas.getContext('2d', { alpha: false })!;
+    window.addEventListener('pinball-theme-change', () => { this.renderDirty = true; });
     new ResizeObserver(() => this.resize()).observe(canvas);
     const followMinimap = (e: PointerEvent) => {
       this.renderDirty = true;
@@ -225,7 +227,8 @@ export class Game extends Race {
     if (this.canvas.width !== pixelWidth) this.canvas.width = pixelWidth;
     if (this.canvas.height !== pixelHeight) this.canvas.height = pixelHeight;
     ctx.setTransform(this.canvas.width / w, 0, 0, this.canvas.height / h, 0, 0);
-    ctx.fillStyle = '#070a0e';
+    const beige = getSceneTheme() === 'beige';
+    ctx.fillStyle = beige ? '#f4ede1' : '#070a0e';
     ctx.fillRect(0, 0, w, h);
     const now = performance.now();
     const dt = this.lastRender ? Math.max(0, Math.min(0.1, (now - this.lastRender) / 1000)) : 1 / 60;
@@ -259,7 +262,7 @@ export class Game extends Race {
     if (this.stage.vortex) {
       const wind = this.stage.vortex;
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = '#64f4e050';
+      ctx.strokeStyle = sceneColor('#64f4e050');
       ctx.lineWidth = 1.5 / scale;
       const phase = wind.speed / wind.radius * (this.elapsed +
         (wind.gust ?? 0) * (1 - Math.cos(this.elapsed * 1.7)) / 1.7);
@@ -273,7 +276,7 @@ export class Game extends Race {
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
     drawMapOverlay(ctx, this.stage, entities, scale, true, view);
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#65efda';
+    ctx.strokeStyle = sceneColor('#65efda');
     ctx.lineWidth = 2 / scale;
     ctx.setLineDash([0.35, 0.3]);
     ctx.beginPath();
@@ -282,7 +285,7 @@ export class Game extends Race {
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.font = `${12 / scale}px sans-serif`;
-    ctx.fillStyle = '#65efda';
+    ctx.fillStyle = sceneColor('#65efda');
     ctx.fillText(this.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, this.stage.goalY - 0.4);
     for (const b of active) {
       const x = at(b.px, b.x), y = at(b.py, b.y);
@@ -294,10 +297,10 @@ export class Game extends Race {
       ctx.globalAlpha = bridgeBallOpacity(this.stage, { x, y, onBridge: b.onBridge });
       if (this.renderCache.drawBall(ctx, b, scale, d, x, y)) { ctx.globalAlpha = 1; continue; }
       drawMarble(ctx, x, y, 0.25, b.color);
-      ctx.fillStyle = b.color;
+      ctx.fillStyle = beige ? '#44382d' : b.color;
       ctx.font = `${Math.min(17, Math.max(12, scale * 0.24)) / scale}px sans-serif`;
       ctx.textAlign = 'center';
-      ctx.strokeStyle = '#050a10';
+      ctx.strokeStyle = beige ? '#fff8eb' : '#050a10';
       ctx.lineWidth = 3 / scale;
       ctx.strokeText(b.name, x, y + 0.55);
       ctx.fillText(b.name, x, y + 0.55);
@@ -309,7 +312,7 @@ export class Game extends Race {
     this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h, this.stage);
     ctx.textAlign = 'right';
     ctx.font = '12px sans-serif';
-    ctx.fillStyle = '#728393';
+    ctx.fillStyle = beige ? '#6f5f4e' : '#728393';
     ctx.fillText(`${this.arrivals.length} / ${this.balls.length} 도착`, w - 24, h - 20);
     if (this.recording) {
       ctx.fillStyle = '#ff777d';
@@ -320,7 +323,7 @@ export class Game extends Race {
     }
     if (this.state === 'ready' && !this.balls.length) {
       ctx.textAlign = 'center';
-      ctx.fillStyle = '#8496a5';
+      ctx.fillStyle = beige ? '#6f5f4e' : '#8496a5';
       ctx.font = '16px sans-serif';
       ctx.fillText('이름을 입력하면 구슬이 나타납니다', w * 0.55, h * 0.45);
     }
@@ -349,7 +352,7 @@ export class Game extends Race {
     ctx.clip();
     ctx.translate(m.x, m.y);
     ctx.scale(scale, scale);
-    ctx.fillStyle = '#142027';
+    ctx.fillStyle = getSceneTheme() === 'beige' ? '#e9dcc4' : '#142027';
     ctx.fillRect(0, 0, mapWidth, this.stage.goalY);
     this.renderCache.drawMinimap(ctx, this.stage, entities, scale, Math.min(devicePixelRatio, 2));
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
@@ -363,10 +366,13 @@ export class Game extends Race {
       ctx.beginPath();
       ctx.arc(x, y, Math.max(0.23, 1.4 / scale), 0, Math.PI * 2);
       ctx.fill();
+      if (getSceneTheme() === 'beige') {
+        ctx.strokeStyle = '#705a40'; ctx.lineWidth = 0.75 / scale; ctx.stroke();
+      }
     }
     ctx.globalAlpha = 1;
     const cam = this.manual ?? this.camera;
-    ctx.strokeStyle = '#65efda70';
+    ctx.strokeStyle = sceneColor('#65efda70');
     ctx.lineWidth = 1 / scale;
     const viewScale = this.viewScale();
     ctx.strokeRect(
@@ -376,10 +382,10 @@ export class Game extends Race {
       this.height / viewScale
     );
     ctx.restore();
-    ctx.strokeStyle = '#3f7167';
+    ctx.strokeStyle = getSceneTheme() === 'beige' ? '#9b815a' : '#3f7167';
     ctx.lineWidth = 1;
     ctx.strokeRect(m.x, m.y, m.w, m.h);
-    ctx.fillStyle = '#7f9a98';
+    ctx.fillStyle = getSceneTheme() === 'beige' ? '#6f5f4e' : '#7f9a98';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText('MAP OVERVIEW', m.x, 15);

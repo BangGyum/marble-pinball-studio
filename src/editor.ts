@@ -5,6 +5,7 @@ import { drawEntities } from './draw';
 import { drawMapArt, drawMapOverlay } from './map-art';
 import { drawWind } from './wind-render';
 import { el, toast, message } from './ui';
+import { getSceneTheme, sceneColor } from './scene-theme';
 
 type Tool = 'select' | 'wall' | 'freehand' | 'pin' | 'bumper' | 'ramp' | 'rotor' | 'boost' | 'spring';
 type Point = { x: number; y: number };
@@ -43,6 +44,7 @@ export class Editor {
   private ctx = this.canvas.getContext('2d')!;
   private dialog = el<HTMLDialogElement>('editor-dialog');
   constructor(private actions: EditorActions) {
+    window.addEventListener('pinball-theme-change', () => { if (this.dialog.open) this.render(); });
     this.canvas.width = 26 * SCALE;
     el('tools').addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-tool]');
@@ -545,12 +547,12 @@ export class Editor {
     this.canvas.width = (this.stage.width ?? 26) * SCALE;
     this.canvas.height = (this.stage.goalY + 3) * SCALE;
     const c = this.ctx;
-    c.fillStyle = '#0e181f';
+    c.fillStyle = getSceneTheme() === 'beige' ? '#efe4cf' : '#0e181f';
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     c.save();
     c.scale(SCALE, SCALE);
     drawMapArt(c, this.stage, SCALE, this.stage.art?.style !== 'reversal-ladder');
-    c.strokeStyle = '#23323d';
+    c.strokeStyle = sceneColor('#23323d');
     c.lineWidth = 0.5 / SCALE;
     for (let x = 0; x <= (this.stage.width ?? 26); x++) {
       c.beginPath();
@@ -564,12 +566,12 @@ export class Editor {
       c.lineTo(this.stage.width ?? 26, y);
       c.stroke();
     }
-    c.fillStyle = '#65efda0e';
+    c.fillStyle = sceneColor('#65efda0e');
     const spawnOffset = (this.stage.spawnX ?? 12.85) - 12.85;
     c.fillRect(9.25 + spawnOffset, 0, 7.25, 6.5);
     c.font = '.45px sans-serif';
     c.textAlign = 'center';
-    c.fillStyle = '#94bdb5';
+    c.fillStyle = sceneColor('#94bdb5');
     c.fillText('출발 영역', 12.8 + spawnOffset, 2);
     for (let i = 0; i < 4; i++) {
       c.fillStyle = `hsl(${i * 85} 90% 75%)`;
@@ -588,19 +590,19 @@ export class Editor {
     if (this.stage.art?.style === 'reversal-ladder') drawMapOverlay(c, this.stage, entities, SCALE, false);
     drawWind(c, this.stage.windZones ?? [], 0, SCALE);
     c.setLineDash([0.5, 0.3]);
-    c.strokeStyle = '#65efda';
+    c.strokeStyle = sceneColor('#65efda');
     c.lineWidth = 2 / SCALE;
     c.beginPath();
     c.moveTo(0, this.stage.goalY);
     c.lineTo(this.stage.width ?? 26, this.stage.goalY);
     c.stroke();
     c.setLineDash([]);
-    c.fillStyle = '#65efda';
+    c.fillStyle = sceneColor('#65efda');
     c.font = '.5px sans-serif';
     c.textAlign = 'left';
     c.fillText('FINISH · 결승선', 1, this.stage.goalY + 1);
     if (this.drag && this.wallEnd) {
-      c.strokeStyle = '#fff';
+      c.strokeStyle = sceneColor('#fff');
       c.lineWidth = 2 / SCALE;
       c.beginPath();
       c.moveTo(this.drag.start.x, this.drag.start.y);

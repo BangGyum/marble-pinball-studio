@@ -1,5 +1,6 @@
 import { Game } from '../src/game';
 import { stages, DEFAULT_MAP_INDEX } from '../src/data/maps';
+import { setSceneTheme } from '../src/scene-theme';
 
 const params = new URLSearchParams(location.search);
 const map = document.querySelector<HTMLSelectElement>('#map')!;
@@ -9,10 +10,15 @@ const count = Math.max(1, Math.min(300, Number(params.get('count') ?? 200)));
 const mode = params.get('mode') ?? 'run';
 const speed = Number(params.get('speed') ?? 1);
 const targetFps = params.get('target') === '60' ? 60 : 120;
+const theme = params.get('theme') === 'beige' ? 'beige' : 'dark';
+const zoom = Number(params.get('zoom') ?? 1);
+setSceneTheme(theme);
 document.querySelector<HTMLInputElement>('#count')!.value = String(count);
 document.querySelector<HTMLSelectElement>('#mode')!.value = mode;
 document.querySelector<HTMLSelectElement>('#speed')!.value = String(speed);
 document.querySelector<HTMLSelectElement>('#target')!.value = String(targetFps);
+document.querySelector<HTMLSelectElement>('#theme')!.value = theme;
+document.querySelector<HTMLSelectElement>('#zoom')!.value = String(zoom);
 const status = document.querySelector('#status')!, result = document.querySelector('#result')!;
 let seed = 123456;
 Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
@@ -45,6 +51,7 @@ game.physics.getEntities = (blend) => { if (measuring) entityReads++; return ent
 
 // Parcel dev bundles wrap modules in synchronous functions, so initialize through a Promise.
 game.init(stages[Number(map.value)], Array.from({ length: count }, (_, i) => '구슬 ' + String(i + 1).padStart(3, '0'))).then(() => {
+  game.setZoom(zoom);
   status.textContent = 'Game 캔버스 진단 · 고정 시드 · 워밍업 2초 + 측정 12초 · 순위 DOM/녹화 제외';
   if (params.has('start')) {
     game.speed = speed;
@@ -70,7 +77,7 @@ game.init(stages[Number(map.value)], Array.from({ length: count }, (_, i) => '�
       const duration = intervals.reduce((a, b) => a + b, 0) / 1000;
       const activeSeconds = activeIntervals.reduce((a, b) => a + b, 0) / 1000;
       const output = {
-        map: stages[Number(map.value)].title, count, mode, speed, seed: 123456,
+        map: stages[Number(map.value)].title, count, mode, speed, theme, zoom, seed: 123456,
         cssSize: [game.canvas.clientWidth, game.canvas.clientHeight], dpr: devicePixelRatio,
         seconds: duration, fps: intervals.length / duration, frame: stats(intervals), slowFrames: intervals.filter(t => t > 25).length,
         renders: renderTimes.length, render: stats(renderTimes), physics: stats(physicsTimes), entityReads, sprites,

@@ -1,3 +1,4 @@
+import { sceneColor } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { backgroundCache } from './background-cache';
 
@@ -12,7 +13,7 @@ export function drawHourglassArt(ctx: Context, stage: StageDef, cacheBackground 
 
 function paint(ctx: Context, stage: StageDef) {
   ctx.save();
-  ctx.strokeStyle = '#223c52'; ctx.fillStyle = '#0b1728'; ctx.lineWidth = 0.12;
+  ctx.strokeStyle = sceneColor('#223c52'); ctx.fillStyle = sceneColor('#0b1728'); ctx.lineWidth = 0.12;
   for (const x of [24.8, 38]) {
     ctx.fillRect(x - 0.3, 7, 0.6, 76); ctx.strokeRect(x - 0.3, 7, 0.6, 76);
     for (let y = 13; y < 82; y += 9) {
@@ -27,8 +28,8 @@ function paint(ctx: Context, stage: StageDef) {
     ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
   }
   const glass = ctx.createLinearGradient(14, 6, 48, 87);
-  glass.addColorStop(0, '#061a22'); glass.addColorStop(0.4, '#08151e');
-  glass.addColorStop(0.7, '#09222b'); glass.addColorStop(1, '#102938');
+  glass.addColorStop(0, sceneColor('#061a22')); glass.addColorStop(0.4, sceneColor('#08151e'));
+  glass.addColorStop(0.7, sceneColor('#09222b')); glass.addColorStop(1, sceneColor('#102938'));
   ctx.fillStyle = glass; ctx.fill('evenodd');
   ctx.save(); ctx.clip('evenodd');
   // Deterministic golden grains are scenery, cached once and never consume the race RNG.
@@ -37,39 +38,39 @@ function paint(ctx: Context, stage: StageDef) {
   for (let i = 0; i < 1900; i++) {
     const x = 14 + random() * 36, y = 9 + random() * 46;
     if (y > 27 && y < 34 || Math.abs(x - 32) < 3.5) continue;
-    ctx.fillStyle = i % 4 ? '#d7a24240' : '#ffcf7566';
+    ctx.fillStyle = sceneColor(i % 4 ? '#d7a24240' : '#ffcf7566');
     const r = 0.02 + random() * 0.035; ctx.fillRect(x, y, r, r);
   }
-  ctx.strokeStyle = '#ffd47b12'; ctx.lineWidth = 0.11;
+  ctx.strokeStyle = sceneColor('#ffd47b12'); ctx.lineWidth = 0.11;
   for (const side of [-1, 1]) {
     ctx.beginPath(); ctx.moveTo(32 + side * 4, 58);
     ctx.bezierCurveTo(32 + side * 4, 63, 32 + side * 21, 64, 32 + side * 16, 72);
     ctx.bezierCurveTo(32 + side * 13, 77, 32 + side * 6, 77, 32 + side * 6, 83); ctx.stroke();
   }
   ctx.restore();
-  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = '#64f4e0';
-  ctx.shadowColor = '#32e8ce'; ctx.shadowBlur = 8; ctx.lineWidth = 0.46;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = sceneColor('#64f4e0');
+  ctx.shadowColor = sceneColor('#32e8ce'); ctx.shadowBlur = 8; ctx.lineWidth = 0.46;
   for (const e of stage.entities ?? []) {
     const s = e.shape;
     if (s.type !== 'polyline' || s.solid) continue;
     ctx.beginPath(); ctx.moveTo(...s.points[0]); s.points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.stroke();
   }
-  ctx.shadowBlur = 0; ctx.textAlign = 'center'; ctx.fillStyle = '#a4fff0'; ctx.font = '700 1.35px system-ui';
+  ctx.shadowBlur = 0; ctx.textAlign = 'center'; ctx.fillStyle = sceneColor('#a4fff0'); ctx.font = '700 1.35px system-ui';
   ctx.fillText('START', 32, 2.9);
-  ctx.strokeStyle = '#7efce5'; ctx.lineWidth = 0.25;
+  ctx.strokeStyle = sceneColor('#7efce5'); ctx.lineWidth = 0.25;
   for (const y of [4.5, 5.2]) {
     ctx.beginPath(); ctx.moveTo(31.4, y); ctx.lineTo(32, y + 0.5); ctx.lineTo(32.6, y); ctx.stroke();
   }
   ctx.font = '700 1.1px system-ui'; ctx.textAlign = 'left'; ctx.fillText('네온 모래시계', 42, 2.8);
-  ctx.font = '600 0.9px system-ui'; ctx.fillStyle = '#dce9ff'; ctx.fillText('쌓였다가 폭발', 3, 20.5);
-  ctx.strokeStyle = '#b6d9e5'; ctx.lineWidth = 0.08;
+  ctx.font = '600 0.9px system-ui'; ctx.fillStyle = sceneColor('#dce9ff'); ctx.fillText('쌓였다가 폭발', 3, 20.5);
+  ctx.strokeStyle = sceneColor('#b6d9e5'); ctx.lineWidth = 0.08;
   ctx.beginPath(); ctx.moveTo(12.5, 20.2); ctx.lineTo(19.5, 20.2); ctx.lineTo(27.2, 26.5); ctx.stroke();
   ctx.fillText('숨은 우회로', 54, 44.5);
   ctx.beginPath(); ctx.moveTo(53.5, 44.2); ctx.lineTo(52.7, 44.2); ctx.lineTo(50.7, 45.7); ctx.stroke();
   for (let row = 0; row < 2; row++) for (let col = 0; col < 16; col++) {
-    ctx.fillStyle = (row + col) % 2 ? '#0a141c' : '#d9fff5';
+    ctx.fillStyle = sceneColor((row + col) % 2 ? '#0a141c' : '#d9fff5');
     ctx.fillRect(21.3 + col * 1.3375, stage.goalY - 1.5 + row * 0.75, 1.3375, 0.75);
   }
-  ctx.textAlign = 'center'; ctx.fillStyle = '#a4fff0'; ctx.font = '700 1.35px system-ui'; ctx.fillText('» FINISH »', 32, stage.goalY + 2);
+  ctx.textAlign = 'center'; ctx.fillStyle = sceneColor('#a4fff0'); ctx.font = '700 1.35px system-ui'; ctx.fillText('» FINISH »', 32, stage.goalY + 2);
   ctx.restore();
 }

@@ -1,4 +1,5 @@
 import type { StageDef } from './data/maps';
+import { getSceneTheme } from './scene-theme';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 type Bounds = { x: number; y: number; width: number; height: number; density: number; maxPixels?: number };
@@ -16,7 +17,7 @@ export class BackgroundCache {
     const { x, y, width, height } = bounds;
     const density = Math.min(bounds.density, Math.sqrt(Math.min(this.budget, this.imageLimit, bounds.maxPixels ?? this.imageLimit) / (width * height)));
     const pixelWidth = Math.max(1, Math.floor(width * density)), pixelHeight = Math.max(1, Math.floor(height * density));
-    const key = `${layer}/${pixelWidth}/${pixelHeight}`;
+    const key = `${getSceneTheme()}/${layer}/${pixelWidth}/${pixelHeight}`;
     let entry = this.stages.get(stage)?.get(key);
     if (!entry) {
       const pixels = pixelWidth * pixelHeight;

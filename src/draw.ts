@@ -1,3 +1,4 @@
+import { sceneColor } from './scene-theme';
 import type { MapEntityState } from './types/MapEntity.type';
 type ViewBounds = { left: number; right: number; top: number; bottom: number };
 export function drawEntities(
@@ -38,21 +39,21 @@ export function drawEntities(
     ctx.translate(e.x, e.y);
     ctx.rotate(e.angle);
     const color = i === selected ? '#ffffff' : (shape.color ?? (shape.type === 'polyline' ? '#b5edeb' : '#59eada'));
-    ctx.fillStyle = color;
-    ctx.strokeStyle = color;
+    ctx.fillStyle = sceneColor(color);
+    ctx.strokeStyle = sceneColor(color);
     ctx.lineWidth = (i === selected ? 3 : 1.6) / scale;
-    ctx.shadowColor = color;
+    ctx.shadowColor = sceneColor(color);
     ctx.shadowBlur = glow ? (shape.type === 'polyline' ? 7 : 13) : 0;
     if (shape.type === 'box') {
       ctx.rotate(shape.rotation);
       if (shape.spring) {
         ctx.shadowBlur = glow ? 8 : 0;
         const springMetal = ctx.createLinearGradient(0, -shape.height, 0, shape.height);
-        springMetal.addColorStop(0, '#448596'); springMetal.addColorStop(.4, '#17313c'); springMetal.addColorStop(1, '#0b1a24');
+        springMetal.addColorStop(0, sceneColor('#448596')); springMetal.addColorStop(.4, sceneColor('#17313c')); springMetal.addColorStop(1, sceneColor('#0b1a24'));
         ctx.fillStyle = springMetal; ctx.fillRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);
-        ctx.strokeStyle = color; ctx.lineWidth = 0.08 + 1 / scale;
+        ctx.strokeStyle = sceneColor(color); ctx.lineWidth = 0.08 + 1 / scale;
         ctx.strokeRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);
-        ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = sceneColor(color); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.font = '600 ' + Math.max(0.28, 10 / scale) + 'px sans-serif';
         ctx.fillText('SPACE', 0, 0);
         ctx.rotate(shape.spring.direction - e.angle - shape.rotation);
@@ -60,11 +61,11 @@ export function drawEntities(
         ctx.restore();return;
       }
       if (shape.boostSpeed !== undefined) {
-        ctx.fillStyle = '#251c0ddd';
+        ctx.fillStyle = sceneColor('#251c0ddd');
         ctx.fillRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);
-        ctx.strokeStyle = color; ctx.lineWidth = 0.08 + 1 / scale;
+        ctx.strokeStyle = sceneColor(color); ctx.lineWidth = 0.08 + 1 / scale;
         ctx.strokeRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);
-        ctx.fillStyle = color;
+        ctx.fillStyle = sceneColor(color);
         for (const offset of [-0.55, 0, 0.55]) {
           const x = offset * shape.width, w = shape.width * 0.22, h = shape.height * 0.62;
           ctx.beginPath(); ctx.moveTo(x - w, -h); ctx.lineTo(x, -h); ctx.lineTo(x + w, 0);
@@ -76,13 +77,13 @@ export function drawEntities(
       ctx.fillRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);
       if (glass) {
         ctx.shadowBlur = 0;
-        ctx.strokeStyle = '#f4e7ff'; ctx.lineWidth = 1 / scale;
+        ctx.strokeStyle = sceneColor('#f4e7ff'); ctx.lineWidth = 1 / scale;
         ctx.strokeRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);
-        ctx.fillStyle = '#080e2540';
+        ctx.fillStyle = sceneColor('#080e2540');
         ctx.fillRect(-shape.width + 0.12, 0, Math.max(0, shape.width * 2 - 0.24), shape.height);
         if (shape.width > 1) {
           ctx.beginPath(); ctx.arc(0, 0, 0.36, 0, Math.PI * 2);
-          ctx.fillStyle = '#413663'; ctx.fill(); ctx.stroke();
+          ctx.fillStyle = sceneColor('#413663'); ctx.fill(); ctx.stroke();
         }
       }
       if (i === selected)
@@ -93,9 +94,9 @@ export function drawEntities(
       ctx.fill();
       if (glass) {
         ctx.shadowBlur = 0;
-        ctx.strokeStyle = '#fff3d4'; ctx.lineWidth = 1.5 / scale; ctx.stroke();
+        ctx.strokeStyle = sceneColor('#fff3d4'); ctx.lineWidth = 1.5 / scale; ctx.stroke();
         ctx.beginPath(); ctx.arc(-shape.radius * 0.2, -shape.radius * 0.25, shape.radius * 0.45, 0, Math.PI * 2);
-        ctx.fillStyle = '#fff2bc80'; ctx.fill();
+        ctx.fillStyle = sceneColor('#fff2bc80'); ctx.fill();
       }
       if (i === selected) {
         ctx.beginPath();
@@ -125,9 +126,9 @@ export function drawEntities(
         connected = true;
       }
       if (glass && i !== selected) {
-        ctx.strokeStyle = '#2d6077'; ctx.lineWidth = 0.2; ctx.stroke();
-        ctx.strokeStyle = color; ctx.lineWidth = 0.08 + 0.8 / scale; ctx.stroke();
-        ctx.strokeStyle = '#e8fbff'; ctx.lineWidth = 0.025 + 0.4 / scale;
+        ctx.strokeStyle = sceneColor('#2d6077'); ctx.lineWidth = 0.2; ctx.stroke();
+        ctx.strokeStyle = sceneColor(color); ctx.lineWidth = 0.08 + 0.8 / scale; ctx.stroke();
+        ctx.strokeStyle = sceneColor('#e8fbff'); ctx.lineWidth = 0.025 + 0.4 / scale;
       }
       ctx.stroke();
     }

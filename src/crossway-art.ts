@@ -1,3 +1,4 @@
+import { sceneColor } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { backgroundCache } from './background-cache';
 import { visibleArt, type ViewBounds } from './art-visibility';
@@ -7,8 +8,8 @@ type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 const tau = Math.PI * 2;
 const chrome = (ctx: Context, x: number, y: number, radius: number) => {
   const fill = ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
-  fill.addColorStop(0, '#f4fbff'); fill.addColorStop(0.24, '#8a9da9'); fill.addColorStop(0.48, '#263541');
-  fill.addColorStop(0.72, '#a2bcc8'); fill.addColorStop(1, '#111c24'); return fill;
+  fill.addColorStop(0, sceneColor('#f4fbff')); fill.addColorStop(0.24, sceneColor('#8a9da9')); fill.addColorStop(0.48, sceneColor('#263541'));
+  fill.addColorStop(0.72, sceneColor('#a2bcc8')); fill.addColorStop(1, sceneColor('#111c24')); return fill;
 };
 function paint(ctx: Context, stage: StageDef) {
   ctx.save();
@@ -16,21 +17,21 @@ function paint(ctx: Context, stage: StageDef) {
   ctx.beginPath(); ctx.moveTo(...outline[0]); outline.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
   ctx.save(); ctx.clip();
   const field = ctx.createLinearGradient(0, 0, 64, 0);
-  field.addColorStop(0, '#071b23'); field.addColorStop(0.35, '#070c12');
-  field.addColorStop(0.65, '#070c12'); field.addColorStop(1, '#231909');
+  field.addColorStop(0, sceneColor('#071b23')); field.addColorStop(0.35, sceneColor('#070c12'));
+  field.addColorStop(0.65, sceneColor('#070c12')); field.addColorStop(1, sceneColor('#231909'));
   ctx.fillStyle = field; ctx.fillRect(0, -30, 64, stage.goalY + 35);
   // The central runway is a floor marking, with rails only where collisions exist.
   const runway = ctx.createLinearGradient(29.5, 0, 34.5, 0);
-  runway.addColorStop(0, '#ffa91c45'); runway.addColorStop(0.15, '#bf852d25');
-  runway.addColorStop(0.5, '#1e1c17'); runway.addColorStop(0.85, '#bf852d25'); runway.addColorStop(1, '#ffa91c45');
+  runway.addColorStop(0, sceneColor('#ffa91c45')); runway.addColorStop(0.15, sceneColor('#bf852d25'));
+  runway.addColorStop(0.5, sceneColor('#1e1c17')); runway.addColorStop(0.85, sceneColor('#bf852d25')); runway.addColorStop(1, sceneColor('#ffa91c45'));
   ctx.fillStyle = runway; ctx.fillRect(29.5, 8, 5, stage.goalY - 8);
-  ctx.setLineDash([0.35, 0.65]); ctx.lineWidth = 0.06; ctx.strokeStyle = '#ffc56265';
+  ctx.setLineDash([0.35, 0.65]); ctx.lineWidth = 0.06; ctx.strokeStyle = sceneColor('#ffc56265');
   for (const x of [29.5, 34.5]) { ctx.beginPath(); ctx.moveTo(x, 10); ctx.lineTo(x, stage.goalY); ctx.stroke(); }
   ctx.setLineDash([]);
   // Fine floor inlays distinguish the playfield from the opaque metal rails.
   for (let y = 24; y < 83; y += 14) for (const x of [23, 41]) {
-    ctx.beginPath(); ctx.arc(x, y, 0.42, 0, tau); ctx.strokeStyle = '#71879935'; ctx.lineWidth = 0.07; ctx.stroke();
-    ctx.fillStyle = '#bacad235'; ctx.fillRect(x - 0.12, y - 0.03, 0.24, 0.06);
+    ctx.beginPath(); ctx.arc(x, y, 0.42, 0, tau); ctx.strokeStyle = sceneColor('#71879935'); ctx.lineWidth = 0.07; ctx.stroke();
+    ctx.fillStyle = sceneColor('#bacad235'); ctx.fillRect(x - 0.12, y - 0.03, 0.24, 0.06);
   }
   ctx.restore();
   // Metallic backing is offset to the same side as each wall's solid fixtures.
@@ -48,23 +49,23 @@ function paint(ctx: Context, stage: StageDef) {
       ctx.fillStyle = chrome(ctx, a[0], a[1], 1); ctx.fill();
     }
     ctx.beginPath(); ctx.moveTo(...p[0]); p.slice(1).forEach(v => ctx.lineTo(...v));
-    ctx.strokeStyle = '#091015'; ctx.lineWidth = 0.42; ctx.stroke();
-    ctx.strokeStyle = s.color ?? '#39e6ff'; ctx.lineWidth = 0.18; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 12; ctx.stroke();
-    ctx.shadowBlur = 0; ctx.strokeStyle = '#ecffff'; ctx.lineWidth = 0.04; ctx.stroke();
+    ctx.strokeStyle = sceneColor('#091015'); ctx.lineWidth = 0.42; ctx.stroke();
+    ctx.strokeStyle = sceneColor(s.color ?? '#39e6ff'); ctx.lineWidth = 0.18; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 12; ctx.stroke();
+    ctx.shadowBlur = 0; ctx.strokeStyle = sceneColor('#ecffff'); ctx.lineWidth = 0.04; ctx.stroke();
     // Small mounting clamps follow the existing rail; they are purely decorative.
     for (let i = 5; i < p.length - 3; i += 10) {
       const a = p[i], b = p[i + 1];
       ctx.save(); ctx.translate(...a); ctx.rotate(Math.atan2(b[1] - a[1], b[0] - a[0]));
       ctx.fillStyle = chrome(ctx, 0, 0, 0.6); ctx.fillRect(-0.18, -0.5, 0.36, 1);
-      ctx.strokeStyle = '#c1d4df'; ctx.lineWidth = 0.045; ctx.strokeRect(-0.18, -0.5, 0.36, 1); ctx.restore();
+      ctx.strokeStyle = sceneColor('#c1d4df'); ctx.lineWidth = 0.045; ctx.strokeRect(-0.18, -0.5, 0.36, 1); ctx.restore();
     }
     ctx.restore();
   }
-  ctx.textAlign = 'center'; ctx.fillStyle = '#d7e7ec'; ctx.font = '600 0.72px system-ui';
+  ctx.textAlign = 'center'; ctx.fillStyle = sceneColor('#d7e7ec'); ctx.font = '600 0.72px system-ui';
   ctx.fillText('NEON / CROSSWAY', 32, -1.5);
-  ctx.fillStyle = '#90a4b0'; ctx.font = '500 0.4px system-ui'; ctx.fillText('CYAN × AMBER', 32, 0);
+  ctx.fillStyle = sceneColor('#90a4b0'); ctx.font = '500 0.4px system-ui'; ctx.fillText('CYAN × AMBER', 32, 0);
   for (let row = 0; row < 3; row++) for (let col = 0; col < 10; col++) {
-    ctx.fillStyle = (row + col) % 2 ? '#10181c' : '#dfebed';
+    ctx.fillStyle = sceneColor((row + col) % 2 ? '#10181c' : '#dfebed');
     ctx.fillRect(29.5 + col * 0.5, stage.goalY - 1.5 + row * 0.5, 0.5, 0.5);
   }
   ctx.restore();
@@ -84,21 +85,21 @@ export function drawCrosswayDevices(ctx: Context, entities: MapEntityState[], vi
     ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);
     if (s.type === 'circle') {
       const r = s.radius;
-      ctx.beginPath(); ctx.arc(0, 0.22, r, 0, tau); ctx.fillStyle = '#000a'; ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0.22, r, 0, tau); ctx.fillStyle = sceneColor('#000a'); ctx.fill();
       ctx.beginPath(); ctx.arc(0, 0, r, 0, tau); ctx.fillStyle = chrome(ctx, 0, 0, r); ctx.fill();
-      ctx.strokeStyle = s.color ?? '#39e6ff'; ctx.lineWidth = 0.19; ctx.stroke();
-      ctx.beginPath(); ctx.arc(0, 0, r * 0.78, 0, tau); ctx.fillStyle = '#121b24'; ctx.fill();
-      ctx.strokeStyle = '#bcd3e0'; ctx.lineWidth = 0.06; ctx.stroke();
+      ctx.strokeStyle = sceneColor(s.color ?? '#39e6ff'); ctx.lineWidth = 0.19; ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.78, 0, tau); ctx.fillStyle = sceneColor('#121b24'); ctx.fill();
+      ctx.strokeStyle = sceneColor('#bcd3e0'); ctx.lineWidth = 0.06; ctx.stroke();
       const cap = ctx.createRadialGradient(-r * 0.15, -r * 0.2, 0, 0, 0, r * 0.56);
-      cap.addColorStop(0, '#fffbeb'); cap.addColorStop(0.45, '#fff0b4'); cap.addColorStop(0.65, '#a17535'); cap.addColorStop(1, '#182633');
+      cap.addColorStop(0, sceneColor('#fffbeb')); cap.addColorStop(0.45, sceneColor('#fff0b4')); cap.addColorStop(0.65, sceneColor('#a17535')); cap.addColorStop(1, sceneColor('#182633'));
       ctx.beginPath(); ctx.arc(0, 0, r * 0.56, 0, tau); ctx.fillStyle = cap; ctx.fill();
     } else if (s.type === 'polyline') {
       ctx.rotate(s.rotation); ctx.beginPath(); ctx.moveTo(...s.points[0]); s.points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
-      ctx.fillStyle = chrome(ctx, 0, 0, 3); ctx.fill(); ctx.strokeStyle = s.color ?? '#ffbf45'; ctx.lineWidth = 0.18; ctx.stroke();
+      ctx.fillStyle = chrome(ctx, 0, 0, 3); ctx.fill(); ctx.strokeStyle = sceneColor(s.color ?? '#ffbf45'); ctx.lineWidth = 0.18; ctx.stroke();
       ctx.save(); ctx.scale(0.76, 0.76); ctx.beginPath(); ctx.moveTo(...s.points[0]); s.points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
-      ctx.fillStyle = '#0b1823'; ctx.fill(); ctx.strokeStyle = '#b8e8f1'; ctx.lineWidth = 0.08; ctx.stroke(); ctx.restore();
-      ctx.beginPath(); ctx.arc(0, 0, 0.37, 0, tau); ctx.fillStyle = '#aabdc9'; ctx.fill();
-      ctx.beginPath(); ctx.arc(0, 0, 0.16, 0, tau); ctx.fillStyle = '#293642'; ctx.fill();
+      ctx.fillStyle = sceneColor('#0b1823'); ctx.fill(); ctx.strokeStyle = sceneColor('#b8e8f1'); ctx.lineWidth = 0.08; ctx.stroke(); ctx.restore();
+      ctx.beginPath(); ctx.arc(0, 0, 0.37, 0, tau); ctx.fillStyle = sceneColor('#aabdc9'); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, 0.16, 0, tau); ctx.fillStyle = sceneColor('#293642'); ctx.fill();
     }
     ctx.restore();
   }
