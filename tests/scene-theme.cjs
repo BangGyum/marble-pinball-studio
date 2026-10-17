@@ -74,7 +74,7 @@ assert.equal(JSON.stringify(stages), before, 'theme changes never mutate saved c
 setSceneTheme('beige');
 assert.equal(sceneColor('#64f4e050').slice(-2), '50', 'alpha is preserved');
 assert.equal(sceneColor('#fff0').slice(-2), '00', 'short hex transparency is preserved');
-console.log('PASS all 16 maps use beige paint, preserve geometry and restore the exact dark palette');
+console.log(`PASS all ${stages.length} maps use beige paint, preserve geometry and restore the exact dark palette`);
 
 const bitmaps = [];
 global.OffscreenCanvas = class {

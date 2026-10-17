@@ -104,3 +104,16 @@ lan.setVisible(true); lan.frame(7000);
 assert.equal(draws, beforeHidden + 1, 'LAN redraws immediately after returning from editor');
 assert.ok(lan.balls[0].y > 10, 'restored LAN view uses snapshots received while hidden');
 console.log('PASS LAN reception continues while hidden and current playback resumes on return');
+
+const { infiniteFunnel } = require('../src/data/infinite-funnel.ts');
+editor.open(infiniteFunnel);
+const moves = [], lines = [], editorAllocations = allocations.length;
+editor.ctx.translate = (...args) => moves.push(args);
+editor.ctx.lineTo = (...args) => lines.push(args);
+editor.stage.entities[0].position.x = 1.25;
+editor.render();
+assert.ok(moves.some(([x, y]) => x === 1.25 && y === 0), 'editing a baked spiral rail redraws its current position');
+assert.ok(lines.some(([x, y]) => x === 29.4 && y === 90), 'the funnel outlet remains visible in the editor');
+assert.equal(allocations.length, editorAllocations, 'editing the spiral does not accumulate stale background textures');
+node('editor-close').dispatch('click');
+console.log('PASS funnel editor live rail geometry, visible outlet and texture reuse');

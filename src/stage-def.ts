@@ -1,6 +1,6 @@
 import type { MapEntity } from './types/MapEntity.type';
 
-export const ART_STYLES = ['reversal-ladder', 'roundhouse', 'rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway', 'switchback-express'] as const;
+export const ART_STYLES = ['reversal-ladder', 'roundhouse', 'rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway', 'switchback-express', 'infinite-funnel'] as const;
 
 export type WindZone = {
   dutyCycle?: number;

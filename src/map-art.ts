@@ -1,4 +1,5 @@
 import { sceneColor, sceneGlow } from './scene-theme';
+import { drawFunnelArt } from './funnel-art';
 import { drawLadderArt, drawLadderDevices } from './ladder-art';
 import { drawRoundhouseArt, drawRoundhouseTrains } from './roundhouse-art';
 import { drawExpressArt, drawExpressDevices } from './express-art';
@@ -23,6 +24,8 @@ export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, e
   ctx.save();
   if (stage.art?.style === 'orbital-lock') {
     drawOrbitalArt(ctx, stage, 2, cacheBackground);
+  } else if (stage.art?.style === 'infinite-funnel') {
+    drawFunnelArt(ctx, stage, 2, cacheBackground);
   } else {
     const points = stage.exitBridge.deck;
     ctx.beginPath(); ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
@@ -53,6 +56,7 @@ export function drawMapArt(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number, cacheBackground = true
 ) {
   if (!stage.art) return;
+  if (stage.art.style === 'infinite-funnel') { drawFunnelArt(ctx, stage, 1, cacheBackground); return; }
   if (stage.art.style === 'reversal-ladder') { drawLadderArt(ctx, stage, cacheBackground); return; }
   if (stage.art.style === 'roundhouse') { drawRoundhouseArt(ctx, stage); return; }
   if (stage.art.style === 'switchback-express') { drawExpressArt(ctx, stage, cacheBackground); return; }

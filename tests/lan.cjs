@@ -200,7 +200,7 @@ async function connect(port, cookie, options = {}) {
     await host.command({ type: 'reset' });
     assert.equal((await host.command({ type: 'configure', settings: { ...settings,
       stage: { ...rapids, art: { style: 'unknown', contours: [] } } } })).ok, false);
-    for (const title of ['네온 핀볼 폭포', '카오스 시계탑', '오비탈 락', '네온 모래시계']) {
+    for (const title of ['네온 핀볼 폭포', '카오스 시계탑', '오비탈 락', '네온 모래시계', '끝없는 나선']) {
       // Keep independent map scenarios below the real server's 30 commands/second limit.
       await delay(1050);
       const stage = stages.find(s => s.title === title), mapId = stages.indexOf(stage);
@@ -216,7 +216,7 @@ async function connect(port, cookie, options = {}) {
       for (let i = 0; i < 90; i++) app.race.advance();
       if (stage.exitBridge) {
         while (!app.race.balls.some(b => b.onBridge) && app.race.elapsed < 60) app.race.advance();
-        assert.ok(app.race.balls.some(b => b.onBridge), 'orbital race reaches its open bridge entrance');
+        assert.ok(app.race.balls.some(b => b.onBridge), 'race reaches its open bridge entrance');
       }
       await host.command({ type: 'pause' });
       await guest2.until(() => guest2.frame.state === 'paused');

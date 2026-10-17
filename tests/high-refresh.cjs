@@ -124,7 +124,7 @@ function lanFrames(hz) {
 
 (async () => {
   try {
-    for (const title of ['네온 분기점', '스위치백 익스프레스', '회전 차고지']) {
+    for (const title of ['네온 분기점', '스위치백 익스프레스', '회전 차고지', '끝없는 나선']) {
       const stage = stages.find(s => s.title === title);
       for (const speed of [1, 4]) {
         const baseline = await actualRace(stage, 60, speed);

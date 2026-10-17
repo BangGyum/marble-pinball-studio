@@ -551,7 +551,8 @@ export class Editor {
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     c.save();
     c.scale(SCALE, SCALE);
-    drawMapArt(c, this.stage, SCALE, this.stage.art?.style !== 'reversal-ladder');
+    const liveArt = this.stage.art?.style === 'reversal-ladder' || this.stage.art?.style === 'infinite-funnel';
+    drawMapArt(c, this.stage, SCALE, !liveArt);
     c.strokeStyle = sceneColor('#23323d');
     c.lineWidth = 0.5 / SCALE;
     for (let x = 0; x <= (this.stage.width ?? 26); x++) {
@@ -587,7 +588,7 @@ export class Editor {
       life: e.props.life ?? -1,
     }));
     drawEntities(c, entities, SCALE, this.selected, false, undefined, !!this.stage.art, this.stage.art?.style === 'reversal-ladder');
-    if (this.stage.art?.style === 'reversal-ladder') drawMapOverlay(c, this.stage, entities, SCALE, false);
+    if (liveArt) drawMapOverlay(c, this.stage, entities, SCALE, false);
     drawWind(c, this.stage.windZones ?? [], 0, SCALE);
     c.setLineDash([0.5, 0.3]);
     c.strokeStyle = sceneColor('#65efda');

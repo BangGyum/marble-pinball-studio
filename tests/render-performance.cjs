@@ -186,3 +186,22 @@ lan.push({ ...frame, seq: 2, positions: undefined }); lan.draw(32);
 assert.equal(item.x, 10, 'omitted translations return reusable entities to their scene origin');
 assert.equal(scene.entities[0].x, 10, 'render interpolation never mutates the network scene');
 console.log('PASS LAN entity reuse, per-frame lookup caching and translation reset');
+
+const { infiniteFunnel } = require('../src/data/infinite-funnel.ts');
+const { drawFunnelArt } = require('../src/funnel-art.ts');
+const funnelStart = bitmaps.length;
+for (const scale of [40, 2]) {
+  const target = context(); target.getTransform = () => ({ a: scale, b: 0 });
+  for (const layer of [1, 2]) drawFunnelArt(target, infiniteFunnel, layer);
+}
+assert.equal(bitmaps.length - funnelStart, 4, 'spiral and outlet have separate main-view and minimap textures');
+calls.length = 0;
+for (let frame = 0; frame < 100; frame++) for (const scale of [40, 2]) {
+  const target = context(); target.getTransform = () => ({ a: scale, b: 0 });
+  for (const layer of [1, 2]) drawFunnelArt(target, infiniteFunnel, layer);
+}
+assert.equal(bitmaps.length - funnelStart, 4, 'zoomed-out funnel does not allocate scenery every frame');
+assert.ok(!calls.some(call => call[0] === 'lineTo'), 'the long spiral is not rebuilt in warm frames');
+assert.ok(bitmaps.slice(funnelStart).reduce((sum, image) => sum + image.width * image.height, 0) < 6 * 1024 * 1024,
+  'both funnel layers and their minimaps stay below a 6MP combined footprint');
+console.log('PASS funnel cached geometry, distant-view reuse and bounded texture footprint');

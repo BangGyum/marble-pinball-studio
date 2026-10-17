@@ -1,4 +1,5 @@
 import { reversalLadder } from './reversal-ladder';
+import { infiniteFunnel } from './infinite-funnel';
 import { springLab } from './spring-lab';
 import { roundhouse } from './roundhouse';
 import { neonJunction } from './neon-junction';
@@ -34,6 +35,7 @@ export const stages: StageDef[] = [
   roundhouse,
   springLab,
   reversalLadder,
+  infiniteFunnel,
 ];
 
 export const DEFAULT_MAP_INDEX = stages.indexOf(neonJunction);
