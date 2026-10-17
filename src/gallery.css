@@ -437,9 +437,9 @@
 @keyframes gallery-neon-sweep { 0% { opacity: 0; translate: 100px 0; } 25% { opacity: .9; } 100% { opacity: .28; translate: 0 0; } }
 @keyframes gallery-title-shine { from { background-position: 100% 0; } to { background-position: -35% 0; } }
 @keyframes gallery-card-charge {
-  0% { border-color: #293840; box-shadow: 0 0 0 transparent; }
+  0% { border-color: var(--card-quiet-border, #293840); box-shadow: 0 0 0 transparent; }
   30% { border-color: var(--map-color); box-shadow: 0 0 28px color-mix(in srgb, var(--map-color) 35%, transparent), inset 0 0 22px color-mix(in srgb, var(--map-color) 12%, transparent); }
-  100% { border-color: color-mix(in srgb, var(--map-color) 29%, #26343c); box-shadow: 0 0 16px color-mix(in srgb, var(--map-color) 5%, transparent); }
+  100% { border-color: var(--card-quiet-border, color-mix(in srgb, var(--map-color) 29%, #26343c)); box-shadow: 0 0 16px color-mix(in srgb, var(--map-color) 5%, transparent); }
 }
 @keyframes gallery-card-shine { 0% { opacity: 0; transform: translateX(-70%); } 18%,55% { opacity: .8; } 100% { opacity: 0; transform: translateX(70%); } }
 .gallery-entering .gallery-copy { animation: gallery-copy-reveal .5s both; }

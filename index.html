@@ -3,12 +3,15 @@
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#090c10" />
+  <script>
+    try { document.documentElement.dataset.theme = localStorage.getItem('marble-pinball.theme') === 'beige' ? 'beige' : 'dark'; } catch {}
+  </script>
   <meta name="description" content="이름을 넣고 구슬을 떨어뜨려 보세요. 나만의 핀볼 맵을 만들고 이 기기에 저장할 수 있습니다." />
-  <title>바울 핀볼</title><link rel="stylesheet" href="./src/style.css" /><link rel="stylesheet" href="./src/gallery.css" />
+  <title>바울 핀볼</title><link rel="stylesheet" href="./src/style.css" /><link rel="stylesheet" href="./src/gallery.css" /><link rel="stylesheet" href="./src/theme.css" />
 </head>
 <body>
   <main id="map-gallery" class="map-gallery" aria-labelledby="gallery-title">
-    <header class="topbar gallery-topbar"><div class="brand"><i></i> 바울 핀볼 <span>PAUL PINBALL</span></div><div class="top-actions"><button id="gallery-resume" aria-label="게임으로 돌아가기" hidden>게임으로 <span aria-hidden="true">↗</span></button><button id="gallery-create">＋ 맵 만들기</button></div></header>
+    <header class="topbar gallery-topbar"><div class="brand"><i></i> 바울 핀볼 <span>PAUL PINBALL</span></div><div class="top-actions"><button id="gallery-resume" aria-label="게임으로 돌아가기" hidden>게임으로 <span aria-hidden="true">↗</span></button><button type="button" class="theme-toggle" data-theme-toggle role="switch" aria-label="베이지 테마" aria-checked="false"><span class="theme-toggle-track" aria-hidden="true"></span><span class="theme-toggle-label" aria-hidden="true">다크</span></button><button id="gallery-create">＋ 맵 만들기</button></div></header>
     <div class="gallery-content">
       <section class="gallery-intro">
         <div class="gallery-neon-backdrop" aria-hidden="true"><i class="gallery-neon-halo"></i><i class="gallery-neon-grid"></i><i class="gallery-neon-streak" style="--streak-y:65px;--streak-color:#78f5db;--streak-delay:0ms"></i><i class="gallery-neon-streak" style="--streak-y:112px;--streak-color:#bda9ff;--streak-delay:90ms"></i><i class="gallery-neon-streak" style="--streak-y:168px;--streak-color:#fbd782;--streak-delay:180ms"></i></div>
@@ -29,7 +32,7 @@
     <footer class="gallery-footer"><span>PAUL PINBALL · 골라서 굴리는 재미</span><div><a href="https://github.com/lazygyu/roulette" target="_blank" rel="noopener noreferrer">Original by lazygyu · MIT</a><a href="./licenses.html" target="_blank" rel="noopener noreferrer">오픈소스 라이선스</a></div></footer>
   </main>
   <main id="game-view" hidden>
-    <header class="topbar"><div class="brand"><i></i> 바울 핀볼 <span>PAUL PINBALL</span></div><div class="top-actions"><button id="maps-open" title="맵 목록으로 돌아가기 · 진행 중인 경기는 잠시 멈춥니다">← 맵 목록</button><span id="status" role="status">게임 준비 중</span><button id="editor-open">맵 만들기 <span>↗</span></button></div></header>
+    <header class="topbar"><div class="brand"><i></i> 바울 핀볼 <span>PAUL PINBALL</span></div><div class="top-actions"><button id="maps-open" title="맵 목록으로 돌아가기 · 진행 중인 경기는 잠시 멈춥니다">← 맵 목록</button><span id="status" role="status">게임 준비 중</span><button type="button" class="theme-toggle" data-theme-toggle role="switch" aria-label="베이지 테마" aria-checked="false"><span class="theme-toggle-track" aria-hidden="true"></span><span class="theme-toggle-label" aria-hidden="true">다크</span></button><button id="editor-open">맵 만들기 <span>↗</span></button></div></header>
     <div class="race-layout">
       <div class="view-controls"><div class="zoom-controls" role="group" aria-label="화면 배율"><button id="zoom-out" aria-label="축소" title="축소">−</button><button id="zoom-reset" aria-label="기본 배율로 돌아가기" title="기본 배율로 돌아가기 · 마우스 휠로 확대·축소">100%</button><button id="zoom-in" aria-label="확대" title="확대">＋</button></div><button id="follow" title="구슬 따라가기">◎ 따라가기</button><label>배속 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label><button id="pause" disabled>일시정지</button></div>
       <div class="play-area"><canvas id="game" aria-label="구슬 경주 화면. 왼쪽 미니맵 위에 마우스를 올리면 해당 위치를 따라갑니다. 마우스 휠로 확대하거나 축소할 수 있습니다."></canvas>
