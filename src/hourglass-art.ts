@@ -1,4 +1,4 @@
-import { sceneColor } from './scene-theme';
+import { sceneColor, sceneGlow } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { backgroundCache } from './background-cache';
 
@@ -49,7 +49,7 @@ function paint(ctx: Context, stage: StageDef) {
   }
   ctx.restore();
   ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = sceneColor('#64f4e0');
-  ctx.shadowColor = sceneColor('#32e8ce'); ctx.shadowBlur = 8; ctx.lineWidth = 0.46;
+  ctx.shadowColor = sceneColor('#32e8ce'); ctx.shadowBlur = sceneGlow(8); ctx.lineWidth = 0.46;
   for (const e of stage.entities ?? []) {
     const s = e.shape;
     if (s.type !== 'polyline' || s.solid) continue;

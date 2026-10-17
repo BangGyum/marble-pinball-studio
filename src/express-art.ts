@@ -1,4 +1,4 @@
-import { sceneColor } from './scene-theme';
+import { getSceneTheme, sceneColor, sceneGlow } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { backgroundCache } from './background-cache';
 import { visibleArt, type ViewBounds } from './art-visibility';
@@ -13,8 +13,10 @@ function path(ctx: Context, points: Point[]) {
 }
 function metal(ctx: Context, x: number, y: number, size: number, gold = false) {
   const gradient = ctx.createLinearGradient(x, y - size, x + size * 0.4, y + size);
-  ['#f1f7f8', '#7b909d', '#203340', '#9bacb6', '#25333c'].forEach((c, i) =>
-    gradient.addColorStop(i / 4, sceneColor(gold ? ['#fff2c0', '#bc9150', '#463420', '#e3bf77', '#4d3824'][i] : c)));
+  const colors = getSceneTheme() === 'beige'
+    ? gold ? ['#f5e6bd', '#baa16b', '#79613b', '#dfcb97', '#8c744b'] : ['#f6f1e6', '#b4ad9f', '#777063', '#d8ceba', '#918574']
+    : gold ? ['#fff2c0', '#bc9150', '#463420', '#e3bf77', '#4d3824'] : ['#f1f7f8', '#7b909d', '#203340', '#9bacb6', '#25333c'];
+  colors.forEach((color, i) => gradient.addColorStop(i / 4, color));
   return gradient;
 }
 function bolt(ctx: Context, x: number, y: number, radius = 0.11) {
@@ -92,7 +94,8 @@ function paint(ctx: Context, stage: StageDef) {
   for (const points of stage.art!.contours) {
     ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
   }
-  ctx.save(); ctx.shadowColor = '#000'; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
+  const beige = getSceneTheme() === 'beige';
+  ctx.save(); ctx.shadowColor = beige ? '#654b3138' : '#000'; ctx.shadowBlur = beige ? 6 : 18; ctx.shadowOffsetY = beige ? 3 : 8;
   ctx.fillStyle = sceneColor('#142831'); ctx.fill(); ctx.restore();
   ctx.save(); ctx.beginPath();
   for (const points of stage.art!.contours) { ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath(); }
@@ -131,7 +134,7 @@ function paint(ctx: Context, stage: StageDef) {
       ctx.fillStyle = metal(ctx, a[0], a[1], 0.7); ctx.fill();
     }
     path(ctx, points); ctx.lineWidth = 0.3; ctx.strokeStyle = sceneColor('#07262e'); ctx.stroke();
-    ctx.lineWidth = 0.14; ctx.strokeStyle = sceneColor(shape.color!); ctx.shadowColor = sceneColor(shape.color!); ctx.shadowBlur = 9; ctx.stroke();
+    ctx.lineWidth = 0.14; ctx.strokeStyle = sceneColor(shape.color!); ctx.shadowColor = sceneColor(shape.color!); ctx.shadowBlur = sceneGlow(9); ctx.stroke();
     ctx.shadowBlur = 0; ctx.lineWidth = 0.035; ctx.strokeStyle = sceneColor('#e4ffff'); ctx.stroke();
     samples({points, halfWidth: 0}, 5.5, (x, y, angle) => {
       if (y < 0 || y > stage.goalY + 2) return;
@@ -144,7 +147,7 @@ function paint(ctx: Context, stage: StageDef) {
   for (const [x, y] of [[18, 9], [43, 13], [41, 38], [18, 57], [43, 82], [18, 102], [46, 127]]) {
     ctx.fillStyle = sceneColor('#7f7968'); ctx.fillRect(x - 0.09, y, 0.18, 1.6);
     ctx.fillStyle = sceneColor('#1b242b'); ctx.fillRect(x - 0.36, y - 0.8, 0.72, 1.1);
-    ctx.fillStyle = sceneColor('#ffd68a'); ctx.shadowColor = sceneColor('#ffae49'); ctx.shadowBlur = 12;
+    ctx.fillStyle = sceneColor('#ffd68a'); ctx.shadowColor = sceneColor('#ffae49'); ctx.shadowBlur = sceneGlow(12);
     ctx.fillRect(x - 0.2, y - 0.68, 0.4, 0.75); ctx.shadowBlur = 0;
   }
   // The departure gantry frames the waiting marbles without covering them.
@@ -223,7 +226,7 @@ export function drawExpressDevices(ctx: Context, entities: MapEntityState[], vie
     ctx.strokeStyle = sceneColor('#a6a78b'); ctx.lineWidth = 0.12; ctx.stroke();
     for (let i = 0; i < 2; i++) {
       const active = i === (open ? 1 : 0), color = i ? '#a4ff7b' : '#ff6651';
-      ctx.fillStyle = sceneColor(active ? color : '#29332e'); ctx.shadowColor = sceneColor(color); ctx.shadowBlur = active ? 12 : 0;
+      ctx.fillStyle = sceneColor(active ? color : '#29332e'); ctx.shadowColor = sceneColor(color); ctx.shadowBlur = sceneGlow(active ? 12 : 0);
       ctx.beginPath(); ctx.arc(x, y - 1.05 + i * 1.08, 0.29, 0, tau); ctx.fill();
     }
     ctx.shadowBlur = 0;

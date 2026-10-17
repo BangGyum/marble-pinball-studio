@@ -1,4 +1,4 @@
-import { sceneColor } from './scene-theme';
+import { getSceneTheme, sceneColor, sceneGlow } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { backgroundCache } from './background-cache';
 import { orbitalRings, orbitalTransfers } from './data/orbital-lock';
@@ -33,8 +33,9 @@ function paintOrbitalBridge(ctx: Context, stage: StageDef) {
   ctx.save();
   // An offset shadow and a shallow fascia separate the overpass from the continuous rings below.
   ctx.save(); ctx.translate(0.8, 1.1); deck();
-  ctx.fillStyle = sceneColor('#02060dd9'); ctx.shadowColor = sceneColor('#000b'); ctx.shadowBlur = 12;
-  ctx.lineWidth = 0.65; ctx.strokeStyle = sceneColor('#02060d99'); ctx.fill(); ctx.stroke(); ctx.restore();
+  const beige = getSceneTheme() === 'beige';
+  ctx.fillStyle = beige ? '#7c633e30' : '#02060dd9'; ctx.shadowColor = beige ? '#654b3126' : '#000b'; ctx.shadowBlur = beige ? 4 : 12;
+  ctx.lineWidth = 0.65; ctx.strokeStyle = beige ? '#7c633e20' : '#02060d99'; ctx.fill(); ctx.stroke(); ctx.restore();
   ctx.save(); clipOrbitalBridgeWalls(ctx, stage);
   for (const entity of stage.entities ?? []) {
     const shape = entity.shape;
@@ -145,7 +146,7 @@ function paintOrbitalArt(ctx: Context, stage: StageDef) {
 export function drawOrbitalRims(ctx: Context, stage: StageDef, layer: 1 | 2) {
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (layer === 2) clipOrbitalBridgeWalls(ctx, stage);
-  ctx.strokeStyle = sceneColor('#72ffe5'); ctx.shadowColor = sceneColor('#35e6d1'); ctx.shadowBlur = 9; ctx.lineWidth = 0.4;
+  ctx.strokeStyle = sceneColor('#72ffe5'); ctx.shadowColor = sceneColor('#35e6d1'); ctx.shadowBlur = sceneGlow(9); ctx.lineWidth = 0.4;
   for (const entity of stage.entities ?? []) {
     const shape = entity.shape;
     if (shape.type !== 'polyline' || shape.solid || shape.hidden || (shape.collisionLayer ?? 1) !== layer) continue;

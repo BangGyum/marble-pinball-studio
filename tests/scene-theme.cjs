@@ -12,9 +12,14 @@ const { BackgroundCache } = require('../src/background-cache.ts');
 const { RenderCache } = require('../src/render-cache.ts');
 
 function context() {
-  const paths = [], colors = [], state = {};
-  return new Proxy({ paths, colors }, {
-    set(_, key, value) { state[key] = value; if (['fillStyle', 'strokeStyle', 'shadowColor'].includes(key) && typeof value === 'string') colors.push(value); return true; },
+  const paths = [], colors = [], shadows = [], state = {};
+  return new Proxy({ paths, colors, shadows }, {
+    set(_, key, value) {
+      state[key] = value;
+      if (['fillStyle', 'strokeStyle', 'shadowColor'].includes(key) && typeof value === 'string') colors.push(value);
+      if (key === 'shadowBlur') shadows.push(value);
+      return true;
+    },
     get(target, key) {
       if (key in target) return target[key];
       if (key in state) return state[key];
@@ -29,6 +34,15 @@ function context() {
 }
 
 const before = JSON.stringify(stages);
+setSceneTheme('beige');
+const laneColors = ['#65efda', '#79baff', '#ba9cff', '#ff96ce', '#ffd279'].map(sceneColor);
+assert.equal(new Set(laneColors).size, 5, 'the five junction lanes must keep distinct colors');
+const luminance = color => [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16) / 255)
+  .map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4)
+  .reduce((sum, v, i) => sum + v * [.2126, .7152, .0722][i], 0);
+for (const color of laneColors)
+  assert.ok((luminance('#f4ede1') + .05) / (luminance(color) + .05) >= 4.5, 'lane stays legible on the beige background');
+console.log('PASS five distinct junction colors with at least 4.5:1 background contrast');
 function paint(stage, theme) {
   setSceneTheme(theme);
   const ctx = context(), entities = stage.entities.map(e => ({ x: e.position.x, y: e.position.y, angle: 0, life: -1, shape: e.shape }));
@@ -42,13 +56,19 @@ for (const stage of stages) {
   const dark = paint(stage, 'dark'), beige = paint(stage, 'beige'), restored = paint(stage, 'dark');
   assert.deepEqual(beige.paths, dark.paths, stage.title + ': theme preserves every drawing path');
   assert.deepEqual(restored.colors, dark.colors, stage.title + ': switching back restores exact colors');
+  assert.deepEqual(restored.shadows, dark.shadows, stage.title + ': switching back restores exact glow');
+  if (['orbital-lock', 'hourglass', 'switchback-express'].includes(stage.art?.style))
+    assert.ok(Math.max(...beige.shadows) < Math.max(...dark.shadows), stage.title + ': beige shadows stay lighter than neon glow');
   assert.notDeepEqual(beige.colors, dark.colors, stage.title + ': scenery and devices change color');
   assert.ok(beige.colors.every(color => /^#[\da-f]{3,8}$/i.test(color)), stage.title + ': valid canvas colors');
   assert.ok(!beige.colors.some(color => {
     if (color.length < 7) return false;
-    const [r, g, b] = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
-    return b - r > 30 || g - r > 45;
-  }), stage.title + ': no cyan or violet neon paints remain');
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16) / 255);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const saturation = max === min ? 0 : (max - min) / (1 - Math.abs(max + min - 1));
+    // Slate and mauve distinguish lanes; high-saturation cyan/violet neon is still excluded.
+    return (b - r > 30 / 255 || g - r > 45 / 255) && saturation > .35;
+  }), stage.title + ': cool accents stay muted');
 }
 assert.equal(JSON.stringify(stages), before, 'theme changes never mutate saved colors or physics definitions');
 setSceneTheme('beige');

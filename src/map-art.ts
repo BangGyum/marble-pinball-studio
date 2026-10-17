@@ -1,4 +1,4 @@
-import { sceneColor } from './scene-theme';
+import { sceneColor, sceneGlow } from './scene-theme';
 import { drawLadderArt, drawLadderDevices } from './ladder-art';
 import { drawRoundhouseArt, drawRoundhouseTrains } from './roundhouse-art';
 import { drawExpressArt, drawExpressDevices } from './express-art';
@@ -112,7 +112,7 @@ export function drawMapArt(
       ctx.beginPath(); ctx.moveTo(x, y + 10);
       ctx.bezierCurveTo(x, y + 4, width / 2, y + 2, width / 2, y + 8); ctx.stroke();
       ctx.fillStyle = sceneColor('#534330'); ctx.fillRect(x - 0.6, y - 0.25, 1.2, 0.5);
-      ctx.shadowColor = sceneColor('#ffcd79'); ctx.shadowBlur = Math.min(12, scale * 0.5);
+      ctx.shadowColor = sceneColor('#ffcd79'); ctx.shadowBlur = sceneGlow(Math.min(12, scale * 0.5));
       ctx.fillStyle = sceneColor('#e7ad58'); ctx.fillRect(x - 0.07, y - 2.2, 0.14, 1.8);
       ctx.shadowBlur = 0;
     }

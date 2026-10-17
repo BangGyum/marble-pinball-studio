@@ -1,4 +1,4 @@
-import { sceneColor } from './scene-theme';
+import { sceneColor, sceneGlow } from './scene-theme';
 import type { MapEntityState } from './types/MapEntity.type';
 type ViewBounds = { left: number; right: number; top: number; bottom: number };
 export function drawEntities(
@@ -43,11 +43,11 @@ export function drawEntities(
     ctx.strokeStyle = sceneColor(color);
     ctx.lineWidth = (i === selected ? 3 : 1.6) / scale;
     ctx.shadowColor = sceneColor(color);
-    ctx.shadowBlur = glow ? (shape.type === 'polyline' ? 7 : 13) : 0;
+    ctx.shadowBlur = sceneGlow(glow ? (shape.type === 'polyline' ? 7 : 13) : 0);
     if (shape.type === 'box') {
       ctx.rotate(shape.rotation);
       if (shape.spring) {
-        ctx.shadowBlur = glow ? 8 : 0;
+        ctx.shadowBlur = sceneGlow(glow ? 8 : 0);
         const springMetal = ctx.createLinearGradient(0, -shape.height, 0, shape.height);
         springMetal.addColorStop(0, sceneColor('#448596')); springMetal.addColorStop(.4, sceneColor('#17313c')); springMetal.addColorStop(1, sceneColor('#0b1a24'));
         ctx.fillStyle = springMetal; ctx.fillRect(-shape.width, -shape.height, shape.width * 2, shape.height * 2);

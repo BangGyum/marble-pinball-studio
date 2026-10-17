@@ -1,4 +1,4 @@
-import { sceneColor } from './scene-theme';
+import { sceneColor, sceneGlow } from './scene-theme';
 import type { WindZone } from './data/maps';
 import { windPower, windTravel } from './wind-power';
 
@@ -49,7 +49,7 @@ export function drawWind(ctx: CanvasRenderingContext2D, winds: WindZone[], time:
         ctx.strokeStyle = sceneColor('#c7a4ff');
         ctx.fillStyle = sceneColor('#392064');
         ctx.shadowColor = sceneColor('#af78ff');
-        ctx.shadowBlur = scale > 8 ? 9 : 0;
+        ctx.shadowBlur = sceneGlow(scale > 8 ? 9 : 0);
         if (fan.front) {
           ctx.beginPath(); ctx.arc(0, 0, fan.radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
           ctx.rotate(travelTime * 8);

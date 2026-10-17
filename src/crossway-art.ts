@@ -1,4 +1,4 @@
-import { sceneColor } from './scene-theme';
+import { getSceneTheme, sceneColor, sceneGlow } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { backgroundCache } from './background-cache';
 import { visibleArt, type ViewBounds } from './art-visibility';
@@ -8,8 +8,10 @@ type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 const tau = Math.PI * 2;
 const chrome = (ctx: Context, x: number, y: number, radius: number) => {
   const fill = ctx.createLinearGradient(x - radius, y - radius, x + radius, y + radius);
-  fill.addColorStop(0, sceneColor('#f4fbff')); fill.addColorStop(0.24, sceneColor('#8a9da9')); fill.addColorStop(0.48, sceneColor('#263541'));
-  fill.addColorStop(0.72, sceneColor('#a2bcc8')); fill.addColorStop(1, sceneColor('#111c24')); return fill;
+  const colors = getSceneTheme() === 'beige'
+    ? ['#f7f2e7', '#b2ac9f', '#766e60', '#dbd0ba', '#8e8472']
+    : ['#f4fbff', '#8a9da9', '#263541', '#a2bcc8', '#111c24'];
+  colors.forEach((color, i) => fill.addColorStop([0, 0.24, 0.48, 0.72, 1][i], color)); return fill;
 };
 function paint(ctx: Context, stage: StageDef) {
   ctx.save();
@@ -50,7 +52,7 @@ function paint(ctx: Context, stage: StageDef) {
     }
     ctx.beginPath(); ctx.moveTo(...p[0]); p.slice(1).forEach(v => ctx.lineTo(...v));
     ctx.strokeStyle = sceneColor('#091015'); ctx.lineWidth = 0.42; ctx.stroke();
-    ctx.strokeStyle = sceneColor(s.color ?? '#39e6ff'); ctx.lineWidth = 0.18; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = 12; ctx.stroke();
+    ctx.strokeStyle = sceneColor(s.color ?? '#39e6ff'); ctx.lineWidth = 0.18; ctx.shadowColor = ctx.strokeStyle; ctx.shadowBlur = sceneGlow(12); ctx.stroke();
     ctx.shadowBlur = 0; ctx.strokeStyle = sceneColor('#ecffff'); ctx.lineWidth = 0.04; ctx.stroke();
     // Small mounting clamps follow the existing rail; they are purely decorative.
     for (let i = 5; i < p.length - 3; i += 10) {
