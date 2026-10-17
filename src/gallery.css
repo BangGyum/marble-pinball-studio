@@ -450,7 +450,7 @@
 .gallery-entering .gallery-intro h1 { animation: gallery-title-shine 1.35s .15s both; }
 .gallery-entering .map-card-entering { animation: gallery-card-rise .55s both, gallery-card-charge 1.1s both; animation-delay: var(--entry-delay); }
 .gallery-entering .map-card-entering::before { animation: gallery-card-shine .9s both; animation-delay: calc(var(--entry-delay) + 110ms); }
-.map-card-launching { animation: map-card-launch .22s both; }
+.map-card-launching { animation: map-card-launch .3s both; }
 .map-transition {
   position: fixed;
   inset: 0;
@@ -463,7 +463,7 @@
   position: absolute;
   inset: 0;
   background: radial-gradient(ellipse, color-mix(in srgb, var(--map-color) 15%, #090d12), #090d12 70%);
-  animation: map-cover .82s both;
+  animation: map-cover 1.6s both;
 }
 .map-transition-ring {
   position: absolute;
@@ -475,7 +475,7 @@
   border: 1px solid color-mix(in srgb, var(--map-color) 65%, transparent);
   border-radius: 50%;
   box-shadow: 0 0 24px color-mix(in srgb, var(--map-color) 25%, transparent), inset 0 0 24px color-mix(in srgb, var(--map-color) 12%, transparent);
-  animation: map-portal .82s both;
+  animation: map-portal 1.6s both;
 }
 .map-transition-ring::before, .map-transition-ring::after {
   content: '';
@@ -499,7 +499,7 @@
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--map-color), #eafff8, var(--map-color), transparent);
   box-shadow: 0 0 14px var(--map-color), 0 0 40px var(--map-color);
-  animation: map-beam .82s both;
+  animation: map-beam 1.6s both;
 }
 .map-transition-copy {
   position: absolute;
@@ -510,7 +510,7 @@
   align-items: center;
   padding: 32px;
   text-align: center;
-  animation: map-title .82s both;
+  animation: map-title 1.6s both;
 }
 .map-transition-copy > span { font-size: .625rem; letter-spacing: 4px; }
 .map-transition-copy > strong {
@@ -539,21 +539,21 @@
   border-radius: 50%;
   background: radial-gradient(circle at 30% 25%, #fff, var(--map-color) 35%, #203834);
   box-shadow: 0 0 16px var(--map-color);
-  animation: map-track .82s both;
+  animation: map-track 1.6s both;
 }
 @keyframes map-card-launch {
   40% { transform: translateY(-5px) scale(1.025); border-color: var(--map-color); box-shadow: 0 0 32px color-mix(in srgb, var(--map-color) 50%, transparent); }
   100% { transform: translateY(-2px) scale(1.01); }
 }
-@keyframes map-cover { 0% { opacity: 0; } 20%, 63% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes map-cover { 0% { opacity: 0; } 16%, 74% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes map-portal {
   0% { opacity: 0; transform: translate(var(--from-x), var(--from-y)) scale(.2) rotate(-40deg); }
-  35% { opacity: .85; transform: translate(0, 0) scale(1) rotate(0); }
-  65% { opacity: .65; }
+  26% { opacity: .85; transform: translate(0, 0) scale(1) rotate(0); }
+  74% { opacity: .65; }
   100% { opacity: 0; transform: translate(0, 0) scale(1.45) rotate(40deg); }
 }
 @keyframes map-beam { 0%, 18% { opacity: 0; transform: translateX(-45%) rotate(-16deg) scaleX(.3); } 40% { opacity: .7; } 75%, 100% { opacity: 0; transform: translateX(45%) rotate(-16deg) scaleX(1); } }
-@keyframes map-title { 0%, 14% { opacity: 0; transform: translateY(18px) scale(.96); } 32%, 64% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-10px) scale(1.025); } }
+@keyframes map-title { 0%, 10% { opacity: 0; transform: translateY(18px) scale(.96); } 22%, 74% { opacity: 1; transform: translateY(0) scale(1); } 100% { opacity: 0; transform: translateY(-10px) scale(1.025); } }
 @keyframes map-track { 0%, 12% { opacity: 0; transform: translateX(-100px); } 30%, 65% { opacity: 1; } 100% { opacity: 0; transform: translateX(100px); } }
 @media (max-width: 1100px) {
   .map-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }

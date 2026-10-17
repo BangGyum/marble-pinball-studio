@@ -34,8 +34,8 @@ export class MapTransition {
     document.body.append(layer);
     this.gallery.inert = this.game.inert = true;
     // The cover is opaque before replacing the gallery with the prepared game.
-    this.swapTimer = setTimeout(() => this.swap(), 220);
-    this.endTimer = setTimeout(() => this.finish(), 820);
+    this.swapTimer = setTimeout(() => this.swap(), 300);
+    this.endTimer = setTimeout(() => this.finish(), 1600);
   }
 
   private swap() {

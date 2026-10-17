@@ -49,10 +49,10 @@ assert.equal(f.layers[0].style['--from-y'], '360px', 'offscreen card origins are
 f.transition.play(f.card, () => { throw new Error('duplicate selection'); });
 assert.equal(f.layers.length, 1);
 assert.equal(f.timers.size, 2);
-f.run(220);
+f.run(300);
 assert.equal(f.selections(), 1);
 assert.equal(f.game.hidden, false);
-f.run(820);
+f.run(1600);
 assert.equal(f.selections(), 1, 'finishing does not select the map twice');
 assert.equal(f.layers.length, 0);
 assert.equal(f.timers.size, 0);
@@ -61,14 +61,14 @@ assert.equal(f.back.focusCount, 1);
 assert.equal(f.card.classList.contains('map-card-launching'), false);
 f.transition.finish(); f.transition.cancel();
 f.gallery.hidden = false; f.game.hidden = true;
-f.transition.play(f.card, f.select); f.run(820);
+f.transition.play(f.card, f.select); f.run(1600);
 assert.equal(f.selections(), 2, 'returning to the gallery allows another map transition');
 console.log('PASS map-colored transition, duplicate input guard, single selection, cleanup, focus and repeat use');
 
 for (const action of ['hidden', 'resize', 'pagehide', 'reduced', 'finish']) {
   for (const swapped of [false, true]) {
     const f = fixture(); f.transition.play(f.card, f.select);
-    if (swapped) f.run(220);
+    if (swapped) f.run(300);
     if (action === 'hidden') { document.hidden = true; f.documentEvents.visibilitychange(); }
     else if (action === 'reduced') { f.motion.matches = true; f.motionEvents.change(); }
     else if (action === 'finish') f.transition.finish();
@@ -83,7 +83,7 @@ console.log('PASS early completion before/after screen swap on visibility, resiz
 
 for (const swapped of [false, true]) {
   const f = fixture(); f.transition.play(f.card, f.select);
-  if (swapped) f.run(220);
+  if (swapped) f.run(300);
   f.transition.cancel();
   assert.equal(f.selections(), Number(swapped), 'external navigation must not later select a stale map');
   assert.equal(f.layers.length + f.timers.size, 0);
