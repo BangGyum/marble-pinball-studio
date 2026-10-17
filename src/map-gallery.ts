@@ -5,6 +5,7 @@ import { drawMapArt, drawMapOverlay } from './map-art';
 import { drawWind } from './wind-render';
 import { drawMarble } from './marble-art';
 import { el } from './ui';
+import { GalleryIntro } from './gallery-intro';
 
 const details: Record<string, [string, string, string]> = {
   '역전 사다리': ['스프링 · 역전', '금속 경사로 네 단과 왕복 열차. 스프링을 선택하고 SPACE로 순위를 뒤집어 보세요.', '#ebc689'],
@@ -57,6 +58,7 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
 }
 
 export class MapGallery {
+  readonly intro = new GalleryIntro(el('map-gallery'));
   private grid = el('map-grid');
   private thumbnails = new WeakMap<StageDef, HTMLCanvasElement>();
   private stages = new WeakMap<HTMLCanvasElement, StageDef>();
@@ -69,6 +71,15 @@ export class MapGallery {
   }, { rootMargin: '240px' });
 
   constructor(select: (id: string) => void) {
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+    this.grid.addEventListener('pointermove', (event) => {
+      if (event.pointerType !== 'mouse' || reduced.matches) return;
+      const card = (event.target as HTMLElement).closest<HTMLButtonElement>('.map-card');
+      if (!card) return;
+      const bounds = card.getBoundingClientRect();
+      card.style.setProperty('--glow-x', `${event.clientX - bounds.left}px`);
+      card.style.setProperty('--glow-y', `${event.clientY - bounds.top}px`);
+    });
     this.grid.addEventListener('click', (event) => {
       const card = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-map-id]');
       if (card) select(card.dataset.mapId!);

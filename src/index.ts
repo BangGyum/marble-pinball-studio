@@ -68,6 +68,7 @@ const gallery = new MapGallery((id) => {
 });
 function showGame() {
   if (!galleryView.hidden) galleryScroll = window.scrollY;
+  gallery.intro.stop();
   galleryView.hidden = true;
   gameView.hidden = false;
   game.setVisible(!el<HTMLDialogElement>('editor-dialog').open);
@@ -86,6 +87,7 @@ el('maps-open').addEventListener('click', () => {
   gallery.refresh(allMaps(), mapSelect.value);
   window.scrollTo(0, galleryScroll);
   gallery.focus(mapSelect.value);
+  gallery.intro.play();
 });
 el('maps-show-all').addEventListener('click', () => el<HTMLButtonElement>('maps-open').click());
 el('gallery-resume').addEventListener('click', () => {
@@ -223,6 +225,7 @@ setInterval(() => {
         : `${game.recording ? '● 녹화 중 · ' : ''}경주 중 · ${Math.floor(game.elapsed)}초`;
 }, 300);
 refreshMaps('builtin-' + initialMapIndex);
+gallery.intro.play();
 game
   .init(currentStage, [])
   .then(() => {
@@ -240,7 +243,10 @@ game
 
 const editor = new Editor({
   list: allMaps,
-  onOpenChange(open) { game.setVisible(!open && !gameView.hidden); },
+  onOpenChange(open) {
+    if (open) gallery.intro.stop();
+    game.setVisible(!open && !gameView.hidden);
+  },
   save(stage, id) {
     const nextId = library.save(localStorage, stage, id);
     currentStage = stage;
