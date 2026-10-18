@@ -1,4 +1,6 @@
 import { drawLadderArt } from './ladder-art';
+import { drawFunnelArt } from './funnel-art';
+import { drawTwinFunnelArt } from './twin-funnel-art';
 import type { Ball } from './game';
 import type { StageDef } from './data/maps';
 import type { MapEntityState } from './types/MapEntity.type';
@@ -7,6 +9,13 @@ import { drawMarble } from './marble-art';
 import { getSceneTheme, type SceneTheme } from './scene-theme';
 
 type Sprite = { canvas: OffscreenCanvas; width: number; height: number; left: number; top: number };
+
+function drawMinimapArt(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef) {
+  // These maps use scenery in place of hidden collision rails. The minimap caches it once.
+  if (stage.art?.style === 'reversal-ladder') drawLadderArt(ctx, stage, false);
+  if (stage.art?.style === 'infinite-funnel') drawFunnelArt(ctx, stage, 1, false);
+  if (stage.art?.style === 'twin-funnel') drawTwinFunnelArt(ctx, stage, 1, false);
+}
 
 export class RenderCache {
   private balls = new WeakMap<Ball, { key: string; sprite: Sprite }>();
@@ -59,7 +68,7 @@ export class RenderCache {
     // Elevated geometry is drawn by the overlay, with the same mouth clipping as the main view.
     if (stage.exitBridge) entities = entities.filter(e => e.shape.collisionLayer !== 2);
     if (typeof OffscreenCanvas === 'undefined' || scale <= 0) {
-      if (stage.art?.style === 'reversal-ladder') drawLadderArt(ctx, stage, false);
+      drawMinimapArt(ctx, stage);
       drawEntities(ctx, entities, scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
       return;
     }
@@ -74,7 +83,7 @@ export class RenderCache {
       );
       const mapCtx = canvas.getContext('2d')!;
       mapCtx.scale(scale * dpr, scale * dpr);
-      if (stage.art?.style === 'reversal-ladder') drawLadderArt(mapCtx, stage, false);
+      drawMinimapArt(mapCtx, stage);
       drawEntities(mapCtx, entities.filter((e) => fixed.has(e.shape)), scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
       cached = this.minimap = { stage, scale, dpr, theme: getSceneTheme(), canvas, fixed };
     }

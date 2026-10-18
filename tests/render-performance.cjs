@@ -238,3 +238,56 @@ assert.ok(returnCutout && returnCutout[1] < 51.4 && returnCutout[1] + returnCuto
   returnCutout[2] + returnCutout[4] > 69, 'both protruding rail ends and the deck are clipped at the lower-floor return');
 assert.ok(calls.some(call => call[0] === 'clip' && call[1] === 'evenodd'));
 console.log('PASS transfer return hides the protruding deck and rails without fading released marbles');
+
+const { setSceneTheme } = require('../src/scene-theme.ts');
+const originalOffscreen = global.OffscreenCanvas;
+for (const stage of [infiniteFunnel, twinFunnel]) {
+  const geometry = JSON.stringify(stage);
+  const entities = stage.entities.map(e => ({ x: e.position.x, y: e.position.y, angle: 0, life: -1, shape: e.shape }));
+  const groundRails = stage.entities.filter(e => e.shape.collisionLayer !== 2).map(e => e.shape.points);
+  for (const theme of ['dark', 'beige']) for (const width of [75, 125]) for (const cached of [false, true]) {
+    const strokes = [];
+    const minimapContext = () => {
+      const target = context(); let path = [];
+      target.beginPath = () => { path = []; };
+      target.moveTo = (...point) => { path.push(point); };
+      target.lineTo = (...point) => { path.push(point); };
+      target.stroke = () => strokes.push(path.slice());
+      return target;
+    };
+    try {
+      setSceneTheme(theme);
+      global.OffscreenCanvas = cached ? class extends originalOffscreen {
+        constructor(w, h) { super(w, h); this.ctx = minimapContext(); }
+      } : undefined;
+      const target = minimapContext(), cache = new RenderCache(), scale = width / stage.width, dpr = width === 75 ? 1 : 2;
+      const before = bitmaps.length;
+      cache.drawMinimap(target, stage, entities, scale, dpr);
+      for (const points of groundRails) assert.ok(strokes.some(path => JSON.stringify(path) === JSON.stringify(points)),
+        `${stage.title}: every hidden spiral rail is visible in the ${theme} ${width}px ${cached ? 'cached' : 'fallback'} minimap`);
+      if (cached) {
+        assert.equal(bitmaps.length, before + 1, 'ground art goes directly into the existing minimap bitmap');
+        assert.deepEqual([bitmaps.at(-1).width, bitmaps.at(-1).height],
+          [width * dpr, Math.ceil(stage.goalY * scale * dpr)], 'desktop/mobile DPR raster sizes stay bounded');
+        const paints = strokes.length;
+        for (let frame = 0; frame < 100; frame++) cache.drawMinimap(target, stage, entities, scale, dpr);
+        assert.equal(strokes.length, paints, 'warm minimaps do not rebuild the spiral paths');
+        assert.equal(bitmaps.length, before + 1, 'warm minimaps allocate no additional textures');
+      }
+    } finally { global.OffscreenCanvas = originalOffscreen; setSceneTheme('dark'); }
+  }
+  for (const Type of [Game, LanView]) {
+    const renderer = new Type(canvas);
+    if (Type === Game) renderer.stage = stage;
+    else renderer.setScene({ raceId: 'minimap', revision: 1, stage, entities,
+      fixed: entities.map(() => true), balls: [], settings: { order: 'asc', picks: 1 } });
+    calls.length = 0;
+    if (Type === Game) renderer.renderMinimap(entities);
+    else renderer.renderMinimap(entities, 0, { x: 32, y: 44 });
+    const spiralPoint = groundRails[0][30];
+    assert.ok(calls.some(call => call[0] === 'lineTo' && call[1] === spiralPoint[0] && call[2] === spiralPoint[1]),
+      `${Type.name} draws the spiral through its actual minimap entry point`);
+  }
+  assert.equal(JSON.stringify(stage), geometry, 'minimap art never changes collision geometry');
+}
+console.log('PASS both funnel minimaps show every rail in desktop/mobile themes, cache warm frames and Game/LAN entry points');
