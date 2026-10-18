@@ -30,6 +30,14 @@ function paint(ctx: Context, stage: StageDef, layer: 1 | 2) {
       ctx.moveTo(bridge.entry.x + 3.2, bridge.entry.y);
       ctx.arc(bridge.entry.x, bridge.entry.y, 3.2, 0, Math.PI * 2);
     }
+    // Marbles return to the ground at the start of this area, before the physical rail tips.
+    for (const transfer of stage.exitBridge!.transfers ?? []) {
+      const left = Math.min(...transfer.deck.map(p => p[0])) - 1;
+      const right = Math.max(...transfer.deck.map(p => p[0])) + 1;
+      const end = transfer.exit.y - transfer.exit.height / 2;
+      const bottom = Math.max(...transfer.deck.map(p => p[1])) + 1;
+      ctx.rect(left, end, right - left, Math.max(0, bottom - end));
+    }
     ctx.clip('evenodd');
     for (const bridge of bridges) {
       path(ctx, bridge.deck); ctx.closePath();

@@ -44,7 +44,9 @@ export function bridgeBallOpacity(stage: StageDef, ball: { x: number; y: number;
   const bridge = stage.exitBridge;
   if (!bridge || ball.onBridge) return 1;
   let opacity = deckOpacity(bridge, ball);
-  for (const transfer of bridge.transfers ?? []) opacity = Math.min(opacity, deckOpacity(transfer, ball));
+  for (const transfer of bridge.transfers ?? []) {
+    if (ball.y < transfer.exit.y - transfer.exit.height / 2) opacity = Math.min(opacity, deckOpacity(transfer, ball));
+  }
   return opacity;
 }
 

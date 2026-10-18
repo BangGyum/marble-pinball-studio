@@ -226,3 +226,15 @@ const { bridgeBallOpacity } = require('../src/map-art.ts');
 assert.ok(bridgeBallOpacity(twinFunnel, { x: 40, y: 54 }) < .3, 'ground marbles under the transfer remain faintly visible');
 assert.equal(bridgeBallOpacity(twinFunnel, { x: 40, y: 54, onBridge: true }), 1);
 console.log('PASS twin funnel cache reuse, bounded textures and transfer occlusion');
+
+assert.equal(bridgeBallOpacity(twinFunnel, { x: 54, y: 67 }), 1,
+  'a marble returned to the lower floor is fully visible beyond the transfer end');
+assert.ok(bridgeBallOpacity(twinFunnel, { x: 54, y: 66.5 }) < .3,
+  'the part of the elevated deck before the return still occludes ground marbles');
+calls.length = 0;
+drawTwinFunnelArt(context(), twinFunnel, 2, false);
+const returnCutout = calls.find(call => call[0] === 'rect' && Math.abs(call[2] - 66.6) < 1e-9);
+assert.ok(returnCutout && returnCutout[1] < 51.4 && returnCutout[1] + returnCutout[3] > 56.6 &&
+  returnCutout[2] + returnCutout[4] > 69, 'both protruding rail ends and the deck are clipped at the lower-floor return');
+assert.ok(calls.some(call => call[0] === 'clip' && call[1] === 'evenodd'));
+console.log('PASS transfer return hides the protruding deck and rails without fading released marbles');
