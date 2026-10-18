@@ -8,50 +8,63 @@ function path(ctx: Context, points: [number, number][]) {
   ctx.beginPath(); ctx.moveTo(...points[0]);
   for (let i = 1; i < points.length; i++) ctx.lineTo(...points[i]);
 }
+function drain(stage: StageDef) {
+  const deck = stage.exitBridge!.deck, xs = deck.map(p => p[0]);
+  const left = Math.min(...xs), right = Math.max(...xs);
+  return { cx: (left + right) / 2, cy: funnel.y, radius: (right - left) / 2, hole: 1.6,
+    bottom: Math.max(...deck.map(p => p[1])) };
+}
 function paint(ctx: Context, stage: StageDef, layer: 1 | 2) {
   const beige = getSceneTheme() === 'beige';
   ctx.save(); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   if (layer === 2) {
-    const inlet = stage.exitBridge!.entry;
-    // A rounded inlet joins the chute; its upper surface is open to ground-level marbles.
-    ctx.beginPath(); ctx.ellipse(inlet.x, inlet.y, 2.6, 1.3, 0, Math.PI, Math.PI * 2);
-    ctx.lineTo(inlet.x + 2.6, stage.goalY + 4); ctx.lineTo(inlet.x - 2.6, stage.goalY + 4);
-    ctx.closePath(); ctx.clip();
-    path(ctx, stage.exitBridge!.deck); ctx.closePath();
-    ctx.fillStyle = beige ? '#d7cbb4' : '#102d36'; ctx.fill();
-    const metal = ctx.createLinearGradient(29.4, 0, 34.6, 0);
+    // The drain sits at the exact spiral centre; the chute is one rounded piece that starts around it.
+    const { cx, cy, radius, hole, bottom } = drain(stage);
+    const chute = () => {
+      ctx.beginPath(); ctx.moveTo(cx - radius, bottom); ctx.lineTo(cx - radius, cy);
+      ctx.arc(cx, cy, radius, Math.PI, Math.PI * 2); ctx.lineTo(cx + radius, bottom); ctx.closePath();
+    };
+    // Only the lower chute casts a bridge shadow; the spiral entrance stays open.
+    ctx.save(); ctx.beginPath(); ctx.rect(0, cy + 2.8, stage.width ?? 64, stage.goalY + 8); ctx.clip();
+    ctx.translate(.3, .5); chute();
+    ctx.fillStyle = beige ? '#6a54383a' : '#000000a6'; ctx.fill(); ctx.restore();
+    chute();
+    const metal = ctx.createLinearGradient(cx - radius, 0, cx + radius, 0);
     [beige ? '#9e8e72' : '#284853', beige ? '#f4ead5' : '#153642', beige ? '#9e8e72' : '#284853']
       .forEach((color, i) => metal.addColorStop(i / 2, color));
     ctx.fillStyle = metal; ctx.fill();
-    const slope = ctx.createLinearGradient(0, inlet.y - 1.3, 0, inlet.y + 4);
-    slope.addColorStop(0, beige ? '#ad9e84' : '#0a202a');
-    slope.addColorStop(1, beige ? '#ad9e8400' : '#0a202a00');
-    ctx.fillStyle = slope; ctx.fill();
-    const mouthWidth = inlet.width / 2 + .15, mouthHeight = inlet.height / 2 + .1;
-    const throat = ctx.createLinearGradient(0, inlet.y - mouthHeight, 0, inlet.y + 2.5);
-    throat.addColorStop(0, beige ? '#51412de6' : '#02090ef2');
-    throat.addColorStop(1, beige ? '#51412d00' : '#02090e00');
-    ctx.beginPath(); ctx.ellipse(inlet.x, inlet.y, mouthWidth, mouthHeight, 0, Math.PI, Math.PI * 2);
-    ctx.bezierCurveTo(inlet.x + mouthWidth, inlet.y + 1, inlet.x + .6, inlet.y + 2, inlet.x + .6, inlet.y + 2.5);
-    ctx.lineTo(inlet.x - .6, inlet.y + 2.5);
-    ctx.bezierCurveTo(inlet.x - .6, inlet.y + 2, inlet.x - mouthWidth, inlet.y + 1, inlet.x - mouthWidth, inlet.y);
-    ctx.closePath();
-    ctx.fillStyle = throat; ctx.fill();
-    ctx.beginPath(); ctx.ellipse(inlet.x, inlet.y, mouthWidth, mouthHeight, 0, Math.PI, Math.PI * 2);
-    ctx.strokeStyle = beige ? '#e8d4ac' : '#8bc0b8'; ctx.lineWidth = .08; ctx.stroke();
-    // Only the lower chute has solid-looking side rails; the entrance stays open.
-    ctx.save(); ctx.beginPath(); ctx.rect(0, inlet.y + 3.3, stage.width ?? 64, stage.goalY + 4); ctx.clip();
-    ctx.strokeStyle = sceneColor('#ffc96e'); ctx.lineWidth = .25;
-    for (const entity of stage.entities ?? []) {
-      const shape = entity.shape;
-      if (shape.type !== 'polyline' || shape.collisionLayer !== 2) continue;
-      ctx.save(); ctx.translate(entity.position.x, entity.position.y); ctx.rotate(shape.rotation);
-      path(ctx, shape.points); ctx.stroke(); ctx.restore();
+    // Recessed drain: dark at the far wall, a lit lower lip where marbles drop into the chute.
+    const pit = ctx.createRadialGradient(cx, cy - hole * .25, hole * .1, cx, cy, hole);
+    pit.addColorStop(0, beige ? '#3a2c1d' : '#000204');
+    pit.addColorStop(.7, beige ? '#4f3e29' : '#031018');
+    pit.addColorStop(1, beige ? '#77623f' : '#0f3039');
+    ctx.beginPath(); ctx.arc(cx, cy, hole, 0, Math.PI * 2); ctx.fillStyle = pit; ctx.fill();
+    ctx.lineWidth = .3; ctx.strokeStyle = beige ? '#8c7a5c' : '#0b222b'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, hole + .1, Math.PI * .15, Math.PI * .85);
+    ctx.lineWidth = .08; ctx.strokeStyle = beige ? '#fff6e2' : '#7fd9cc'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, hole + .1, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.strokeStyle = beige ? '#c4b18e' : '#2f6f72'; ctx.stroke();
+    // Fade the rail heads through the open entrance, then show solid rails below it.
+    const railFade = ctx.createLinearGradient(0, cy, 0, cy + 2.8);
+    railFade.addColorStop(0, sceneColor('#ffc96e00'));
+    railFade.addColorStop(1, sceneColor('#ffc96e'));
+    ctx.lineWidth = .25;
+    for (const [start, end, color] of [
+      [cy, cy + 2.8, railFade], [cy + 2.8, bottom, sceneColor('#ffc96e')],
+    ] as [number, number, string | CanvasGradient][]) {
+      ctx.save(); ctx.beginPath(); ctx.rect(0, start, stage.width ?? 64, end - start); ctx.clip();
+      ctx.strokeStyle = color;
+      for (const entity of stage.entities ?? []) {
+        const shape = entity.shape;
+        if (shape.type !== 'polyline' || shape.collisionLayer !== 2) continue;
+        ctx.save(); ctx.translate(entity.position.x, entity.position.y); ctx.rotate(shape.rotation);
+        path(ctx, shape.points); ctx.stroke(); ctx.restore();
+      }
+      ctx.restore();
     }
-    ctx.restore();
     ctx.strokeStyle = sceneColor('#ffd279'); ctx.lineWidth = .2;
-    for (const y of [47.8, 51, 59, 67, 75]) {
-      ctx.beginPath(); ctx.moveTo(31.2, y); ctx.lineTo(32, y + .7); ctx.lineTo(32.8, y); ctx.stroke();
+    for (let y = cy + hole + 2; y < stage.goalY - 4; y += 8) {
+      ctx.beginPath(); ctx.moveTo(cx - .8, y); ctx.lineTo(cx, y + .7); ctx.lineTo(cx + .8, y); ctx.stroke();
     }
     for (let row = 0; row < 2; row++) for (let col = 0; col < 8; col++) {
       ctx.fillStyle = (row + col) % 2 ? (beige ? '#6e5a3e' : '#c5eee4') : (beige ? '#f4ead5' : '#14323b');
@@ -92,7 +105,11 @@ export function drawFunnelArt(ctx: Context, stage: StageDef, layer: 1 | 2 = 1, c
   if (!cached) { paint(ctx, stage, layer); return; }
   const transform = ctx.getTransform();
   const density = Math.min(24, Math.max(8, Math.ceil(Math.hypot(transform.a, transform.b) / 8) * 8));
-  const bounds = layer === 1 ? { x: 0, y: -30, width: stage.width ?? 64, height: stage.goalY + 34 }
-    : { x: 28.8, y: stage.exitBridge!.entry.y - 1.6, width: 6.4, height: Math.max(1, stage.goalY + 5.6 - stage.exitBridge!.entry.y) };
+  let bounds = { x: 0, y: -30, width: stage.width ?? 64, height: stage.goalY + 34 };
+  if (layer === 2) {
+    const { cx, cy, radius, bottom } = drain(stage);
+    const top = Math.min(cy - radius, stage.exitBridge!.entry.y) - .6;
+    bounds = { x: cx - radius - .6, y: top, width: radius * 2 + 1.5, height: Math.max(1, bottom + 1 - top) };
+  }
   backgroundCache.draw(ctx, stage, `funnel-${layer}`, { ...bounds, density, maxPixels: 6 * 1024 * 1024 }, target => paint(target, stage, layer));
 }

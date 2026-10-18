@@ -214,6 +214,20 @@ assert.ok(bitmaps.slice(funnelStart).reduce((sum, image) => sum + image.width * 
   'both funnel layers and their minimaps stay below a 6MP combined footprint');
 console.log('PASS funnel cached geometry, distant-view reuse and bounded texture footprint');
 
+const groundOnlyFunnel = { ...infiniteFunnel, exitBridge: undefined,
+  entities: infiniteFunnel.entities.filter(e => e.shape.collisionLayer !== 2) };
+drawFunnelArt(context(), groundOnlyFunnel, 1);
+let upperArc, solidUpperArc = 0;
+const drainContext = context();
+drainContext.beginPath = () => { upperArc = undefined; };
+drainContext.arc = (...args) => { upperArc = args; };
+drainContext.stroke = () => {
+  if (upperArc?.[2] === 2.6 && drainContext.lineWidth >= .2) solidUpperArc++;
+};
+drawFunnelArt(drainContext, infiniteFunnel, 2, false);
+assert.equal(solidUpperArc, 0, 'ground marbles never cross a solid-looking upper drain rail');
+console.log('PASS saved ground-only funnel art and no false wall across the drain entrance');
+
 const { twinFunnel } = require('../src/data/twin-funnel.ts');
 const { drawTwinFunnelArt } = require('../src/twin-funnel-art.ts');
 const twinStart = bitmaps.length;
