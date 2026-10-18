@@ -192,7 +192,15 @@ const { drawFunnelArt } = require('../src/funnel-art.ts');
 const funnelStart = bitmaps.length;
 for (const scale of [40, 2]) {
   const target = context(); target.getTransform = () => ({ a: scale, b: 0 });
-  for (const layer of [1, 2]) drawFunnelArt(target, infiniteFunnel, layer);
+  for (const layer of [1, 2]) {
+    drawFunnelArt(target, infiniteFunnel, layer);
+    if (layer === 2) {
+      const [, , x, y, width, height] = calls.at(-1), inlet = infiniteFunnel.exitBridge.entry;
+      assert.ok(x <= inlet.x - inlet.width / 2 && x + width >= inlet.x + inlet.width / 2 &&
+        y <= inlet.y - inlet.height / 2 && y + height >= infiniteFunnel.goalY,
+      'the outlet bitmap includes the central inlet and the entire connected chute at both zoom levels');
+    }
+  }
 }
 assert.equal(bitmaps.length - funnelStart, 4, 'spiral and outlet have separate main-view and minimap textures');
 calls.length = 0;
