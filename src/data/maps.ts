@@ -11,7 +11,6 @@ import { neonJackpot } from './neon-jackpot';
 import { pinballCascade } from './pinball-cascade';
 import { chaosClocktower } from './chaos-clocktower';
 import { orbitalLock } from './orbital-lock';
-import { neonHourglass } from './neon-hourglass';
 import { neonCrossway } from './neon-crossway';
 import { fractureCanyon } from './fracture-canyon';
 import { switchbackExpress } from './switchback-express';
@@ -29,7 +28,6 @@ export const stages: StageDef[] = [
   pinballCascade,
   chaosClocktower,
   orbitalLock,
-  neonHourglass,
   fractureCanyon,
   neonCrossway,
   switchbackExpress,
@@ -40,4 +38,5 @@ export const stages: StageDef[] = [
   twinFunnel,
 ];
 
+export const hiddenStages: StageDef[] = [springLab, reversalLadder];
 export const DEFAULT_MAP_INDEX = stages.indexOf(neonJunction);

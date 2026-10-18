@@ -3,7 +3,7 @@ import { LanView } from './view';
 import { Rankings } from '../rankings';
 import { Editor } from '../editor';
 import { Recorder } from '../recorder';
-import { stages, DEFAULT_MAP_INDEX, type StageDef } from '../data/maps';
+import { stages, hiddenStages, DEFAULT_MAP_INDEX, type StageDef } from '../data/maps';
 import { parseNames, winningRange, type WinnerOrder } from '../model';
 import { MapLibrary } from '../map-library';
 import { el, toast, message, STALLED_MESSAGE } from '../ui';
@@ -20,7 +20,7 @@ let socket: WebSocket | undefined, scene: Scene | undefined, frame: Frame | unde
 let identity: Identity = { type: 'identity', role: 'viewer' };
 let info: Info, online = false, retry = 0, sequence = 0, uiUpdate = 0;
 let preferredPicks = 2, customStage: StageDef | undefined;
-const library = new MapLibrary(stages);
+const library = new MapLibrary(stages, hiddenStages);
 let inputTimer: ReturnType<typeof setTimeout>, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
 try {

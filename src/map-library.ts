@@ -3,14 +3,15 @@ import { readSavedMaps, saveMaps, type SavedMap } from './model';
 
 export class MapLibrary {
   private saved: SavedMap[] = [];
-  constructor(private builtins: StageDef[]) {}
+  constructor(private builtins: StageDef[], private hiddenBuiltins: StageDef[] = []) {}
 
   load(storage: Pick<Storage, 'getItem'>, onInvalid?: (count: number) => void) {
     this.saved = readSavedMaps(storage, onInvalid);
   }
 
   list(preview?: StageDef): SavedMap[] {
-    return [...this.builtins.map((stage, i) => ({ id: 'builtin-' + i, stage })), ...this.saved,
+    return [...this.builtins.map((stage, i) => ({ id: 'builtin-' + i, stage }))
+      .filter(map => !this.hiddenBuiltins.includes(map.stage)), ...this.saved,
       ...(preview ? [{ id: 'preview', stage: preview }] : [])];
   }
 
