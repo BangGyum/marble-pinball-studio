@@ -200,7 +200,7 @@ async function connect(port, cookie, options = {}) {
     await host.command({ type: 'reset' });
     assert.equal((await host.command({ type: 'configure', settings: { ...settings,
       stage: { ...rapids, art: { style: 'unknown', contours: [] } } } })).ok, false);
-    for (const title of ['네온 핀볼 폭포', '카오스 시계탑', '오비탈 락', '네온 모래시계', '끝없는 나선']) {
+    for (const title of ['네온 핀볼 폭포', '카오스 시계탑', '오비탈 락', '네온 모래시계', '끝없는 나선', '쌍둥이 와류']) {
       // Keep independent map scenarios below the real server's 30 commands/second limit.
       await delay(1050);
       const stage = stages.find(s => s.title === title), mapId = stages.indexOf(stage);
@@ -226,6 +226,15 @@ async function connect(port, cookie, options = {}) {
         const lateSession = await request(port, '/api/session', { method: 'POST' });
         const late = await connect(port, lateSession.cookie); clients.push(late);
         assert.deepEqual(late.frame.bridgeIds, bridgeIds, 'mid-race join restores the upper-floor marbles');
+        if (stage.exitBridge.transfers) {
+          const id = bridgeIds[0];
+          await host.command({ type: 'pause' });
+          while (app.race.balls[id].onBridge && app.race.elapsed < 60) app.race.advance();
+          assert.equal(app.race.balls[id].onBridge, false, 'transfer returns the marble to the lower bowl');
+          await host.command({ type: 'pause' });
+          await guest2.until(() => guest2.frame.state === 'paused' && !guest2.frame.bridgeIds.includes(id));
+          assert.deepEqual(guest2.frame.bridgeIds, app.race.balls.filter(b => b.onBridge).map(b => b.id), 'bridge return reaches spectators');
+        }
       }
       const positions = new Map((guest2.frame.positions ?? []).map(([i, x, y]) => [i, { x, y }]));
       const entities = app.race.physics.getEntities();

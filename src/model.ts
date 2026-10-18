@@ -103,12 +103,23 @@ export function validateStage(value: unknown): StageDef {
       !finite(a[0], -1000, 1000) || !finite(a[1], -1000, 1000) || !finite(a[2], -100, 100))))
     throw new Error('맵 방향 표시가 올바르지 않아요.');
   if (s.exitBridge !== undefined) {
-    const bridge = s.exitBridge, entry = bridge?.entry;
-    if (!entry || !finite(entry.x, -1000, 1000) || !finite(entry.y, -1000, 1000) ||
-      !finite(entry.width, 0.5, 200) || !finite(entry.height, 0.5, 300) ||
-      !Array.isArray(bridge.deck) || bridge.deck.length < 3 || bridge.deck.length > 1000 ||
-      bridge.deck.some(p => !Array.isArray(p) || p.length !== 2 || !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))
-      throw new Error('입체 출구의 진입 영역과 바닥 좌표를 확인해 주세요.');
+    const transfers = s.exitBridge?.transfers;
+    if (transfers !== undefined && (!Array.isArray(transfers) || transfers.length > 10))
+      throw new Error('연결 통로는 최대 10개까지 사용할 수 있어요.');
+    for (const bridge of [s.exitBridge, ...(transfers ?? [])]) {
+      const entry = bridge?.entry;
+      if (!entry || !finite(entry.x, -1000, 1000) || !finite(entry.y, -1000, 1000) ||
+        !finite(entry.width, 0.5, 200) || !finite(entry.height, 0.5, 300) ||
+        !Array.isArray(bridge.deck) || bridge.deck.length < 3 || bridge.deck.length > 1000 ||
+        bridge.deck.some(p => !Array.isArray(p) || p.length !== 2 || !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))
+        throw new Error('입체 출구의 진입 영역과 바닥 좌표를 확인해 주세요.');
+    }
+    for (const transfer of transfers ?? []) {
+      const exit = transfer.exit;
+      if (!exit || !finite(exit.x, -1000, 1000) || !finite(exit.y, -1000, 1000) ||
+        !finite(exit.width, 0.5, 200) || !finite(exit.height, 0.5, 300))
+        throw new Error('연결 통로의 복귀 영역을 확인해 주세요.');
+    }
   }
   if (s.vortex && (!finite(s.vortex.x, -1000, 1000) || !finite(s.vortex.y, -1000, 1000) ||
     !finite(s.vortex.radius, 1, 100) || !finite(s.vortex.speed, -30, 30) ||

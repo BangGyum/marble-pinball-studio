@@ -551,7 +551,7 @@ export class Editor {
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     c.save();
     c.scale(SCALE, SCALE);
-    const liveArt = this.stage.art?.style === 'reversal-ladder' || this.stage.art?.style === 'infinite-funnel';
+    const liveArt = this.stage.art?.style === 'reversal-ladder' || this.stage.art?.style === 'infinite-funnel' || this.stage.art?.style === 'twin-funnel';
     drawMapArt(c, this.stage, SCALE, !liveArt);
     c.strokeStyle = sceneColor('#23323d');
     c.lineWidth = 0.5 / SCALE;

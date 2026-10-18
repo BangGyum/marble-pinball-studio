@@ -11,6 +11,9 @@ type PhysicsEntity = { body: Box2D.b2Body; moving: boolean; springAt?: number;
   sliding?: MapEntity['props']['sliding']; oscillation?: MapEntity['props']['oscillation'];
   timedGate?: MapEntity['props']['timedGate']; spinCycle?: MapEntity['props']['spinCycle']; spin: number } & MapEntityState;
 
+const inBridgeArea = (x: number, y: number, area: NonNullable<StageDef['exitBridge']>['entry']) =>
+  Math.abs(x - area.x) <= area.width / 2 && Math.abs(y - area.y) <= area.height / 2;
+
 export class Box2dPhysics implements IPhysics {
   private Box2D!: typeof Box2D & EmscriptenModule;
   private world!: Box2D.b2World;
@@ -414,15 +417,21 @@ export class Box2dPhysics implements IPhysics {
       }
       this.world.Step(dt, 8, this.collisionSubsteps === 4 ? 4 : 8);
       if (this.exitBridge) {
-        const entry = this.exitBridge.entry;
         for (const body of bodies) {
-          if (this.bridgeBodies.has(body)) continue;
+          const elevated = this.bridgeBodies.has(body);
+          if (elevated && !this.exitBridge.transfers?.length) continue;
           const p = body.GetPosition();
-          if (Math.abs(p.x - entry.x) > entry.width / 2 || Math.abs(p.y - entry.y) > entry.height / 2) continue;
+          let crossing = !elevated && inBridgeArea(p.x, p.y, this.exitBridge.entry);
+          for (const transfer of this.exitBridge.transfers ?? []) {
+            if (inBridgeArea(p.x, p.y, elevated ? transfer.exit : transfer.entry)) { crossing = true; break; }
+          }
+          if (!crossing) continue;
+          const layer = elevated ? 1 : 2;
           const fixture = body.GetFixtureList(), filter = fixture.GetFilterData();
-          filter.set_categoryBits(2); filter.set_maskBits(2);
+          filter.set_categoryBits(layer); filter.set_maskBits(layer);
           fixture.SetFilterData(filter);
-          this.bridgeBodies.add(body);
+          if (elevated) this.bridgeBodies.delete(body);
+          else this.bridgeBodies.add(body);
         }
       }
       for (const e of this.boosters) if (e.shape.type === 'box' && e.shape.boostSpeed !== undefined) {

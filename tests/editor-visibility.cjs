@@ -117,3 +117,16 @@ assert.ok(lines.some(([x, y]) => x === 29.4 && y === 90), 'the funnel outlet rem
 assert.equal(allocations.length, editorAllocations, 'editing the spiral does not accumulate stale background textures');
 node('editor-close').dispatch('click');
 console.log('PASS funnel editor live rail geometry, visible outlet and texture reuse');
+
+const { twinFunnel } = require('../src/data/twin-funnel.ts');
+editor.open(twinFunnel);
+moves.length = 0; lines.length = 0;
+const twinAllocations = allocations.length;
+editor.stage.entities[0].position.x = 1.25;
+editor.render();
+assert.ok(moves.some(([x, y]) => x === 1.25 && y === 0));
+assert.ok(lines.some(([x, y]) => x === 39.4 && y === 134), 'lower outlet remains visible while editing');
+assert.ok(lines.some(([x, y]) => x === 51.4 && y === 69), 'transfer remains visible while editing');
+assert.equal(allocations.length, twinAllocations);
+node('editor-close').dispatch('click');
+console.log('PASS twin funnel editor live rails, transfer and outlet');

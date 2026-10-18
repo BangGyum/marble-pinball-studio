@@ -205,3 +205,24 @@ assert.ok(!calls.some(call => call[0] === 'lineTo'), 'the long spiral is not reb
 assert.ok(bitmaps.slice(funnelStart).reduce((sum, image) => sum + image.width * image.height, 0) < 6 * 1024 * 1024,
   'both funnel layers and their minimaps stay below a 6MP combined footprint');
 console.log('PASS funnel cached geometry, distant-view reuse and bounded texture footprint');
+
+const { twinFunnel } = require('../src/data/twin-funnel.ts');
+const { drawTwinFunnelArt } = require('../src/twin-funnel-art.ts');
+const twinStart = bitmaps.length;
+for (const scale of [40, 2]) {
+  const target = context(); target.getTransform = () => ({ a: scale, b: 0 });
+  for (const layer of [1, 2]) drawTwinFunnelArt(target, twinFunnel, layer);
+}
+assert.equal(bitmaps.length - twinStart, 4);
+calls.length = 0;
+for (let frame = 0; frame < 100; frame++) for (const scale of [40, 2]) {
+  const target = context(); target.getTransform = () => ({ a: scale, b: 0 });
+  for (const layer of [1, 2]) drawTwinFunnelArt(target, twinFunnel, layer);
+}
+assert.equal(bitmaps.length - twinStart, 4, 'distant twin funnels reuse all four textures');
+assert.ok(!calls.some(call => call[0] === 'lineTo'), 'neither spiral is rebuilt in warm frames');
+assert.ok(bitmaps.slice(twinStart).reduce((sum, image) => sum + image.width * image.height, 0) < 9 * 1024 * 1024);
+const { bridgeBallOpacity } = require('../src/map-art.ts');
+assert.ok(bridgeBallOpacity(twinFunnel, { x: 40, y: 54 }) < .3, 'ground marbles under the transfer remain faintly visible');
+assert.equal(bridgeBallOpacity(twinFunnel, { x: 40, y: 54, onBridge: true }), 1);
+console.log('PASS twin funnel cache reuse, bounded textures and transfer occlusion');

@@ -1,5 +1,6 @@
 import { sceneColor, sceneGlow } from './scene-theme';
 import { drawFunnelArt } from './funnel-art';
+import { drawTwinFunnelArt } from './twin-funnel-art';
 import { drawLadderArt, drawLadderDevices } from './ladder-art';
 import { drawRoundhouseArt, drawRoundhouseTrains } from './roundhouse-art';
 import { drawExpressArt, drawExpressDevices } from './express-art';
@@ -26,6 +27,8 @@ export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, e
     drawOrbitalArt(ctx, stage, 2, cacheBackground);
   } else if (stage.art?.style === 'infinite-funnel') {
     drawFunnelArt(ctx, stage, 2, cacheBackground);
+  } else if (stage.art?.style === 'twin-funnel') {
+    drawTwinFunnelArt(ctx, stage, 2, cacheBackground);
   } else {
     const points = stage.exitBridge.deck;
     ctx.beginPath(); ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
@@ -39,9 +42,16 @@ export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, e
 // Keep a faint silhouette for tracking a marble while it passes beneath the deck.
 export function bridgeBallOpacity(stage: StageDef, ball: { x: number; y: number; onBridge?: boolean }) {
   const bridge = stage.exitBridge;
-  if (!bridge || ball.onBridge || ball.y <= bridge.entry.y + bridge.entry.height / 2 + 1) return 1;
+  if (!bridge || ball.onBridge) return 1;
+  let opacity = deckOpacity(bridge, ball);
+  for (const transfer of bridge.transfers ?? []) opacity = Math.min(opacity, deckOpacity(transfer, ball));
+  return opacity;
+}
+
+function deckOpacity(deck: NonNullable<StageDef['exitBridge']>, ball: { x: number; y: number }) {
+  if (ball.y <= deck.entry.y + deck.entry.height / 2 + 1) return 1;
   let inside = false, distance = Infinity;
-  const points = bridge.deck;
+  const points = deck.deck;
   for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
     const a = points[j], b = points[i], dx = b[0] - a[0], dy = b[1] - a[1];
     if ((a[1] > ball.y) !== (b[1] > ball.y) && ball.x < dx * (ball.y - a[1]) / dy + a[0]) inside = !inside;
@@ -56,6 +66,7 @@ export function drawMapArt(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number, cacheBackground = true
 ) {
   if (!stage.art) return;
+  if (stage.art.style === 'twin-funnel') { drawTwinFunnelArt(ctx, stage, 1, cacheBackground); return; }
   if (stage.art.style === 'infinite-funnel') { drawFunnelArt(ctx, stage, 1, cacheBackground); return; }
   if (stage.art.style === 'reversal-ladder') { drawLadderArt(ctx, stage, cacheBackground); return; }
   if (stage.art.style === 'roundhouse') { drawRoundhouseArt(ctx, stage); return; }

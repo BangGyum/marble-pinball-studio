@@ -83,7 +83,7 @@ assert.equal(library.list().length, stages.length);
 console.log('PASS shared library save/re-edit/reload/duplicate titles/preview/removal and failed writes');
 assert.equal(stages[DEFAULT_MAP_INDEX].title, '네온 분기점');
 console.log('PASS shared initial map is neon junction');
-assert.equal(stages.length, 17, 'the built-in map list includes infinite funnel and excludes retired maps');
+assert.equal(stages.length, 18, 'the built-in map list includes both funnel maps and excludes retired maps');
 assert.ok(stages.some(stage => stage.title === '끝없는 나선'));
 assert.ok(stages.some(stage => stage.title === '네온 크로스웨이'));
 assert.ok(stages.some(stage => stage.title === '회전 차고지'));
