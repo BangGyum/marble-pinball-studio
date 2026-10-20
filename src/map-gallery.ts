@@ -64,6 +64,8 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
 export class MapGallery {
   readonly intro = new GalleryIntro(el('map-gallery'));
   readonly transition = new MapTransition(el('map-gallery'), el('game-view'));
+  private reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  private returnHighlight?: Animation;
   private grid = el('map-grid');
   private thumbnails = new WeakMap<StageDef, HTMLCanvasElement>();
   private stages = new WeakMap<HTMLCanvasElement, StageDef>();
@@ -84,9 +86,8 @@ export class MapGallery {
         this.observer.observe(canvas);
       }
     });
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     this.grid.addEventListener('pointermove', (event) => {
-      if (event.pointerType !== 'mouse' || reduced.matches) return;
+      if (event.pointerType !== 'mouse' || this.reduced.matches) return;
       const card = (event.target as HTMLElement).closest<HTMLButtonElement>('.map-card');
       if (!card) return;
       const bounds = card.getBoundingClientRect();
@@ -96,6 +97,8 @@ export class MapGallery {
     this.grid.addEventListener('click', (event) => {
       const card = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-map-id]');
       if (card) {
+        this.returnHighlight?.cancel();
+        this.returnHighlight = undefined;
         this.intro.stop();
         this.transition.play(card, () => select(card.dataset.mapId!));
       }
@@ -109,6 +112,8 @@ export class MapGallery {
   }
 
   refresh(maps: SavedMap[], selected: string) {
+    this.returnHighlight?.cancel();
+    this.returnHighlight = undefined;
     this.observer.disconnect();
     const defaultId = `builtin-${DEFAULT_MAP_INDEX}`;
     const ordered = [...maps.filter(map => map.id === defaultId), ...maps.filter(map => map.id !== defaultId)];
@@ -144,8 +149,18 @@ export class MapGallery {
       this.observer.observe(canvas);
   }
 
-  focus(id: string) {
+  focus(id: string, highlight = false) {
     const card = [...this.grid.querySelectorAll<HTMLButtonElement>('[data-map-id]')].find(c => c.dataset.mapId === id);
     (card ?? el('gallery-title')).focus({ preventScroll: true });
+    if (!highlight || !card || document.hidden || this.reduced.matches) return;
+    const color = getSceneTheme() === 'beige' ? '#a98b65' : card.style.getPropertyValue('--map-color');
+    const shadow = getComputedStyle(card).boxShadow;
+    const animation = card.animate([
+      { boxShadow: shadow },
+      { boxShadow: `0 0 0 2px ${color}, 0 0 22px ${color}55`, offset: .45 },
+      { boxShadow: shadow },
+    ], { duration: 280, easing: 'ease-out' });
+    this.returnHighlight = animation;
+    animation.onfinish = () => { if (this.returnHighlight === animation) this.returnHighlight = undefined; };
   }
 }

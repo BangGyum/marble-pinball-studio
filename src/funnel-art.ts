@@ -113,3 +113,16 @@ export function drawFunnelArt(ctx: Context, stage: StageDef, layer: 1 | 2 = 1, c
   }
   backgroundCache.draw(ctx, stage, `funnel-${layer}`, { ...bounds, density, maxPixels: 6 * 1024 * 1024 }, target => paint(target, stage, layer));
 }
+
+export function drawFunnelEntryCue(ctx: CanvasRenderingContext2D, stage: StageDef, age: number, scale: number) {
+  if (!stage.exitBridge || age < 0 || age >= .45) return;
+  const { cx, cy, hole } = drain(stage), progress = age / .45;
+  ctx.save();
+  ctx.globalAlpha = (1 - progress) * .8;
+  ctx.strokeStyle = sceneColor('#ffd279');
+  ctx.lineWidth = 2 / scale;
+  ctx.beginPath();
+  ctx.arc(cx, cy, hole + .2 + progress * 1.2, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}

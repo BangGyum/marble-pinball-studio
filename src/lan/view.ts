@@ -3,6 +3,7 @@ import { drawEntities } from '../draw';
 import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from '../map-art';
 import { drawWind } from '../wind-render';
 import { drawCelebration } from '../celebration';
+import { drawFunnelEntryCue } from '../funnel-art';
 import { RenderCache } from '../render-cache';
 import { drawMarble } from '../marble-art';
 import { Recorder } from '../recorder';
@@ -46,7 +47,9 @@ export class LanView {
   private width = 1000;
   private height = 600;
   private winnerAt = 0;
-  private reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : undefined;
+  private drainCueAt = 0;
+  private drainCueDone = false;
   private recorder = new Recorder();
   private recordStop?: ReturnType<typeof setTimeout>;
   constructor(readonly canvas: HTMLCanvasElement) {
@@ -103,6 +106,7 @@ export class LanView {
   }
   setScene(scene: Scene) {
     if (this.scene?.raceId !== scene.raceId) {
+      this.drainCueAt = 0; this.drainCueDone = false;
       this.stopRecording(); this.winnerAt = 0; this.manual = null;
       this.cache = new RenderCache();
       const count = scene.balls.length, rows = Math.ceil(count / 10), offset = (scene.stage.spawnX ?? 12.85) - 12.85;
@@ -135,7 +139,8 @@ export class LanView {
   private frame(now: number) {
     if (!this.visible) return;
     if (this.state !== 'running' && !this.recording && !this.renderDirty && !this.cameraMoving && !this.playbackMoving &&
-      (!this.winnerAt || now - this.winnerAt >= 1400) && now - this.lastFrameDraw < 100) return;
+      (!this.winnerAt || now - this.winnerAt >= 1400) &&
+      (!this.drainCueAt || now - this.drainCueAt >= 450) && now - this.lastFrameDraw < 100) return;
     this.lastFrameDraw = now; this.renderDirty = false; this.draw(now);
   }
   private framePositions(frame: Frame) {
@@ -161,6 +166,10 @@ export class LanView {
     const mix = (a: number, b: number) => a + (b - a) * t;
     let bridgeIds = this.bridgeIds.get(shown);
     if (!bridgeIds) { bridgeIds = new Set(shown.bridgeIds ?? []); this.bridgeIds.set(shown, bridgeIds); }
+    if (!this.drainCueDone && scene.stage.art?.style === 'infinite-funnel' && scene.stage.exitBridge && bridgeIds.size) {
+      this.drainCueDone = true;
+      if (!this.reducedMotion?.matches) this.drainCueAt = now;
+    }
     after.balls.forEach((_, i) => {
       const a = before.balls[i], b = after.balls[i], ball = this.balls[i];
       ball.x = mix(a[1], b[1]); ball.y = mix(a[2], b[2]); ball.angle = mix(a[3], b[3]);
@@ -217,6 +226,8 @@ export class LanView {
       }
       ctx.globalAlpha = 1;
     }
+    if (this.drainCueAt && !this.reducedMotion?.matches)
+      drawFunnelEntryCue(ctx, scene.stage, (now - this.drainCueAt) / 1000, scale);
     ctx.restore();
     this.renderMinimap(entities, elapsed, cam);
     this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h, scene.stage);
@@ -232,7 +243,7 @@ export class LanView {
     if (shown.winners.length) {
       if (!this.winnerAt) this.winnerAt = now;
       drawCelebration(ctx, shown.winners.map((id) => balls[id]), scene.settings.order,
-        (now - this.winnerAt) / 1000, w, h, this.reducedMotion, this.celebrationRightInset);
+        (now - this.winnerAt) / 1000, w, h, this.reducedMotion?.matches ?? false, this.celebrationRightInset);
     }
   }
   private renderMinimap(entities: MapEntityState[], elapsed: number, cam: { x: number; y: number }) {

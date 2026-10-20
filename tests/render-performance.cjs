@@ -187,8 +187,58 @@ assert.equal(item.x, 10, 'omitted translations return reusable entities to their
 assert.equal(scene.entities[0].x, 10, 'render interpolation never mutates the network scene');
 console.log('PASS LAN entity reuse, per-frame lookup caching and translation reset');
 
+const motion = { matches: false };
+global.matchMedia = () => motion;
+try {
+  const motionGame = new Game(canvas);
+  motionGame.stage = { title: 'Test', goalY: 100, entities: [] };
+  motionGame.physics.getEntities = () => [];
+  motionGame.winners = [ball];
+  motionGame.winnerAt = performance.now() - 400;
+  calls.length = 0; motionGame.render();
+  assert.ok(calls.some(call => call[0] === 'fillRect' && call[1] === -2), 'game starts with confetti enabled');
+  motion.matches = true;
+  calls.length = 0; motionGame.render();
+  assert.ok(!calls.some(call => call[0] === 'fillRect' && call[1] === -2), 'game reads live reduced-motion setting');
+
+  motion.matches = false;
+  const motionLan = new LanView(canvas);
+  motionLan.setScene({ ...scene, entities: [], fixed: [] });
+  motionLan.push({ ...frame, state: 'finished', balls: [[0, 10, 5, 0, 1]], positions: [], angles: [], winners: [0] });
+  motionLan.draw(1000);
+  calls.length = 0; motionLan.draw(1400);
+  assert.ok(calls.some(call => call[0] === 'fillRect' && call[1] === -2), 'LAN starts with confetti enabled');
+  motion.matches = true;
+  calls.length = 0; motionLan.draw(1416);
+  assert.ok(!calls.some(call => call[0] === 'fillRect' && call[1] === -2), 'LAN reads live reduced-motion setting');
+} finally { delete global.matchMedia; }
+console.log('PASS game and LAN celebration follow live reduced-motion changes');
+
 const { infiniteFunnel } = require('../src/data/infinite-funnel.ts');
-const { drawFunnelArt } = require('../src/funnel-art.ts');
+const { drawFunnelArt, drawFunnelEntryCue } = require('../src/funnel-art.ts');
+calls.length = 0;
+drawFunnelEntryCue(ctx, infiniteFunnel, .225, 40);
+assert.equal(calls.filter(call => call[0] === 'arc' && call[1] === 32 && call[2] === 44).length, 1,
+  'the first bridge entry gets one small ring around the drain');
+calls.length = 0;
+drawFunnelEntryCue(ctx, infiniteFunnel, .45, 40);
+assert.equal(calls.length, 0, 'the drain ring ends after 450ms');
+
+const cueScene = { ...scene, raceId: 'funnel-cue', stage: { ...infiniteFunnel }, entities: [], fixed: [] };
+const cueView = new LanView(canvas);
+cueView.setScene(cueScene);
+cueView.push({ ...frame, raceId: 'funnel-cue', bridgeIds: [] });
+cueView.draw(1000);
+assert.equal(cueView.drainCueDone, false, 'the drain stays quiet before the first bridge entry');
+cueView.push({ ...frame, raceId: 'funnel-cue', seq: 2, bridgeIds: [0] });
+cueView.draw(1400);
+assert.equal(cueView.drainCueAt, 1400, 'LAN plays the cue on the first bridge entry');
+cueView.draw(1550);
+assert.equal(cueView.drainCueAt, 1400, 'later frames cannot restart the cue');
+cueView.setScene({ ...cueScene, raceId: 'next-race' });
+assert.equal(cueView.drainCueDone, false, 'a new race can show its own first entry');
+console.log('PASS one-shot funnel drain cue, finite lifetime and LAN race reset');
+
 const funnelStart = bitmaps.length;
 for (const scale of [40, 2]) {
   const target = context(); target.getTransform = () => ({ a: scale, b: 0 });

@@ -1,5 +1,6 @@
 import type { Ball } from './game';
 import type { WinnerOrder } from './model';
+import { getSceneTheme, sceneColor } from './scene-theme';
 
 export function drawCelebration(
   ctx: CanvasRenderingContext2D,
@@ -18,6 +19,7 @@ export function drawCelebration(
   const maxWidth = Math.max(1, Math.min(260, width * 0.35, x - 16) - 24);
   const visibleCount = Math.max(1, Math.min(5, Math.floor((height * 0.5 - 40) / 24)));
   const shown = ordered.slice(0, visibleCount);
+  const beige = getSceneTheme() === 'beige';
   ctx.save();
   ctx.beginPath();
   ctx.rect(0, 0, x + 4, height);
@@ -36,7 +38,7 @@ export function drawCelebration(
         y - 28 + Math.sin(angle) * distance + progress * progress * 45
       );
       ctx.rotate(angle + progress * 4);
-      ctx.fillStyle = colors[i % colors.length];
+      ctx.fillStyle = sceneColor(colors[i % colors.length]);
       ctx.fillRect(-2, -3, 4, 6);
       ctx.restore();
     }
@@ -45,7 +47,7 @@ export function drawCelebration(
   ctx.globalAlpha = reveal;
   ctx.translate((1 - reveal) ** 3 * 16, 0);
   ctx.textAlign = 'right';
-  ctx.strokeStyle = '#070a0e';
+  ctx.strokeStyle = beige ? '#fff8eb' : '#070a0e';
   ctx.lineWidth = 4;
   const label = (text: string, atY: number, font: string, color: string) => {
     ctx.font = font;
@@ -65,18 +67,18 @@ export function drawCelebration(
     (winners.some((ball) => !ball.rank) ? '당첨 확정 · ' : '최종 당첨 순위 · ') + winners.length + '명',
     y - 54,
     '12px sans-serif',
-    '#b5d1cc'
+    sceneColor('#b5d1cc')
   );
-  label('축하합니다!', y - 26, 'bold ' + Math.min(26, Math.max(18, width * 0.024)) + 'px sans-serif', '#65efda');
+  label('축하합니다!', y - 26, 'bold ' + Math.min(26, Math.max(18, width * 0.024)) + 'px sans-serif', sceneColor('#65efda'));
   shown.forEach((ball, i) =>
-    label((ball.rank ? ball.rank + '등 · ' : '당첨 · ') + ball.name, y + 6 + i * 24, 'bold 16px sans-serif', ball.color)
+    label((ball.rank ? ball.rank + '등 · ' : '당첨 · ') + ball.name, y + 6 + i * 24, 'bold 16px sans-serif', beige ? '#44382d' : ball.color)
   );
   if (ordered.length > shown.length)
     label(
       '외 ' + (ordered.length - shown.length) + '명 · 전체 결과는 순위 목록에서',
       y + 6 + shown.length * 24,
       '12px sans-serif',
-      '#b5d1cc'
+      sceneColor('#b5d1cc')
     );
   ctx.restore();
 }

@@ -90,7 +90,7 @@ el('maps-open').addEventListener('click', () => {
   galleryView.hidden = false;
   gallery.refresh(allMaps(), mapSelect.value);
   window.scrollTo(0, galleryScroll);
-  gallery.focus(mapSelect.value);
+  gallery.focus(mapSelect.value, true);
   gallery.intro.play();
 });
 el('maps-show-all').addEventListener('click', () => el<HTMLButtonElement>('maps-open').click());

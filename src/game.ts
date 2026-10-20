@@ -10,10 +10,13 @@ import { Recorder } from './recorder';
 import { RenderCache } from './render-cache';
 import { drawMarble } from './marble-art';
 import { getSceneTheme, sceneColor } from './scene-theme';
+import { drawFunnelEntryCue } from './funnel-art';
 import type { MapEntityState } from './types/MapEntity.type';
 export type { Ball } from './race';
 export class Game extends Race {
-  private reducedMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  private reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : undefined;
+  private drainCueAt = 0;
+  private drainCueDone = false;
   speed = 1;
   private visible = true;
   private fastForward = false;
@@ -99,6 +102,8 @@ export class Game extends Race {
     this.frameId = requestAnimationFrame((t) => this.frame(t));
   }
   prepare(stage: StageDef, names: string[]) {
+    this.drainCueAt = 0;
+    this.drainCueDone = false;
     this.stopRecording();
     this.fastForward = false;
     this.renderCache = new RenderCache();
@@ -201,7 +206,8 @@ export class Game extends Race {
       if (this.accumulator >= 1 / 60) this.accumulator %= 1 / 60;
     }
     if (this.state === 'running' || this.recording || this.renderDirty || this.cameraMoving ||
-      (this.winners.length && now - this.winnerAt < 1400) || now - this.lastFrameDraw >= 100) {
+      (this.winners.length && now - this.winnerAt < 1400) ||
+      (this.drainCueAt && now - this.drainCueAt < 450) || now - this.lastFrameDraw >= 100) {
       this.lastFrameDraw = now; this.renderDirty = false;
       this.render();
     }
@@ -209,6 +215,11 @@ export class Game extends Race {
   }
   advance() {
     super.advance();
+    if (!this.drainCueDone && this.stage.art?.style === 'infinite-funnel' && this.stage.exitBridge &&
+      this.balls.some(ball => ball.onBridge)) {
+      this.drainCueDone = true;
+      if (!this.reducedMotion?.matches) this.drainCueAt = performance.now();
+    }
     this.stepped = true;
     if (this.state === 'finished') {
       this.fastForward = false;
@@ -306,6 +317,8 @@ export class Game extends Race {
       ctx.fillText(b.name, x, y + 0.55);
       ctx.globalAlpha = 1;
     }
+    if (this.drainCueAt && !this.reducedMotion?.matches)
+      drawFunnelEntryCue(ctx, this.stage, (now - this.drainCueAt) / 1000, scale);
     ctx.restore();
     this.renderMinimap(entities, blend);
     this.springControls.setStatuses(this.springStatuses(undefined, entities));
@@ -335,7 +348,7 @@ export class Game extends Race {
         (performance.now() - this.winnerAt) / 1000,
         w,
         h,
-        this.reducedMotion,
+        this.reducedMotion?.matches ?? false,
         this.celebrationRightInset
       );
     }
