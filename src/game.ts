@@ -9,6 +9,7 @@ import { drawCelebration } from './celebration';
 import { Recorder } from './recorder';
 import { RenderCache } from './render-cache';
 import { drawMarble } from './marble-art';
+import { MarbleElasticity } from './marble-elasticity';
 import { getSceneTheme, sceneColor } from './scene-theme';
 import { drawFunnelEntryCue } from './funnel-art';
 import type { MapEntityState } from './types/MapEntity.type';
@@ -42,6 +43,7 @@ export class Game extends Race {
   private minimap = { x: 18, y: 20, w: 115, h: 400, scale: 4 };
   private frameId = 0;
   private renderCache = new RenderCache();
+  private marbleElasticity = new MarbleElasticity();
   private springControls: SpringControls;
   constructor(readonly canvas: HTMLCanvasElement) {
     super();
@@ -107,6 +109,7 @@ export class Game extends Race {
     this.stopRecording();
     this.fastForward = false;
     this.renderCache = new RenderCache();
+    this.marbleElasticity?.reset();
     this.accumulator = 0;
     this.stepped = false;
     this.manual = null;
@@ -135,6 +138,7 @@ export class Game extends Race {
     this.renderDirty = true;
     this.fastForward = false;
     super.pause();
+    this.marbleElasticity?.reset();
     this.accumulator = 0;
     this.stepped = false;
   }
@@ -215,6 +219,9 @@ export class Game extends Race {
   }
   advance() {
     super.advance();
+    const now = performance.now();
+    for (const ball of this.balls) if (!ball.rank)
+      this.marbleElasticity?.sample(ball.id, ball.x, ball.y, this.elapsed, now);
     if (!this.drainCueDone && this.stage.art?.style === 'infinite-funnel' && this.stage.exitBridge &&
       this.balls.some(ball => ball.onBridge)) {
       this.drainCueDone = true;
@@ -306,8 +313,9 @@ export class Game extends Race {
         x < view.left - labelMargin || x > view.right + labelMargin
       ) continue;
       ctx.globalAlpha = bridgeBallOpacity(this.stage, { x, y, onBridge: b.onBridge });
-      if (this.renderCache.drawBall(ctx, b, scale, d, x, y)) { ctx.globalAlpha = 1; continue; }
-      drawMarble(ctx, x, y, 0.25, b.color);
+      const squash = this.marbleElasticity?.effect(b.id, now, this.reducedMotion?.matches ?? false);
+      if (this.renderCache.drawBall(ctx, b, scale, d, x, y, squash)) { ctx.globalAlpha = 1; continue; }
+      drawMarble(ctx, x, y, 0.25, b.color, squash);
       ctx.fillStyle = beige ? '#44382d' : b.color;
       ctx.font = `${Math.min(17, Math.max(12, scale * 0.24)) / scale}px sans-serif`;
       ctx.textAlign = 'center';

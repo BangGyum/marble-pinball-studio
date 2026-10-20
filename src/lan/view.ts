@@ -6,6 +6,7 @@ import { drawCelebration } from '../celebration';
 import { drawFunnelEntryCue } from '../funnel-art';
 import { RenderCache } from '../render-cache';
 import { drawMarble } from '../marble-art';
+import { MarbleElasticity } from '../marble-elasticity';
 import { Recorder } from '../recorder';
 import { SnapshotPlayback } from './playback';
 import type { Scene, Frame } from './protocol';
@@ -40,6 +41,8 @@ export class LanView {
   private positions = new WeakMap<Frame, Map<number, [number, number]>>();
   private bridgeIds = new WeakMap<Frame, Set<number>>();
   private cache = new RenderCache();
+  private marbleElasticity = new MarbleElasticity();
+  private elasticFrameSeq = -1;
   private ctx: CanvasRenderingContext2D;
   private camera = { x: 12.85, y: 4 };
   private manual: { x: number; y: number } | null = null;
@@ -105,6 +108,9 @@ export class LanView {
     if (visible) { this.renderDirty = true; this.lastDraw = 0; }
   }
   setScene(scene: Scene) {
+    if (this.scene?.raceId !== scene.raceId || this.scene.revision !== scene.revision) {
+      this.marbleElasticity.reset(); this.elasticFrameSeq = -1;
+    }
     if (this.scene?.raceId !== scene.raceId) {
       this.drainCueAt = 0; this.drainCueDone = false;
       this.stopRecording(); this.winnerAt = 0; this.manual = null;
@@ -128,6 +134,7 @@ export class LanView {
     if (frame.state === 'finished' && this.state !== 'finished' && this.recording)
       this.recordStop = setTimeout(() => this.stopRecording(), 1800);
     if (frame.state !== this.state) this.renderDirty = true;
+    if (frame.state !== 'running') { this.marbleElasticity.reset(); this.elasticFrameSeq = -1; }
     this.springControls.setStatuses(frame.springs ?? []);
     this.state = frame.state; this.playback.push(frame);
   }
@@ -162,6 +169,11 @@ export class LanView {
     const sample = this.playback.sample(now);
     if (!scene || !sample) return;
     const { before, after, t, elapsed } = sample, shown = t >= 1 ? after : before;
+    if (this.state === 'running' && before.seq !== this.elasticFrameSeq) {
+      this.elasticFrameSeq = before.seq;
+      if (before.state === 'running') for (const [id, x, y, , rank] of before.balls)
+        if (!rank) this.marbleElasticity.sample(id, x, y, before.elapsed, now);
+    }
     this.playbackMoving = t < 1 || shown.state !== this.state;
     const mix = (a: number, b: number) => a + (b - a) * t;
     let bridgeIds = this.bridgeIds.get(shown);
@@ -220,8 +232,9 @@ export class LanView {
         ctx.strokeStyle = '#fff3a8'; ctx.lineWidth = 2 / scale; ctx.beginPath(); ctx.arc(ball.x, ball.y, .52, 0, Math.PI * 2); ctx.stroke();
       }
       ctx.globalAlpha = bridgeBallOpacity(scene.stage, ball);
-      if (!this.cache.drawBall(ctx, ball, scale, dpr)) {
-        drawMarble(ctx, ball.x, ball.y, .25, ball.color); ctx.fillStyle = ball.color;
+      const squash = this.marbleElasticity.effect(ball.id, now, this.reducedMotion?.matches ?? false);
+      if (!this.cache.drawBall(ctx, ball, scale, dpr, ball.x, ball.y, squash)) {
+        drawMarble(ctx, ball.x, ball.y, .25, ball.color, squash); ctx.fillStyle = ball.color;
         ctx.font = 12 / scale + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(ball.name, ball.x, ball.y + .55);
       }
       ctx.globalAlpha = 1;

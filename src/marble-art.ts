@@ -1,8 +1,14 @@
+import type { MarbleSquash } from './marble-elasticity';
+
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
-// The highlight stays in screen space; the physical collision radius remains unchanged.
-export function drawMarble(ctx: Context, x: number, y: number, radius: number, color: string) {
+// Deformation only affects the drawing; the physical collision radius remains unchanged.
+export function drawMarble(ctx: Context, x: number, y: number, radius: number, color: string, squash?: MarbleSquash) {
   ctx.save(); ctx.translate(x, y);
+  if (squash) {
+    ctx.rotate(squash.angle); ctx.scale(1 - squash.amount, 1 + squash.amount * 0.7);
+    ctx.rotate(-squash.angle);
+  }
   ctx.shadowColor = color; ctx.shadowBlur = Math.min(7, radius * 0.6);
   ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fillStyle = color; ctx.fill(); ctx.shadowBlur = 0;

@@ -6,6 +6,7 @@ import type { StageDef } from './data/maps';
 import type { MapEntityState } from './types/MapEntity.type';
 import { drawEntities } from './draw';
 import { drawMarble } from './marble-art';
+import type { MarbleSquash } from './marble-elasticity';
 import { getSceneTheme, type SceneTheme } from './scene-theme';
 
 type Sprite = { canvas: OffscreenCanvas; width: number; height: number; left: number; top: number };
@@ -22,7 +23,7 @@ export class RenderCache {
   private labels = new WeakMap<Ball, { key: string; sprite: Sprite }>();
   private minimap?: { stage: StageDef; scale: number; dpr: number; theme: SceneTheme; canvas: OffscreenCanvas; fixed: Set<MapEntityState['shape']> };
 
-  drawBall(ctx: CanvasRenderingContext2D, ball: Ball, scale: number, dpr: number, x = ball.x, y = ball.y) {
+  drawBall(ctx: CanvasRenderingContext2D, ball: Ball, scale: number, dpr: number, x = ball.x, y = ball.y, squash?: MarbleSquash) {
     // Older browsers can keep using the vector renderer.
     if (typeof OffscreenCanvas === 'undefined') return false;
     // Rasterize in small resolution buckets; continuous zoom reuses these bitmaps.
@@ -39,7 +40,15 @@ export class RenderCache {
       this.balls.set(ball, cached);
     }
     const marble = cached.sprite;
-    ctx.drawImage(marble.canvas, x - marble.left / resolution, y - marble.top / resolution, marble.width / resolution, marble.height / resolution);
+    if (squash) {
+      ctx.save(); ctx.translate(x, y); ctx.rotate(squash.angle);
+      ctx.scale(1 - squash.amount, 1 + squash.amount * 0.7);
+      ctx.rotate(-squash.angle);
+      ctx.drawImage(marble.canvas, -marble.left / resolution, -marble.top / resolution, marble.width / resolution, marble.height / resolution);
+      ctx.restore();
+    } else {
+      ctx.drawImage(marble.canvas, x - marble.left / resolution, y - marble.top / resolution, marble.width / resolution, marble.height / resolution);
+    }
     // Labels keep the original 12–17 CSS pixel policy, independently of marble zoom.
     const font = Math.min(17, Math.max(12, scale * 0.24)), rasterFont = Math.ceil(font);
     const labelKey = `${getSceneTheme()}/${rasterFont}/${dpr}/${ball.color}/${ball.name}`;
