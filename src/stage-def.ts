@@ -1,6 +1,6 @@
 import type { MapEntity } from './types/MapEntity.type';
 
-export const ART_STYLES = ['reversal-ladder', 'roundhouse', 'rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway', 'switchback-express', 'infinite-funnel', 'twin-funnel'] as const;
+export const ART_STYLES = ['reversal-ladder', 'roundhouse', 'rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway', 'switchback-express', 'infinite-funnel', 'twin-funnel', 'bounce-stairs'] as const;
 
 type BridgeArea = { x: number; y: number; width: number; height: number };
 type Bridge = { entry: BridgeArea; deck: [number, number][] };

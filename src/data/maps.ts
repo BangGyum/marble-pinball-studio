@@ -15,6 +15,7 @@ import { neonCrossway } from './neon-crossway';
 import { fractureCanyon } from './fracture-canyon';
 import { switchbackExpress } from './switchback-express';
 import { desireJar } from './desire-jar';
+import { bounceStairs } from './bounce-stairs';
 import type { StageDef } from '../stage-def';
 export { ART_STYLES, type StageDef, type WindZone } from '../stage-def';
 
@@ -36,6 +37,7 @@ export const stages: StageDef[] = [
   reversalLadder,
   infiniteFunnel,
   twinFunnel,
+  bounceStairs,
 ];
 
 export const hiddenStages: StageDef[] = [springLab, reversalLadder];

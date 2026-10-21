@@ -27,6 +27,7 @@ const details: Record<string, [string, string, string]> = {
   '균열 협곡': ['협곡 · 급강하', '깊은 암벽 사이의 경사 다리와 스프링 부스터를 달려요.', '#a8d898'],
   '네온 크로스웨이': ['교차 · 합류', '청록과 금빛 선로를 오가며 하나의 결승선으로 합류해요.', '#65e4f5'],
   '스위치백 익스프레스': ['철교 · 지름길', '밤의 철교를 따라 급커브를 돌고, 열린 지름길로 질주해요.', '#edcb8b'],
+  '반동 계단': ['연쇄 반발', '좌우 발판을 번갈아 튕기며 내려가는 탱탱볼 레이스.', '#ffc26e'],
 };
 
 function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {

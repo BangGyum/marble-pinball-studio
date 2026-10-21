@@ -11,6 +11,7 @@ import { clipOrbitalBridgeWalls, drawOrbitalArt } from './orbital-art';
 import { drawHourglassArt } from './hourglass-art';
 import { drawCanyonArt, drawCanyonDevices } from './canyon-art';
 import { drawEntities } from './draw';
+import { drawBounceStairsArt } from './bounce-stairs-art';
 import type { MapEntityState } from './types/MapEntity.type';
 import type { ViewBounds } from './art-visibility';
 
@@ -72,6 +73,7 @@ export function drawMapArt(
   if (stage.art.style === 'infinite-funnel') { drawFunnelArt(ctx, stage, 1, cacheBackground); return; }
   if (stage.art.style === 'reversal-ladder') { drawLadderArt(ctx, stage, cacheBackground); return; }
   if (stage.art.style === 'roundhouse') { drawRoundhouseArt(ctx, stage); return; }
+  if (stage.art.style === 'bounce-stairs') { drawBounceStairsArt(ctx, stage); return; }
   if (stage.art.style === 'switchback-express') { drawExpressArt(ctx, stage, cacheBackground); return; }
   if (stage.art.style === 'crossway') { drawCrosswayArt(ctx, stage, cacheBackground); return; }
   if (stage.art.style === 'fracture-canyon') { drawCanyonArt(ctx, stage, cacheBackground); return; }

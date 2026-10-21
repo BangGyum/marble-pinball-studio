@@ -64,7 +64,7 @@ async function connect(port, cookie, options = {}) {
       settings: { names: '가'.repeat(Math.ceil(MAX_LAN_MESSAGE_BYTES / 3)), mapId: 0, order: 'asc', picks: 1 } }),
     /너무 커서 전송할 수 없어요/, 'UTF-8 message size is rejected before opening a pending request');
     assert.equal(app.info().maps[0].title, '네온 잭팟', 'map order must never overwrite a different map title');
-    assert.equal(app.info().maps.length, 15);
+    assert.equal(app.info().maps.length, 16);
     assert.ok(!app.info().maps.some(map => ['네온 모래시계', '스프링 놀이터', '역전 사다리'].includes(map.title)));
     assert.ok(app.info().maps.every(map => stages[map.id].title === map.title), 'hidden maps do not shift the exposed LAN ids');
     const guestSession = await request(port, '/api/session', { method: 'POST' });
