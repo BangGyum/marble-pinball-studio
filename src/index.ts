@@ -8,6 +8,7 @@ import { Editor } from './editor';
 import { Rankings } from './rankings';
 import { MapGallery } from './map-gallery';
 import { initTheme } from './theme';
+import { ViewHistory } from './view-history';
 
 initTheme();
 const library = new MapLibrary(stages, hiddenStages);
@@ -68,7 +69,12 @@ const gallery = new MapGallery((id) => {
   showGame(true);
   prepare();
 });
+const viewHistory = new ViewHistory((view) => {
+  if (view === 'game') resumeGame();
+  else showGallery();
+});
 function showGame(fromMapSelection = false) {
+  viewHistory.enterGame();
   if (!fromMapSelection) gallery.transition.cancel();
   if (!galleryView.hidden) galleryScroll = window.scrollY;
   gallery.intro.stop();
@@ -79,7 +85,7 @@ function showGame(fromMapSelection = false) {
   window.scrollTo(0, 0);
   el('maps-open').focus({ preventScroll: true });
 }
-el('maps-open').addEventListener('click', () => {
+function showGallery() {
   gallery.transition.cancel();
   resumeAfterGallery = game.state === 'running';
   if (resumeAfterGallery) game.pause();
@@ -92,15 +98,17 @@ el('maps-open').addEventListener('click', () => {
   window.scrollTo(0, galleryScroll);
   gallery.focus(mapSelect.value, true);
   gallery.intro.play();
-});
+}
+el('maps-open').addEventListener('click', () => viewHistory.returnToGallery());
 el('maps-show-all').addEventListener('click', () => el<HTMLButtonElement>('maps-open').click());
-el('gallery-resume').addEventListener('click', () => {
+function resumeGame() {
   showGame();
   if (resumeAfterGallery && game.state === 'paused') {
     game.pause();
     el('pause').textContent = '일시정지';
   }
-});
+}
+el('gallery-resume').addEventListener('click', resumeGame);
 function setPanelCollapsed(collapsed: boolean) {
   if (collapsed && panel.contains(document.activeElement)) panelToggle.focus({ preventScroll: true });
   gameView.classList.toggle('controls-collapsed', collapsed);
