@@ -23,7 +23,8 @@ jobs:
       - run: yarn test
       - run: yarn build
       - name: Include dolphin effect preview
-        run: node -e "require('node:fs').cpSync('src/assets/effects/dolphin-v1', 'dist/effects/dolphin-v1', { recursive: true })"
+        run: |
+          node -e "require('node:fs').cpSync('src/assets/effects/dolphin-v1', 'dist/effects/dolphin-v1', { recursive: true })"
       - run: yarn build:lan
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
