@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>돌고래 스플래시 · 효과 시안</title>
+<style>
+  :root { color-scheme: dark; font: 15px/1.6 system-ui, 'Malgun Gothic', sans-serif; color: #e7edf3; background: #090d13; }
+  * { box-sizing: border-box; } body { margin: 0; } main { max-width: 1380px; padding: 36px; margin: auto; }
+  header { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 28px; }
+  .eyebrow { color: #82c6ce; font-size: 12px; letter-spacing: .12em; margin: 0 0 10px; }
+  h1 { font-size: clamp(26px, 3vw, 40px); line-height: 1.2; margin: 0 0 12px; } h2 { margin: 0; font-size: 16px; }
+  p { margin: 0; } .muted { color: #99a7b6; } .controls { display: flex; flex-wrap: wrap; gap: 8px; }
+  button { font: inherit; padding: 9px 14px; border: 1px solid #33414f; border-radius: 9px; background: #151f2b; color: inherit; cursor: pointer; white-space: nowrap; }
+  button[aria-pressed="true"] { background: #24484d; border-color: #7fc3ca; } button:hover { border-color: #a3ced2; }
+  button:focus-visible, input:focus-visible { outline: 2px solid #a3e0e4; outline-offset: 3px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .toolbar label { color: #a2b1c0; font-size: 13px; } input { accent-color: #7fc3ca; }
+  .stages, .assets { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel { overflow: hidden; border: 1px solid #2c3948; border-radius: 16px; background: #101923; }
+  .panel-head { display: flex; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid #263544; align-items: center; }
+  .panel-head span { font-size: 12px; color: #9babb9; } canvas { display: block; width: 100%; aspect-ratio: 640/340; }
+  .beige { background: #f4ede1; color: #473d31; border-color: #cfc0a5; } .beige .panel-head { border-color: #d7c9b2; }
+  .beige .panel-head span { color: #7a6951; } .notice { margin: 16px 0 32px; font-size: 13px; color: #a4b3c2; }
+  .assets { margin-top: 16px; } .asset-title { margin-top: 32px; } .samples { display: flex; align-items: center; justify-content: space-around; gap: 12px; padding: 24px 16px; min-height: 130px; flex-wrap: wrap; }
+  figure { margin: 0; text-align: center; } figure img { display: block; height: auto; } figcaption { font-size: 12px; color: #93a5b5; margin-top: 8px; }
+  .beige figcaption { color: #75664e; } .splash-row { border-top: 1px solid #293745; } .beige .splash-row { border-color: #d7c9b2; }
+  .spec { display: flex; gap: 20px; flex-wrap: wrap; padding: 20px 0; color: #a4b3c2; font-size: 13px; }
+  a { color: #a1dce2; } #load-state { color: #9dd9c6; } @media(max-width: 850px) { main { padding: 22px 16px; } header { display: block; } .controls { margin-top: 22px; } .stages, .assets { grid-template-columns: 1fr; } }
+</style>
+<main>
+  <header><div><p class="eyebrow">PAUL PINBALL / EFFECT CONCEPT 01</p><h1>돌고래 스플래시</h1><p class="muted">좌우에서 첨벙첨벙. 레일을 지나가며 공을 튕기는 공통 효과 시안.</p></div><div class="controls"><button id="left" aria-pressed="true">왼쪽에서 →</button><button id="right" aria-pressed="false">← 오른쪽에서</button><button id="pause">일시정지</button><button id="replay">다시 보기</button></div></header>
+  <div class="toolbar"><p id="load-state" role="status">투명 이미지 불러오는 중…</p><div class="controls"><button id="jump-still">도약 장면</button><button id="splash-still">첨벙 장면</button></div><label><input id="guide" type="checkbox" checked> 도약 경로 표시</label></div>
+  <section class="stages" aria-label="테마별 움직임 비교">
+    <article class="panel"><div class="panel-head"><h2>다크 테마</h2><span>본체 약 144px · 공 지름 18px</span></div><canvas id="dark" width="1280" height="680" aria-label="다크 배경의 돌고래 도약 시안"></canvas></article>
+    <article class="panel beige"><div class="panel-head"><h2>베이지 테마</h2><span>같은 PNG · 같은 움직임</span></div><canvas id="beige" width="1280" height="680" aria-label="베이지 배경의 돌고래 도약 시안"></canvas></article>
+  </section>
+  <p class="notice">이미지·움직임 검토용 별도 화면입니다. 공은 닿은 면과 돌고래의 이동 속도에 따라 반사됩니다. 실제 게임 물리에는 아직 연결하지 않았습니다. 동작 줄이기 설정에서는 멈춘 장면으로 시작합니다.</p>
+  <h2 class="asset-title">꼬리 형태 수정 전후</h2>
+  <section class="assets" aria-label="꼬리 수정 전후 비교">
+    <article class="panel"><div class="samples"><figure><img src="dolphin.png" width="240" alt="수정 전 위아래로 크게 벌어진 꼬리"><figcaption>수정 전</figcaption></figure><figure><img src="dolphin-tail-fixed.png" width="240" alt="수정 후 납작한 형태와 원근을 반영한 꼬리"><figcaption>수정 후 · 납작한 꼬리와 자연스러운 연결</figcaption></figure></div></article>
+    <article class="panel beige"><div class="samples"><figure><img src="dolphin.png" width="240" alt="베이지 배경 수정 전 돌고래"><figcaption>수정 전</figcaption></figure><figure><img src="dolphin-tail-fixed.png" width="240" alt="베이지 배경 수정 후 돌고래"><figcaption>수정 후</figcaption></figure></div></article>
+  </section>
+  <h2 class="asset-title">작은 크기와 투명 가장자리 확인</h2>
+  <section class="assets" aria-label="원본 이미지 축소 비교">
+    <article class="panel"><div class="samples"><figure><img src="dolphin-tail-fixed.png" width="96" alt="96픽셀 돌고래"><figcaption>96px</figcaption></figure><figure><img src="dolphin-tail-fixed.png" width="144" alt="144픽셀 돌고래"><figcaption>144px</figcaption></figure><figure><img src="dolphin-tail-fixed.png" width="192" alt="192픽셀 돌고래"><figcaption>192px</figcaption></figure></div><div class="samples splash-row"><figure><img src="splash.png" width="100" alt="100픽셀 물보라"><figcaption>물보라 100px</figcaption></figure><figure><img src="splash.png" width="160" alt="160픽셀 물보라"><figcaption>물보라 160px</figcaption></figure></div></article>
+    <article class="panel beige"><div class="samples"><figure><img src="dolphin-tail-fixed.png" width="96" alt="베이지 배경 96픽셀 돌고래"><figcaption>96px</figcaption></figure><figure><img src="dolphin-tail-fixed.png" width="144" alt="베이지 배경 144픽셀 돌고래"><figcaption>144px</figcaption></figure><figure><img src="dolphin-tail-fixed.png" width="192" alt="베이지 배경 192픽셀 돌고래"><figcaption>192px</figcaption></figure></div><div class="samples splash-row"><figure><img src="splash.png" width="100" alt="베이지 배경 100픽셀 물보라"><figcaption>물보라 100px</figcaption></figure><figure><img src="splash.png" width="160" alt="베이지 배경 160픽셀 물보라"><figcaption>물보라 160px</figcaption></figure></div></article>
+  </section>
+  <div class="spec"><span>등장 간격 20초 · 1마리 · 등장할 때 3회 도약</span><span>사용 소재: 투명 RGBA PNG 2장 / 각 1774 × 887</span><span>사용 소재 합계: 약 1.59 MiB · 비교용 이전 이미지는 별도</span><span>좌우 반전으로 본체 이미지 재사용</span><a href="asset-manifest.json">원본 프롬프트·적용 메모</a><a href="inspection.json">알파 검사 결과</a></div>
+</main>
+<script>
+  const W = 640, H = 340, duration = 5.8, cycle = 20, bodyWidth = 144;
+  const physicsStep = 1 / 240, ballRadius = 9, restitution = .55;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+  const loadState = document.getElementById('load-state'), pauseButton = document.getElementById('pause');
+  const guide = document.getElementById('guide');
+  let direction = 1, time = reduced.matches ? 2.9 : 0, paused = reduced.matches, previous = 0, frameId = 0;
+  let physicsAccumulator = 0;
+  let balls = [], dolphin, splash, ready = false;
+  function makeCanvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function sprite(image, rect, width) {
+    const c = makeCanvas(width, Math.round(width * rect[3] / rect[2]));
+    c.getContext('2d').drawImage(image, ...rect, 0, 0, c.width, c.height); return c;
+  }
+  function resetBalls() {
+    balls = [52, 82, 115, 284, 318, 351, 532, 566, 598].map((x, i) => ({
+      x: direction === 1 ? x : W - x, y: 141 + (i % 3) * 12, color: ['#8edcce', '#edcc86', '#b6a5e7'][i % 3], age: -1, vx: 0, vy: 0, hitAngle: 0, impact: 0,
+    }));
+  }
+  function pose(t) {
+    const p = Math.min(1, Math.max(0, t / duration)), hop = (p * 3) % 1;
+    // A smooth landing avoids an instantaneous rotation/velocity reversal between hops.
+    return { x: direction === 1 ? -80 + p * 800 : 720 - p * 800, y: 274 - Math.sin(hop * Math.PI) ** 2 * 145,
+      angle: Math.atan2(-145 * Math.PI * 3 / duration * Math.sin(hop * Math.PI * 2), 800 / duration) * .48 };
+  }
+  const views = ['dark', 'beige'].map(theme => {
+    const canvas = document.getElementById(theme), base = makeCanvas(W * 2, H * 2), ctx = base.getContext('2d'), light = theme === 'beige';
+    ctx.scale(2, 2); ctx.fillStyle = light ? '#f4ede1' : '#090f17'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = light ? '#ac97751a' : '#7399b113'; ctx.lineWidth = 1;
+    for (let x = 20; x < W; x += 32) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 20; y < H; y += 32) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+    const rails = new Path2D(); rails.moveTo(58, 80); rails.lineTo(175, 248); rails.moveTo(305, 64); rails.lineTo(305, 300);
+    rails.moveTo(416, 112); rails.lineTo(581, 230); rails.moveTo(415, 275); rails.quadraticCurveTo(502, 310, 590, 275);
+    ctx.strokeStyle = light ? '#87905236' : '#58e1cf22'; ctx.lineWidth = 12; ctx.lineCap = 'round'; ctx.stroke(rails);
+    ctx.strokeStyle = light ? '#78854f' : '#58cbbd'; ctx.lineWidth = 3; ctx.stroke(rails);
+    ctx.fillStyle = light ? '#73634e' : '#829baa'; ctx.font = '12px system-ui'; ctx.fillText('도약 중 벽·장치는 통과', 18, 26);
+    return { ctx: canvas.getContext('2d'), base, light };
+  });
+  function splashAt(ctx, x, age) {
+    if (age < 0 || age > .65) return;
+    const p = age / .65, w = 105 * (.45 + Math.sin(p * Math.PI / 2) * .7), h = w * splash.height / splash.width;
+    ctx.globalAlpha = (1 - p) * .92; ctx.drawImage(splash, x - w / 2, 281 - h, w, h); ctx.globalAlpha = 1;
+  }
+  function render() {
+    if (!ready) return;
+    const p = pose(time);
+    for (const { ctx, base, light } of views) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(base, 0, 0); ctx.setTransform(2, 0, 0, 2, 0, 0);
+      if (guide.checked) {
+        ctx.beginPath();
+        for (let i = 0; i <= 180; i++) { const q = pose(i / 180 * duration); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
+        ctx.setLineDash([3, 6]); ctx.strokeStyle = light ? '#8a7b6666' : '#9dbac166'; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
+      }
+      for (let hop = 1; hop < 3; hop++) splashAt(ctx, direction === 1 ? -80 + hop * 800 / 3 : 720 - hop * 800 / 3, time - hop * duration / 3);
+      if (time <= duration) {
+        ctx.save(); ctx.translate(p.x, p.y); ctx.scale(direction, 1); ctx.rotate(p.angle);
+        const h = bodyWidth * dolphin.height / dolphin.width;
+        ctx.drawImage(dolphin, -bodyWidth / 2, -h / 2, bodyWidth, h); ctx.restore();
+      }
+      for (const b of balls) {
+        const a = b.age, squash = a >= 0 ? Math.sin(Math.min(1, a / .14) * Math.PI) * b.impact : 0;
+        ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.hitAngle);
+        ctx.scale(1 - squash, 1 + squash * .7); ctx.rotate(-b.hitAngle);
+        const g = ctx.createRadialGradient(-3, -4, 1, 0, 0, 10); g.addColorStop(0, '#fff9ee'); g.addColorStop(.3, b.color); g.addColorStop(1, light ? '#685b4a' : '#344b61');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 0, 9, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+        if (a >= 0 && a < .32) { ctx.strokeStyle = light ? '#6a9ba2' : '#a9e5e6'; ctx.globalAlpha = 1 - a / .32; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(b.x, b.y, 12 + a * 35, 0, Math.PI * 2); ctx.stroke(); ctx.globalAlpha = 1; }
+      }
+      ctx.font = '12px system-ui'; ctx.fillStyle = light ? '#78644d' : '#91acb9'; ctx.fillText(direction === 1 ? '왼쪽 → 오른쪽' : '오른쪽 → 왼쪽', 18, H - 17);
+      ctx.textAlign = 'right'; ctx.fillText('시각 모형 · 실제 경기 미적용', W - 18, H - 17); ctx.textAlign = 'left';
+    }
+  }
+  function resolveContact(b, p, motion) {
+    const c = Math.cos(p.angle), s = Math.sin(p.angle);
+    const dx = (b.x - p.x) * direction, dy = b.y - p.y;
+    const x = dx * c + dy * s, y = -dx * s + dy * c;
+    // Rounded torso, matching the sprite's taper; fins remain decorative.
+    const ax = -38, ay = 10, sx = 86, sy = -10, radius = 14;
+    const t = Math.max(0, Math.min(1, ((x - ax) * sx + (y - ay) * sy) / (sx * sx + sy * sy)));
+    const qx = ax + sx * t, qy = ay + sy * t, distance = Math.hypot(x - qx, y - qy);
+    if (distance >= radius + ballRadius) return false;
+    const nx = distance > 1e-8 ? (x - qx) / distance : sy / Math.hypot(sx, sy);
+    const ny = distance > 1e-8 ? (y - qy) / distance : -sx / Math.hypot(sx, sy);
+    const normalX = direction * (c * nx - s * ny), normalY = s * nx + c * ny;
+    b.x += normalX * (radius + ballRadius - distance + .02);
+    b.y += normalY * (radius + ballRadius - distance + .02);
+    const localX = qx + nx * radius, localY = qy + ny * radius;
+    const rx = direction * (c * localX - s * localY), ry = s * localX + c * localY;
+    const surfaceX = motion.vx - motion.omega * ry, surfaceY = motion.vy + motion.omega * rx;
+    const inward = (b.vx - surfaceX) * normalX + (b.vy - surfaceY) * normalY;
+    // Separating contacts are only depenetrated, never launched a second time.
+    if (inward >= 0) return false;
+    const impulse = -(1 + (inward < -10 ? restitution : 0)) * inward;
+    b.vx += impulse * normalX; b.vy += impulse * normalY;
+    b.age = 0; b.hitAngle = Math.atan2(normalY, normalX); b.impact = Math.min(.12, -inward / 1200);
+    return true;
+  }
+  function stepPhysics(dt) {
+    const before = pose(time);
+    time += dt;
+    if (time + 1e-10 >= cycle) { time = 0; resetBalls(); return; }
+    const p = pose(time), motion = { vx: (p.x - before.x) / dt, vy: (p.y - before.y) / dt,
+      omega: direction * Math.atan2(Math.sin(p.angle - before.angle), Math.cos(p.angle - before.angle)) / dt };
+    for (const b of balls) {
+      if (b.age >= 0) { b.age += dt; b.vy += 190 * dt; b.x += b.vx * dt; b.y += b.vy * dt; }
+      if (time <= duration) resolveContact(b, p, motion);
+    }
+  }
+  function update(dt) {
+    physicsAccumulator += dt;
+    while (physicsAccumulator + 1e-12 >= physicsStep) {
+      stepPhysics(physicsStep); physicsAccumulator = Math.max(0, physicsAccumulator - physicsStep);
+    }
+  }
+  function tick(now) { frameId = 0; if (paused || document.hidden || !ready) return; const dt = previous ? Math.min(.04, (now - previous) / 1000) : 0; previous = now; update(dt); render(); frameId = requestAnimationFrame(tick); }
+  function schedule() { previous = 0; if (!frameId && !paused && !document.hidden && ready) frameId = requestAnimationFrame(tick); }
+  function restart(dir = direction) { direction = dir; time = 0; physicsAccumulator = 0; paused = false; resetBalls(); document.getElementById('left').setAttribute('aria-pressed', String(dir === 1)); document.getElementById('right').setAttribute('aria-pressed', String(dir === -1)); pauseButton.textContent = '일시정지'; render(); schedule(); }
+  document.getElementById('left').onclick = () => restart(1); document.getElementById('right').onclick = () => restart(-1);
+  document.getElementById('replay').onclick = () => restart();
+  function still(target) { paused = true; time = 0; physicsAccumulator = 0; resetBalls(); update(target); pauseButton.textContent = '계속 보기'; render(); }
+  document.getElementById('jump-still').onclick = () => still(duration / 2);
+  document.getElementById('splash-still').onclick = () => still(duration / 3 + .18);
+  pauseButton.onclick = () => { paused = !paused; pauseButton.textContent = paused ? '계속 보기' : '일시정지'; schedule(); };
+  guide.onchange = render;
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(frameId); frameId = 0; previous = 0; } else schedule(); });
+  reduced.addEventListener('change', () => { if (reduced.matches) { paused = true; pauseButton.textContent = '계속 보기'; } });
+  const bodyImage = new Image(), splashImage = new Image(); bodyImage.src = 'dolphin-tail-fixed.png'; splashImage.src = 'splash.png';
+  Promise.all([bodyImage.decode(), splashImage.decode()]).then(() => {
+    dolphin = sprite(bodyImage, [53, 102, 1675, 626], 384); splash = sprite(splashImage, [69, 133, 1651, 671], 320); ready = true;
+    resetBalls(); if (paused) still(time); pauseButton.textContent = paused ? '계속 보기' : '일시정지'; loadState.textContent = '이미지 2장 준비됨 · 좌우 방향을 바꿔 확인하세요'; render(); schedule();
+  }).catch(error => { loadState.textContent = '이미지를 불러오지 못했습니다: ' + error.message; });
+</script>
+</html>

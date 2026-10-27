@@ -1,0 +1,71 @@
+{
+  "name": "돌고래 스플래시",
+  "version": 2,
+  "created": "2026-10-23",
+  "updated": "2026-10-27",
+  "status": "visual-preparation-only",
+  "generatedWith": "Codex built-in image_gen; transparent_background=true",
+  "assets": {
+    "dolphin": {
+      "file": "dolphin-tail-fixed.png",
+      "editSource": "dolphin.png",
+      "editPrompt": "Use case: precise-object-edit.\nAsset type: transparent 2D dolphin game sprite, correction of the tail anatomy only.\nInput image 1: EDIT TARGET, the existing right-facing blue-grey dolphin PNG. Retain its existing sprite design.\nPrimary request: fix the LEFTMOST tail and its narrow connection to the body. The existing tail reads like an upright fish caudal fin with tall upper and lower lobes. Replace it with a believable dolphin's HORIZONTAL tail flukes: a flattened, gently swept-back transverse pair of flukes lying in the horizontal plane, like a small flat wing, with a shallow central trailing-edge notch. Show the tail slightly from above/three-quarter so the flattened top surface and foreshortened far fluke are readable, while the rest of the dolphin remains in its current side view. Make the tail compact, elegant and low in vertical profile. The tail should NOT be a tall vertical V, should NOT have one large fin pointing straight up and another straight down, and should NOT resemble a shark/fish tail. Connect it smoothly through a tapered, muscular tail stock with continuous blue shading; no abrupt pasted-on joint. Keep the tail comfortably inside the original padding.\nInvariants: change only the tail flukes and immediate narrow tail stock in the leftmost quarter. Preserve the head, face, eye, beak, smile, dorsal fin, visible front flipper, entire main body silhouette, ivory belly, exact sea-blue/teal and ivory color scheme, soft glossy cel shading, thin dark edge and lighting direction. Preserve the right-facing horizontal orientation and original body size and placement. Exactly one complete dolphin, entire body visible, same landscape 2:1 framing.\nBackground: real transparent alpha, preserve transparency. No water or splash, no ground or shadow outside the animal, no additional fins or limbs, no text, labels, arrows, checkerboard, border or watermark. The resulting tail must be anatomically readable even when the whole sprite is rendered only 120 to 144 pixels wide.",
+      "size": [
+        1774,
+        887
+      ],
+      "sourceRect": [
+        53,
+        102,
+        1675,
+        626
+      ],
+      "pivot": [
+        0.5,
+        0.5
+      ],
+      "facing": "right",
+      "leftDirection": "mirror horizontally at render time",
+      "proposedWorldWidth": 4,
+      "prompt": "Use case: stylized-concept.\nAsset type: production-ready isolated 2D dolphin sprite for a browser pinball game, transparent PNG.\nPrimary request: one playful dolphin that jumps across a pinball board and bumps marbles. Create ONLY the dolphin body; the game will rotate and mirror this sprite for jumps.\nComposition: ONE full-body dolphin in an exact side view, head facing RIGHT, tail extending LEFT, long body approximately horizontal with a very gentle upward arch. Compact believable dolphin anatomy: rounded forehead, short distinct dolphin beak, one dorsal fin, one visible near-side pectoral flipper, clearly readable two-lobed dolphin tail fluke, one small expressive dark eye with a highlight. Friendly confident expression, mouth closed.\nStyle: polished clean 2D game illustration with restrained soft cel shading and glossy highlights, smooth simple shapes, not photorealistic, not pixel art, not a plush toy, not an emoji. Readable at 120 pixels wide. Strong silhouette and clean antialiased edges.\nPalette: muted sea-teal and blue-grey upper body, light warm ivory underside, a thin deep blue-teal outline. Use natural subtle highlights, no neon aura. It must remain visible on both very dark blue-black and warm beige pinball backgrounds.\nFraming: landscape canvas, full subject centered, dolphin fills about 82 percent of canvas width, 10 percent clear padding on all sides; no cropped fins or tail. All empty space is actual transparent alpha.\nConstraints: exactly one dolphin, no water, no waves, no splashes, no droplets, no ground, no cast shadow outside the body, no surrounding scenery, no text, no letters, no arrows, no frame, no checkerboard pattern, no watermark. Do not add multiple animation frames or multiple dolphins. Background genuinely transparent."
+    },
+    "splash": {
+      "file": "splash.png",
+      "size": [
+        1774,
+        887
+      ],
+      "sourceRect": [
+        69,
+        133,
+        1651,
+        671
+      ],
+      "pivot": [
+        0.5,
+        0.96
+      ],
+      "proposedDurationMs": 550,
+      "prompt": "Use case: stylized-concept.\nAsset type: isolated water splash effect sprite for a polished 2D browser pinball game, transparent PNG.\nPrimary request: ONE compact splash burst that appears for half a second when a dolphin leaps into or out of an imaginary water surface. Only water, no dolphin.\nComposition: a low wide symmetrical semicircular crown of water, viewed from the side, with five to seven rounded upward/outward jets and a small handful of clearly separated large droplets. A thin shallow oval ripple at the bottom anchors the splash, without a solid pool. The center stays low and open so a moving dolphin remains readable above it. All parts fit in one compact cluster; landscape 2:1 composition.\nStyle: clean stylized game illustration, smooth cel-shaded translucent water, simple broad readable shapes, restrained glossy highlights and deep teal-blue edge accents. Match a soft blue-grey/sea-teal dolphin with an ivory belly. Readable at 90 to 140 pixels wide on both blue-black and warm beige backgrounds. Edges should be clearly defined rather than a huge glow or fine spray.\nPalette: muted turquoise-blue water, pale icy ivory-white highlights, subtle darker blue-teal contour accents. Moderate internal transparency; bright highlights can be opaque.\nFraming: centered, full splash and every droplet inside the frame, 10 percent clear padding.\nConstraints: actual transparent alpha background. No dolphin, no other animal, no marbles, no sea or large water surface, no ground plane, no text, no letters, no arrows, no interface, no checkerboard painted in, no shadow rectangle, no border, no watermark. Only one splash state, not a sprite sheet."
+    }
+  },
+  "preview": "preview.html",
+  "notes": [
+    "수정 전 dolphin.png를 비교용으로 보존하고 내장 이미지 생성 도구로 꼬리 형태를 수정한 dolphin-tail-fixed.png를 사용합니다. sourceRect는 눈에 보이는 알파 경계에 16px 여백을 더한 렌더링 영역입니다.",
+    "미리보기의 궤적·공 튕김은 이미지 검토용 연출이며 실제 게임 물리나 승률 검증 결과가 아닙니다.",
+    "미리보기는 등장 시작 기준 20초마다 1마리가 5.8초 동안 3회 도약하고, 다음 등장까지 14.2초 대기합니다. 다크·베이지 화면은 같은 한 마리의 동작을 비교 표시합니다.",
+    "미리보기는 1/240초 고정 스텝으로 몸통 접촉면과 돌고래의 이동·회전 속도를 반영해 공을 반사합니다. 접선 속도를 보존하고 이미 멀어지는 공은 다시 튕기지 않으며, 공을 1초 뒤 없애던 연출은 제거했습니다.",
+    "같은 본체를 좌우 반전하고 도약 접선에 맞춰 회전합니다. 물보라는 이륙/착지 시 짧게 확대 후 사라집니다.",
+    "사용 소재 2장 합계 1,671,535 bytes. 두 장을 그대로 디코딩하면 RGBA 버퍼 약 12MiB. 수정 전 비교용 이미지는 별도이며 실제 적용 전 축소 텍스처/전송 포맷 최적화를 권장합니다.",
+    "Pages 배포 설정에서 effects/dolphin-v1/preview.html로 별도 미리보기를 복사합니다. 실제 게임 번들에서는 참조하지 않으며 전체 맵 통합, 실제 프레임·승률 측정은 아직 하지 않았습니다."
+  ],
+  "integrationPlan": [
+    "맵별 장애물로 저장하지 않고 경기 공통 효과 설정으로 둡니다. 모든 맵에서 사용 가능하게 설계하되 실제 맵별 테스트가 필요합니다.",
+    "발동 시 경주의 공 위치로 월드좌표 궤적을 확정합니다. 관전자 카메라·창 크기·줌이 타격 대상을 바꾸지 않도록 합니다.",
+    "공만 대상으로 이동 구간 접촉 검사를 하고 한 번의 접촉마다 제한된 충격을 줍니다. 돌고래는 맵 충돌체를 만들지 않아 벽·회전 장치·다리를 통과합니다.",
+    "공은 기존 Box2D 충돌과 wall-guard 보호를 유지합니다. 이미 도착한 공은 제외하고 같은 공의 연속 중복 타격을 막아야 합니다.",
+    "Race의 고정 스텝에 공유 동작을 넣고 일반 Game과 LAN view는 그림만 표시합니다. LAN server가 발동·타격을 결정하고 이벤트를 동기화합니다.",
+    "IPhysics, Box2dPhysics, Race, Game, LAN protocol/client/view/server가 직접 영향 지점입니다. 이번 준비에서는 이 계약들을 바꾸지 않았습니다.",
+    "추후 검증: 좌우 동일 조건, 공 1/100/300개, 기본 16개·사용자 맵, 층간 다리, 벽 끼임/관통, 60/120Hz, 배속·일시정지·재시작, LAN 중도 입장."
+  ]
+}

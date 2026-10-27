@@ -19,8 +19,11 @@ jobs:
           node-version: '22'
       - run: npm install --global yarn@1.22.22
       - run: yarn install --frozen-lockfile
+      - run: node tests/dolphin-bounce.cjs
       - run: yarn test
       - run: yarn build
+      - name: Include dolphin effect preview
+        run: node -e "require('node:fs').cpSync('src/assets/effects/dolphin-v1', 'dist/effects/dolphin-v1', { recursive: true })"
       - run: yarn build:lan
       - uses: actions/upload-pages-artifact@v3
         if: github.event_name != 'pull_request'
