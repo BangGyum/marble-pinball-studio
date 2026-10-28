@@ -90,6 +90,13 @@ console.log('PASS dolphin glancing collision uses contact-normal reflection');
   }
   console.log('PASS 9/100 balls: identical 30/60/120/144Hz trajectories and left/right symmetry');
 
+  for (const fps of [20, 30, 60, 120, 144]) {
+    run('pose = originalPose; restart(1); previous = 1000;');
+    run(`for(let i=1;i<=${fps};i++) tick(1000+i*1000/${fps});`);
+    near(run('time'), 1, `animation clock keeps elapsed time at ${fps}Hz`);
+  }
+  console.log('PASS callback timing at 20/30/60/120/144Hz');
+
   run('direction = 1; pose = originalPose;');
   for (const landing of [5.8 / 3, 5.8 * 2 / 3]) {
     const a = run(`pose(${landing - 1e-5})`), b = run(`pose(${landing + 1e-5})`);
@@ -103,13 +110,33 @@ console.log('PASS dolphin glancing collision uses contact-normal reflection');
   assert.equal(run('balls.every(b => b.age === -1 && b.vx === 0 && b.vy === 0)'), true);
   run('still(2.9);'); near(run('time'), 2.9, 'still scene follows the same physics steps');
   assert.equal(run('paused'), true);
-  const circles = []; ctx.arc = (...args) => circles.push(args);
+  const positions = []; ctx.translate = (...args) => positions.push(args);
   run("balls=[{x:320,y:170,vx:0,vy:0,age:2,hitAngle:0,impact:0,color:'#8edcce'}]; render();");
-  assert.equal(circles.filter(c => c[2] === 9).length, 2, 'balls still render after one second in both themes');
+  assert.equal(positions.filter(p => p[0] === 320 && p[1] === 170).length, 2, 'balls still render after one second in both themes');
   console.log('PASS smooth landing, pause/restart, still scene and no timed ball disappearance');
+  let gradients = 0;
+  ctx.createRadialGradient = () => { gradients++; return { addColorStop() {} }; };
+  run("balls=Array.from({length:100},(_,i)=>({x:20+i%20*30,y:115+Math.floor(i/20)*16,age:-1,hitAngle:0,impact:0,color:'#39adce'})); guidePaths.clear(); render();");
+  const warmGradients = gradients;
+  run('for(let i=0;i<120;i++) render();');
+  assert.equal(gradients, warmGradients, '100 marbles reuse highlights over repeated frames');
+  assert.equal(run('guidePaths.size'), 1, 'both themes share a guide for the current direction');
+  positions.length = 0;
+  run("balls=[{x:320,y:1000,age:2,hitAngle:0,impact:0,color:'#39adce'}]; render();");
+  assert.equal(positions.filter(p => p[0] === 320 && p[1] === 1000).length, 0, 'offscreen marbles do not render');
+  console.log('PASS 100-marble highlight/guide reuse and offscreen culling');
+  run('restart(1); render(); restart(-1); render();');
+  const cacheSizes = run('[ballSprites.size, guidePaths.size].join()');
+  run('for(let i=0;i<10;i++){update(20);render();}');
+  near(run('time'), 0, 'ten full 20-second cycles reset without clock drift');
+  assert.equal(run('[ballSprites.size, guidePaths.size].join()'), cacheSizes, 'repeating the effect does not grow its caches');
+  assert.equal(run('balls.every(b=>[b.x,b.y,b.vx,b.vy].every(Number.isFinite))'), true);
+  console.log('PASS ten 20-second cycles without invalid state or cache growth');
   const output = path.join(__dirname, '../.test-build/dolphin-bounce'); fs.mkdirSync(output, { recursive: true });
   fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({ scope: 'Standalone dolphin preview only; not game/LAN integration',
     contactCases, participantCounts: [9, 100], displayRates: [30, 60, 120, 144], maxFpsDelta,
     tangentialSpeedBefore: 50, oldTangentialSpeedAfter: 103.74383331954519, tangentialSpeedAfter: 50,
-    separatingContacts: 'PASS', overlapCorrection: 'PASS', mirroredDirections: 'PASS', pauseRestart: 'PASS', noTimedFade: 'PASS' }, null, 2) + '\n');
+    separatingContacts: 'PASS', overlapCorrection: 'PASS', mirroredDirections: 'PASS', pauseRestart: 'PASS', noTimedFade: 'PASS',
+    callbackRates: [20, 30, 60, 120, 144], cachedHighlights: 'PASS', cachedGuide: 'PASS', offscreenCulling: 'PASS',
+    repeatedCycles: 10, cacheGrowth: 0 }, null, 2) + '\n');
 })().catch(error => { console.error(error); process.exitCode = 1; });
