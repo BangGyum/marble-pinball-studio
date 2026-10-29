@@ -98,6 +98,46 @@ console.log('PASS dolphin glancing collision uses contact-normal reflection');
   console.log('PASS callback timing at 20/30/60/120/144Hz');
 
   run('direction = 1; pose = originalPose;');
+  const arcSample = t => {
+    const h = .0001, a = run(`pose(${t - h})`), p = run(`pose(${t})`), b = run(`pose(${t + h})`);
+    return { ...p, vx: (b.x - a.x) / (2 * h), vy: (b.y - a.y) / (2 * h), ay: (b.y - 2 * p.y + a.y) / (h * h) };
+  };
+  const period = run('duration / 3'), rising = arcSample(period * .3), apex = arcSample(period * .5);
+  near(rising.ay, apex.ay, 'airborne arc has constant downward acceleration', .001);
+  assert.ok(apex.ay > 0, 'gravity continues pulling downward throughout the flight');
+  near(rising.angle, Math.atan2(rising.vy, rising.vx), 'body pitch follows the actual flight tangent', 1e-6);
+  near(apex.vy, 0, 'the crest has no vertical velocity', .00001);
+  const startPhase = run('airStart'), endPhase = run('airEnd'), surface = run('waterY');
+  const bodyHalfWidth = run('bodyWidth / 2'), bodyHalfHeight = bodyHalfWidth * 626 / 1675;
+  for (const turn of [period, 2 * period]) for (const offset of [-.03, 0, .03]) {
+    const p = run(`pose(${turn + offset})`);
+    const top = p.y - Math.abs(Math.sin(p.angle)) * bodyHalfWidth - Math.abs(Math.cos(p.angle)) * bodyHalfHeight;
+    assert.ok(top > surface, 'the entire sprite stays submerged briefly while turning toward the next jump');
+  }
+  for (const hop of [0, 1, 2]) for (const phase of [startPhase, endPhase]) {
+    const at = (hop + phase) * period, h = .00001;
+    const a = arcSample(at - h), b = arcSample(at + h), p = run(`pose(${at})`);
+    near(p.y, surface, 'splash event occurs at the water crossing', .000001);
+    near(a.vy, b.vy, 'water crossing keeps a continuous velocity', .02);
+    near(a.ay, b.ay, 'water crossing keeps continuous acceleration', 3);
+    assert.ok(Math.abs(a.angle - b.angle) < .001, 'water entry never snaps the body angle');
+    assert.ok(phase === startPhase ? a.vy < -100 : b.vy > 100, 'entry/exit retains momentum instead of hovering');
+  }
+  run('direction = 1;');
+  const underwaterBall = { x: 325 + normal.x * 22.5, y: surface + 45 + normal.y * 22.5,
+    vx: -normal.x * 100, vy: -normal.y * 100, age: -1 };
+  const underwaterBefore = { ...underwaterBall };
+  assert.equal(contact(underwaterBall, { x: 320, y: surface + 40, angle: 0 }, { vx: 0, vy: 0, omega: 0 }), false);
+  assert.deepEqual(underwaterBall, underwaterBefore, 'hidden submerged surfaces cannot push or teleport marbles');
+  for (const event of run('splashEvents')) {
+    const p = run(`pose(${event.at})`);
+    near(p.y + Math.sin(p.angle) * 62, surface, 'splash starts when the nose crosses the surface', .0001);
+    near(p.x + Math.cos(p.angle) * 62, event.x, 'splash is placed at the nose crossing', .0001);
+  }
+  console.log('PASS ballistic flight acceleration and tangent-aligned pitch');
+  console.log('PASS six continuous water crossings and no invisible submerged impact');
+
+  run('direction = 1; pose = originalPose;');
   for (const landing of [5.8 / 3, 5.8 * 2 / 3]) {
     const a = run(`pose(${landing - 1e-5})`), b = run(`pose(${landing + 1e-5})`);
     assert.ok(Math.abs(a.angle - b.angle) < .001, 'landing has no instant angle flip');
@@ -110,6 +150,9 @@ console.log('PASS dolphin glancing collision uses contact-normal reflection');
   assert.equal(run('balls.every(b => b.age === -1 && b.vx === 0 && b.vy === 0)'), true);
   run('still(2.9);'); near(run('time'), 2.9, 'still scene follows the same physics steps');
   assert.equal(run('paused'), true);
+  elements['splash-still'].onclick();
+  const entryAt = run('splashEvents[1].at');
+  assert.ok(run('time') > entryAt && run('time') < entryAt + .2, 'splash scene shows water entry');
   const positions = []; ctx.translate = (...args) => positions.push(args);
   run("balls=[{x:320,y:170,vx:0,vy:0,age:2,hitAngle:0,impact:0,color:'#8edcce'}]; render();");
   assert.equal(positions.filter(p => p[0] === 320 && p[1] === 170).length, 2, 'balls still render after one second in both themes');
@@ -138,5 +181,6 @@ console.log('PASS dolphin glancing collision uses contact-normal reflection');
     tangentialSpeedBefore: 50, oldTangentialSpeedAfter: 103.74383331954519, tangentialSpeedAfter: 50,
     separatingContacts: 'PASS', overlapCorrection: 'PASS', mirroredDirections: 'PASS', pauseRestart: 'PASS', noTimedFade: 'PASS',
     callbackRates: [20, 30, 60, 120, 144], cachedHighlights: 'PASS', cachedGuide: 'PASS', offscreenCulling: 'PASS',
-    repeatedCycles: 10, cacheGrowth: 0 }, null, 2) + '\n');
+    repeatedCycles: 10, cacheGrowth: 0, ballisticArc: 'PASS', tangentAlignedPitch: 'PASS',
+    continuousWaterCrossings: 6, submergedTurn: 'PASS', submergedImpact: 'blocked' }, null, 2) + '\n');
 })().catch(error => { console.error(error); process.exitCode = 1; });

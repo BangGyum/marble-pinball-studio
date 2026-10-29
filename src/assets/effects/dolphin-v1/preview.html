@@ -49,6 +49,10 @@
 </main>
 <script>
   const W = 640, H = 340, duration = 5.8, cycle = 20, bodyWidth = 144;
+  const hopPeriod = duration / 3, waterY = 230, jumpHeight = 90, swimPart = .30;
+  const airStart = swimPart / 2, airEnd = 1 - airStart, airTime = hopPeriod * (1 - swimPart);
+  const launchSpeed = 4 * jumpHeight / airTime, gravity = 8 * jumpHeight / (airTime * airTime);
+  const swimTime = hopPeriod * swimPart, swimA = launchSpeed * swimTime, swimB = swimA + gravity * swimTime * swimTime / 2;
   const physicsStep = 1 / 240, ballRadius = 9, restitution = .55;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const loadState = document.getElementById('load-state'), pauseButton = document.getElementById('pause');
@@ -67,11 +71,31 @@
     }));
   }
   function pose(t) {
-    const p = Math.min(1, Math.max(0, t / duration)), hop = (p * 3) % 1;
-    // A smooth landing avoids an instantaneous rotation/velocity reversal between hops.
-    return { x: direction === 1 ? -80 + p * 800 : 720 - p * 800, y: 274 - Math.sin(hop * Math.PI) ** 2 * 145,
-      angle: Math.atan2(-145 * Math.PI * 3 / duration * Math.sin(hop * Math.PI * 2), 800 / duration) * .48 };
+    const p = Math.min(1, Math.max(0, t / duration)), phase = (p * 3) % 1;
+    let y, vy;
+    if (phase >= airStart && phase <= airEnd) {
+      const u = (phase - airStart) / (airEnd - airStart);
+      y = waterY - 4 * jumpHeight * u * (1 - u);
+      vy = launchSpeed * (2 * u - 1);
+    } else {
+      // The short submerged turn matches flight position, velocity and acceleration at both ends.
+      const u = ((phase - airEnd + 1) % 1) / swimPart, bend = u * (1 - u);
+      y = waterY + swimA * bend + swimB * bend * bend;
+      vy = (1 - 2 * u) * (swimA + 2 * swimB * bend) / swimTime;
+    }
+    return { x: direction === 1 ? -80 + p * 800 : 720 - p * 800, y, angle: Math.atan2(vy, 800 / duration) };
   }
+  const splashEvents = Array.from({ length: 6 }, (_, i) => {
+    const hop = Math.floor(i / 2), exiting = i % 2 === 0;
+    let lo = (hop + (exiting ? 0 : .5)) * hopPeriod, hi = (hop + (exiting ? airStart : airEnd)) * hopPeriod;
+    // The nose crosses first; waiting for the body's center makes the splash visibly late.
+    for (let j = 0; j < 24; j++) {
+      const at = (lo + hi) / 2, p = pose(at), frontY = p.y + Math.sin(p.angle) * 62;
+      if (exiting ? frontY > waterY : frontY < waterY) lo = at; else hi = at;
+    }
+    const at = (lo + hi) / 2, p = pose(at);
+    return { at, x: p.x + Math.cos(p.angle) * 62 };
+  });
   const views = ['dark', 'beige'].map(theme => {
     const canvas = document.getElementById(theme), base = makeCanvas(W * 2, H * 2), ctx = base.getContext('2d'), light = theme === 'beige';
     ctx.scale(2, 2); ctx.fillStyle = light ? '#f4ede1' : '#090f17'; ctx.fillRect(0, 0, W, H);
@@ -100,7 +124,7 @@
   function splashAt(ctx, x, age) {
     if (age < 0 || age > .65) return;
     const p = age / .65, w = 105 * (.45 + Math.sin(p * Math.PI / 2) * .7), h = w * splash.height / splash.width;
-    ctx.globalAlpha = (1 - p) * .92; ctx.drawImage(splash, x - w / 2, 281 - h, w, h); ctx.globalAlpha = 1;
+    ctx.globalAlpha = Math.min(1, age / .045) * (1 - p) * .92; ctx.drawImage(splash, x - w / 2, waterY + 4 - h, w, h); ctx.globalAlpha = 1;
   }
   function render() {
     if (!ready) return;
@@ -115,9 +139,11 @@
         }
         ctx.setLineDash([3, 6]); ctx.strokeStyle = light ? '#8a7b6666' : '#9dbac166'; ctx.lineWidth = 1; ctx.stroke(guidePaths.get(direction)); ctx.setLineDash([]);
       }
-      for (let hop = 1; hop < 3; hop++) splashAt(ctx, direction === 1 ? -80 + hop * 800 / 3 : 720 - hop * 800 / 3, time - hop * duration / 3);
+      for (const event of splashEvents) if (time >= event.at && time - event.at <= .65)
+        splashAt(ctx, direction === 1 ? event.x : W - event.x, time - event.at);
       if (time <= duration) {
-        ctx.save(); ctx.translate(p.x, p.y); ctx.scale(direction, 1); ctx.rotate(p.angle);
+        ctx.save(); ctx.beginPath(); ctx.rect(0, 0, W, waterY); ctx.clip();
+        ctx.translate(p.x, p.y); ctx.scale(direction, 1); ctx.rotate(p.angle);
         const h = bodyWidth * dolphin.height / dolphin.width;
         ctx.drawImage(dolphin, -bodyWidth / 2, -h / 2, bodyWidth, h); ctx.restore();
       }
@@ -146,10 +172,12 @@
     const nx = distance > 1e-8 ? (x - qx) / distance : sy / Math.hypot(sx, sy);
     const ny = distance > 1e-8 ? (y - qy) / distance : -sx / Math.hypot(sx, sy);
     const normalX = direction * (c * nx - s * ny), normalY = s * nx + c * ny;
-    b.x += normalX * (radius + ballRadius - distance + .02);
-    b.y += normalY * (radius + ballRadius - distance + .02);
     const localX = qx + nx * radius, localY = qy + ny * radius;
     const rx = direction * (c * localX - s * localY), ry = s * localX + c * localY;
+    // Submerged sprite parts are clipped from view and must not strike marbles invisibly.
+    if (p.y + ry > waterY) return false;
+    b.x += normalX * (radius + ballRadius - distance + .02);
+    b.y += normalY * (radius + ballRadius - distance + .02);
     const surfaceX = motion.vx - motion.omega * ry, surfaceY = motion.vy + motion.omega * rx;
     const inward = (b.vx - surfaceX) * normalX + (b.vy - surfaceY) * normalY;
     // Separating contacts are only depenetrated, never launched a second time.
@@ -183,7 +211,7 @@
   document.getElementById('replay').onclick = () => restart();
   function still(target) { paused = true; time = 0; physicsAccumulator = 0; resetBalls(); update(target); pauseButton.textContent = '계속 보기'; render(); }
   document.getElementById('jump-still').onclick = () => still(duration / 2);
-  document.getElementById('splash-still').onclick = () => still(duration / 3 + .18);
+  document.getElementById('splash-still').onclick = () => still(splashEvents[1].at + .14);
   pauseButton.onclick = () => { paused = !paused; pauseButton.textContent = paused ? '계속 보기' : '일시정지'; schedule(); };
   guide.onchange = render;
   document.addEventListener('visibilitychange', () => { if (document.hidden) { cancelAnimationFrame(frameId); frameId = 0; previous = 0; } else schedule(); });

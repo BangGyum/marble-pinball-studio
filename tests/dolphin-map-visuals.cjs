@@ -37,6 +37,7 @@ vm.runInContext(previewSource, preview);
 const W = 1000, H = 600, duration = vm.runInContext('duration', preview);
 const previewScale = manifest.assets.dolphin.proposedWorldWidth / vm.runInContext('bodyWidth', preview);
 const previewCenter = vm.runInContext('pose(duration / 2)', preview);
+const previewWaterY = vm.runInContext('waterY', preview), previewSplash = vm.runInContext('splashEvents[2]', preview);
 const views = new Map(), gallery = [];
 for (const theme of ['dark', 'beige']) views.set(theme, createCanvas(1600, Math.ceil(stages.length / 4) * 240));
 function pose(time, direction, anchor) {
@@ -46,8 +47,9 @@ function pose(time, direction, anchor) {
 function render(race, anchor, body, splash, theme, zoom, direction, phase) {
   setSceneTheme(theme);
   const canvas = createCanvas(W, H), ctx = canvas.getContext('2d'), stage = race.stage;
-  const time = phase === 'jump' ? duration / 2 : duration / 3 + .18;
+  const time = phase === 'jump' ? duration / 2 : previewSplash.at + .18;
   const p = pose(time, direction, anchor), scale = Math.min(W / 20, H / 13, 70) * zoom;
+  const surface = anchor.y + (previewWaterY - previewCenter.y) * previewScale;
   // Fixed world path; changing zoom or theme never changes the object's world position.
   const cam = phase === 'jump' ? anchor : { x: p.x, y: p.y };
   const view = { left: cam.x - W * .56 / scale, right: cam.x + W * .44 / scale,
@@ -62,13 +64,14 @@ function render(race, anchor, body, splash, theme, zoom, direction, phase) {
   drawMapOverlay(ctx, stage, entities, scale, true, view);
   ctx.shadowBlur = 0;
   if (phase === 'splash') {
-    const age = .18 / .65, width = 2.9 * (.45 + Math.sin(age * Math.PI / 2) * .7), height = width * splash.height / splash.width;
+    const age = .18 / .65, width = 105 * previewScale * (.45 + Math.sin(age * Math.PI / 2) * .7), height = width * splash.height / splash.width;
     ctx.save(); ctx.globalAlpha = (1 - age) * .92;
-    const landing = pose(duration / 3, direction, anchor);
-    ctx.drawImage(splash, landing.x - width / 2, landing.y + .2 - height, width, height); ctx.restore();
+    const splashX = anchor.x + direction * (previewSplash.x - previewCenter.x) * previewScale;
+    ctx.drawImage(splash, splashX - width / 2, surface + 4 * previewScale - height, width, height); ctx.restore();
   }
   const before = ctx.getTransform(), width = manifest.assets.dolphin.proposedWorldWidth;
-  ctx.save(); ctx.translate(p.x, p.y); ctx.scale(direction, 1); ctx.rotate(p.angle);
+  ctx.save(); ctx.beginPath(); ctx.rect(view.left, view.top, view.right - view.left, Math.max(0, surface - view.top)); ctx.clip();
+  ctx.translate(p.x, p.y); ctx.scale(direction, 1); ctx.rotate(p.angle);
   ctx.drawImage(body, -width / 2, -width * body.height / body.width / 2, width, width * body.height / body.width);
   ctx.restore();
   const after = ctx.getTransform();
