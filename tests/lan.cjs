@@ -3,7 +3,7 @@ const http = require('node:http');
 const { WebSocket } = require('ws');
 const { createLanServer } = require('../server/lan.cjs');
 const { DEFAULT_MAP_INDEX, stages } = require('../.lan-build/data/maps.js');
-const { MAX_LAN_MESSAGE_BYTES, serializeCommand } = require('../.lan-build/lan/protocol.js');
+const { MAX_LAN_MESSAGE_BYTES, decodeScene, serializeCommand } = require('../.lan-build/lan/protocol.js');
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function request(port, route, { method = 'GET', cookie, host = `127.0.0.1:${port}`, origin = `http://${host}`, address = '127.0.0.1' } = {}) {
@@ -18,12 +18,12 @@ function request(port, route, { method = 'GET', cookie, host = `127.0.0.1:${port
 let nextId = 0;
 async function connect(port, cookie, options = {}) {
   const ws = new WebSocket(`ws://127.0.0.1:${port}/live`, { headers: { Cookie: cookie, Origin: options.origin ?? `http://127.0.0.1:${port}` } });
-  const client = { ws, messages: [], frame: null, scene: null, identity: null, bytes: 0 };
+  const client = { ws, messages: [], frame: null, scene: null, rawScene: null, identity: null, bytes: 0 };
   ws.on('message', (raw) => {
     const msg = JSON.parse(raw); client.messages.push(msg); client.bytes += raw.length;
     if (client.messages.length > 1000) client.messages.shift();
     if (msg.type === 'frame') client.frame = msg;
-    if (msg.type === 'scene') client.scene = msg;
+    if (msg.type === 'scene') { client.rawScene = msg; client.scene = decodeScene(msg); }
     if (msg.type === 'identity') client.identity = msg;
   });
   client.until = async (predicate, timeout = 5000) => {
@@ -174,6 +174,12 @@ async function connect(port, cookie, options = {}) {
     await guest2.until(() => guest2.scene.stage.title === custom.title);
     assert.equal(app.race.stage.title, custom.title);
     assert.deepEqual(guest2.scene.settings.stage, { ...custom, zoomY: custom.goalY - 5 }, 'editor map uses the same normalization as saved maps');
+    assert.equal(guest2.rawScene.settings.stage, undefined, 'the stage is not repeated in scene settings');
+    assert.ok(guest2.rawScene.entities.every(e => e.shapeIndex !== undefined || e.shape), 'every entity resolves a shape');
+    assert.deepEqual(guest2.scene.entities.map(e => e.shape), app.race.physics.getEntities().map(e => e.shape),
+      'compact entity shapes reconstruct the authoritative scene');
+    assert.ok(Buffer.byteLength(JSON.stringify(guest2.rawScene)) < Buffer.byteLength(JSON.stringify(guest2.scene)) * 0.7,
+      'the custom map scene is materially smaller on the wire');
     assert.equal((await guest2.command({ type: 'configure', settings: { ...settings, stage: custom } })).ok, false);
     const rapids = stages.find(s => s.title === '지그재그 급류');
     assert.equal((await host.command({ type: 'configure', settings: { ...settings, stage: rapids } })).ok, true);

@@ -1,11 +1,11 @@
-import type { Frame, Scene } from '../src/lan/protocol';
+import type { Frame, WireScene } from '../src/lan/protocol';
 import { SnapshotPlayback } from '../src/lan/playback';
 import { legacyElapsed } from './legacy-lan-playback';
 const playback = new SnapshotPlayback();
 const canvas = document.getElementById('motion') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d')!;
 const output = document.getElementById('metrics')!;
-let frames: Frame[] = [], received = 0, scene: Scene | undefined, lastNow = 0, lastElapsed = 0, lastSmooth = 0, began = 0;
+let frames: Frame[] = [], received = 0, scene: WireScene | undefined, lastNow = 0, lastElapsed = 0, lastSmooth = 0, began = 0;
 let speeds: number[] = [], smoothSpeeds: number[] = [], paints: number[] = [], packets: number[] = [], serverSpeeds: number[] = [];
 const reset = () => { speeds = []; smoothSpeeds = []; paints = []; packets = []; serverSpeeds = []; lastNow = 0; began = performance.now(); };
 document.getElementById('clear')!.addEventListener('click', reset);
@@ -21,7 +21,7 @@ async function connect() {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const socket = new WebSocket(`ws://${location.host}/live`);
   socket.onmessage = (event) => {
-    const message = JSON.parse(event.data) as Frame | Scene;
+    const message = JSON.parse(event.data) as Frame | WireScene;
     if (message.type === 'scene') {
       if (scene?.raceId !== message.raceId || scene.revision !== message.revision) { frames = []; playback.reset(); reset(); }
       scene = message;

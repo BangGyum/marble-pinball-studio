@@ -9,6 +9,8 @@ import { Rankings } from './rankings';
 import { MapGallery } from './map-gallery';
 import { initTheme } from './theme';
 import { ViewHistory } from './view-history';
+import { DolphinSettingsPanel } from './dolphin-settings';
+import './dolphin.css';
 
 initTheme();
 const library = new MapLibrary(stages, hiddenStages);
@@ -56,6 +58,12 @@ winnerCount.addEventListener('change', () => (preferredWinnerCount = Number(winn
 const initialMapIndex = DEFAULT_MAP_INDEX;
 let currentStage: StageDef = stages[initialMapIndex];
 let initialized = false;
+const dolphinPanel = new DolphinSettingsPanel(el('dolphin-settings'), settings => {
+  if (!initialized) return;
+  if (game.state === 'finished') prepare();
+  game.setDolphins(settings);
+}, show => game.setDolphinPreview(show), () => game.showDolphinLayout());
+game.onDolphinChange = settings => dolphinPanel.moved(settings);
 const gameView = el('game-view'),
   panel = el('control-panel'),
   panelToggle = el<HTMLButtonElement>('panel-toggle');
@@ -146,6 +154,7 @@ function updateStandings() {
   rankings.update(game);
 }
 function lockControls(locked: boolean) {
+  dolphinPanel.setLocked(locked);
   for (const id of [
     'names',
     'map-select',
@@ -167,7 +176,8 @@ function prepare() {
   if (!initialized) return;
   try {
     const list = parseNames(names.value);
-    game.prepare(currentStage, list);
+    dolphinPanel.setStage(currentStage);
+    game.prepare(currentStage, list, dolphinPanel.value);
     updateWinnerCount(list.length);
     updateStandings();
     el('count').textContent = `${list.length}개의 구슬`;
@@ -196,7 +206,7 @@ mapSelect.addEventListener('change', () => {
   prepare();
 });
 el('speed').addEventListener('change', () => (game.speed = Number(el<HTMLSelectElement>('speed').value)));
-el('follow').addEventListener('click', () => game.follow());
+el('follow').addEventListener('click', () => game.follow(true));
 el('pause').addEventListener('click', () => {
   game.pause();
   el('pause').textContent = game.state === 'paused' ? '계속하기' : '일시정지';
@@ -210,7 +220,8 @@ function startRace() {
   updateWinnerCount(list.length);
   const order = mode.value as WinnerOrder;
   const range = winningRange(order, list.length, Number(winnerCount.value));
-  game.prepare(currentStage, list);
+  dolphinPanel.setStage(currentStage);
+  game.prepare(currentStage, list, dolphinPanel.value);
   game.start(range, record.checked, order);
   updateStandings();
   setPanelCollapsed(true);

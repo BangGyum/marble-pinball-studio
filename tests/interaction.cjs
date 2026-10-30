@@ -318,6 +318,7 @@ for (const range of [
   const race = Object.create(Game.prototype);
   Object.assign(race, {
     state: 'running',
+    dolphins: { enabled: false, rows: [], interval: 20 },
     elapsed: 0,
     range,
     stage: { goalY: 10 },

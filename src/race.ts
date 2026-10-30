@@ -4,6 +4,7 @@ import type { IPhysics } from './IPhysics';
 import type { StageDef } from './data/maps';
 import { shuffled, type WinnerOrder } from './model';
 import { WallGuard, WALL_GUARD_MAX_SPEED } from './wall-guard';
+import { dolphinBounce, dolphinPose, dolphinWave, DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from './dolphin';
 
 export type Ball = {
   id: number;
@@ -66,6 +67,8 @@ export class Race {
   protected winnerOrder: WinnerOrder = 'asc';
   range: [number, number] = [1, 1];
   elapsed = 0;
+  dolphins: DolphinSettings = { enabled: false, rows: [], interval: 20 };
+  private dolphinContacts = new Set<string>();
   onFinish: (winners: Ball[]) => void = () => {};
   private walls?: WallGuard;
   private progressAt = 0;
@@ -74,10 +77,13 @@ export class Race {
   // A wedged marble must also outlast every periodic device that could still free it.
   private trapSeconds = 60;
 
-  prepare(stage: StageDef, names: string[]) {
+  prepare(stage: StageDef, names: string[], dolphins?: DolphinSettings) {
+    const effect = validateDolphins(dolphins, stage);
     this.springCooldowns.reset();
     this.state = 'ready';
     this.stage = stage;
+    this.dolphins = effect;
+    this.dolphinContacts = new Set();
     this.arrivals = [];
     this.winners = [];
     this.winnerAt = 0;
@@ -136,7 +142,7 @@ export class Race {
   }
 
   advance() {
-    this.physics.step(STEP);
+    this.physics.step(STEP, this.dolphins.enabled ? (dt, offset) => this.stepDolphins(dt, this.elapsed + offset) : undefined);
     this.elapsed += STEP;
     const crossing: { ball: Ball; fraction: number }[] = [];
     let trapped = true;
@@ -215,5 +221,29 @@ export class Race {
     ball.rank = this.arrivals.length + 1;
     this.arrivals.push(ball);
     this.physics.removeMarble(ball.id);
+  }
+  private stepDolphins(dt: number, elapsed: number) {
+    const { wave, time } = dolphinWave(this.dolphins, elapsed);
+    if (time + dt > DOLPHIN_DURATION) { this.dolphinContacts.clear(); return; }
+    const touching = new Set<string>();
+    const poses = this.dolphins.rows.map((row, index) => {
+      const direction = (wave + index) % 2 ? -1 : 1;
+      const before = dolphinPose(this.stage, row, time, direction), p = dolphinPose(this.stage, row, time + dt, direction);
+      const motion = { vx: (p.x - before.x) / dt, vy: (p.y - before.y) / dt,
+        omega: direction * Math.atan2(Math.sin(p.angle - before.angle), Math.cos(p.angle - before.angle)) / dt };
+      return { p, motion, index };
+    });
+    for (const ball of this.balls) {
+      if (ball.rank) continue;
+      const pos = this.physics.getMarblePosition(ball.id);
+      for (const { p, motion, index } of poses) {
+        if (Math.abs(pos.x - p.x) > 3 || Math.abs(pos.y - p.y) > 3) continue;
+        const contact = dolphinBounce({ ...pos, ...this.physics.getMarbleVelocity(ball.id) }, p, motion);
+        if (!contact) continue;
+        const key = `${index}:${ball.id}`; touching.add(key);
+        if (contact.hit && !this.dolphinContacts.has(key)) this.physics.setMarbleVelocity(ball.id, contact.vx, contact.vy);
+      }
+    }
+    this.dolphinContacts = touching;
   }
 }

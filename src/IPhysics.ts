@@ -22,6 +22,10 @@ export interface IPhysics {
 
   getMarbleSpeed(id: number): number;
 
+  getMarbleVelocity(id: number): { vx: number; vy: number };
+
+  setMarbleVelocity(id: number, vx: number, vy: number): void;
+
   placeMarble(id: number, x: number, y: number): void;
 
   isMarbleOnBridge(id: number): boolean;
@@ -35,5 +39,5 @@ export interface IPhysics {
 
   start(): void;
 
-  step(deltaSeconds: number): void;
+  step(deltaSeconds: number, beforeSubstep?: (dt: number, offset: number) => void): void;
 }

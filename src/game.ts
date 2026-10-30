@@ -12,6 +12,9 @@ import { drawMarble } from './marble-art';
 import { MarbleElasticity } from './marble-elasticity';
 import { getSceneTheme, sceneColor } from './scene-theme';
 import { drawFunnelEntryCue } from './funnel-art';
+import { validateDolphins, type DolphinSettings } from './dolphin';
+import { DolphinRenderer } from './dolphin-render';
+import { DolphinDrag } from './dolphin-drag';
 import type { MapEntityState } from './types/MapEntity.type';
 export type { Ball } from './race';
 export class Game extends Race {
@@ -45,8 +48,19 @@ export class Game extends Race {
   private renderCache = new RenderCache();
   private marbleElasticity = new MarbleElasticity();
   private springControls: SpringControls;
+  private dolphinRenderer = new DolphinRenderer();
+  private dolphinDrag: DolphinDrag;
+  private dolphinOverview = false;
+  private dolphinPreview = true;
+  private readyCamera = { x: 12.85, y: 3 };
+  onDolphinChange: (settings: DolphinSettings, commit: boolean) => void = () => {};
   constructor(readonly canvas: HTMLCanvasElement) {
     super();
+    this.dolphinDrag = new DolphinDrag(canvas, () => this.state === 'ready' && this.dolphinPreview,
+      () => this.dolphins, () => this.stage, (index, y, commit) => {
+        const rows = [...this.dolphins.rows]; rows[index] = y;
+        this.setDolphins({ ...this.dolphins, rows }); this.onDolphinChange(this.dolphins, commit);
+      });
     this.springControls = new SpringControls(canvas, index => this.activateSpring(index), () => this.state === 'running');
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     window.addEventListener('pinball-theme-change', () => { this.renderDirty = true; });
@@ -103,7 +117,8 @@ export class Game extends Race {
     this.resize();
     this.frameId = requestAnimationFrame((t) => this.frame(t));
   }
-  prepare(stage: StageDef, names: string[]) {
+  prepare(stage: StageDef, names: string[], dolphins?: DolphinSettings) {
+    this.dolphinOverview = false;
     this.drainCueAt = 0;
     this.drainCueDone = false;
     this.stopRecording();
@@ -114,18 +129,35 @@ export class Game extends Race {
     this.stepped = false;
     this.manual = null;
     this.springControls.reset();
-    super.prepare(stage, names);
+    super.prepare(stage, names, dolphins);
     const rows = Math.ceil(names.length / 10);
     const spawnOffset = (stage.spawnX ?? 12.85) - 12.85;
     this.camera = {
       x: spawnOffset + (names.length < 10 ? 10.1 + (Math.max(1, names.length) - 1) * 0.305 : 12.85),
       y: 5 - (rows - 1) * 0.31,
     };
+    this.readyCamera = { ...this.camera };
     this.render();
+  }
+  setDolphins(settings: DolphinSettings) {
+    if (this.state !== 'ready') return;
+    this.dolphins = validateDolphins(settings, this.stage);
+    if (!settings.enabled && this.dolphinOverview) { this.dolphinOverview = false; this.camera = { ...this.readyCamera }; this.manual = null; }
+    this.renderDirty = true; this.render();
+  }
+  setDolphinPreview(show: boolean) { this.dolphinPreview = show; this.renderDirty = true; }
+  showDolphinLayout() {
+    if (this.state !== 'ready' || !this.dolphins.enabled) return;
+    this.dolphinOverview = true; this.manual = null;
+    this.zoom = 1; this.onZoomChange(1);
+    this.camera = { x: (this.stage.width ?? 26) / 2, y: this.stage.goalY / 2 - this.height * .07 / this.viewScale() };
+    this.renderDirty = true; this.render();
   }
   start(range: [number, number], record: boolean, order: WinnerOrder = 'asc') {
     if (!this.balls.length) throw new Error('참가자 이름을 먼저 입력해 주세요.');
     this.fastForward = false;
+    if (this.dolphinOverview) this.camera = { ...this.readyCamera };
+    this.dolphinOverview = false; this.manual = null;
     this.accumulator = 0;
     this.stepped = false;
     if (record) {
@@ -142,7 +174,8 @@ export class Game extends Race {
     this.accumulator = 0;
     this.stepped = false;
   }
-  follow() {
+  follow(closeOverview = false) {
+    if (closeOverview && this.state === 'ready' && this.dolphinOverview) { this.dolphinOverview = false; this.camera = { ...this.readyCamera }; }
     this.manual = null;
     this.renderDirty = true;
   }
@@ -162,6 +195,8 @@ export class Game extends Race {
     }
   }
   private viewScale() {
+    if (this.state === 'ready' && this.dolphinOverview)
+      return Math.min(Math.max(1, this.width - 180) / ((this.stage.width ?? 26) + 4), Math.max(1, this.height - 45) / (this.stage.goalY + 4)) * this.zoom;
     const base =
       this.state === 'ready'
         ? Math.min(this.width / 13, this.height / Math.max(10, Math.ceil(this.balls.length / 10) * 0.7 + 4), 100)
@@ -293,6 +328,9 @@ export class Game extends Race {
     }
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
     drawMapOverlay(ctx, this.stage, entities, scale, true, view);
+    if (this.state === 'ready') {
+      if (this.dolphinPreview) this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale);
+    } else this.dolphinRenderer.draw(ctx, this.stage, this.dolphins, Math.max(0, this.elapsed - (1 - blend) / 60), view);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = sceneColor('#65efda');
     ctx.lineWidth = 2 / scale;
@@ -329,6 +367,9 @@ export class Game extends Race {
       drawFunnelEntryCue(ctx, this.stage, (now - this.drainCueAt) / 1000, scale);
     ctx.restore();
     this.renderMinimap(entities, blend);
+    this.dolphinDrag.setView({ x: w * .56 - cam.x * scale, y: h * .43 - cam.y * scale,
+      scale, width: (this.stage.width ?? 26) * scale, height: this.stage.goalY * scale },
+      { x: this.minimap.x, y: this.minimap.y, scale: this.minimap.scale, width: this.minimap.w, height: this.minimap.h });
     this.springControls.setStatuses(this.springStatuses(undefined, entities));
     this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h, this.stage);
     ctx.textAlign = 'right';
@@ -378,6 +419,7 @@ export class Game extends Race {
     this.renderCache.drawMinimap(ctx, this.stage, entities, scale, Math.min(devicePixelRatio, 2));
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
     drawMapOverlay(ctx, this.stage, entities, scale);
+    if (this.state === 'ready' && this.dolphinPreview) this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale, true);
     for (const b of this.balls) {
       if (b.rank) continue;
       const x = b.px === undefined ? b.x : b.px + (b.x - b.px) * blend;

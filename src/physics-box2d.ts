@@ -278,6 +278,14 @@ export class Box2dPhysics implements IPhysics {
     const v = body.GetLinearVelocity();
     return Math.hypot(v.x, v.y);
   }
+  getMarbleVelocity(id: number) {
+    const v = this.marbleMap[id].GetLinearVelocity();
+    return { vx: v.x, vy: v.y };
+  }
+  setMarbleVelocity(id: number, vx: number, vy: number) {
+    const body = this.marbleMap[id];
+    this.vector.Set(vx, vy); body.SetLinearVelocity(this.vector); body.SetAwake(true);
+  }
   placeMarble(id: number, x: number, y: number) {
     const body = this.marbleMap[id];
     if (!body) return;
@@ -336,7 +344,7 @@ export class Box2dPhysics implements IPhysics {
       body.SetAwake(true);
     }
   }
-  step(seconds: number) {
+  step(seconds: number, beforeSubstep?: (dt: number, offset: number) => void) {
     this.recordPoses();
     const bodies = this.marbleBodies;
     if (this.winds.length) {
@@ -415,6 +423,7 @@ export class Box2dPhysics implements IPhysics {
       } else if (e.spinCycle) {
         e.body.SetAngularVelocity(e.spinCycle.idleSpeed + (e.spin - e.spinCycle.idleSpeed) * rotorPower(e.spinCycle, this.motionTime));
       }
+      beforeSubstep?.(dt, i * dt);
       this.world.Step(dt, 8, this.collisionSubsteps === 4 ? 4 : 8);
       if (this.exitBridge) {
         for (const body of bodies) {

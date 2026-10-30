@@ -9,7 +9,9 @@ Reflect.deleteProperty(globalThis, 'fetch');
 const { Race } = require('../.lan-build/race.js');
 const { stages, hiddenStages, DEFAULT_MAP_INDEX } = require('../.lan-build/data/maps.js');
 const { parseNames, winningRange, validateStage } = require('../.lan-build/model.js');
-const { LAN_PORT, MAX_LAN_MESSAGE_BYTES } = require('../.lan-build/lan/protocol.js');
+const { LAN_PORT, MAX_LAN_MESSAGE_BYTES, encodeScene } = require('../.lan-build/lan/protocol.js');
+const { validateDolphins } = require('../.lan-build/dolphin.js');
+const MAX_LAN_BUFFERED_BYTES = 2 * MAX_LAN_MESSAGE_BYTES;
 /** @typedef {import('../src/lan/protocol').Settings} Settings */
 /** @typedef {import('../src/lan/protocol').Scene} Scene */
 /** @typedef {import('../src/lan/protocol').Frame} Frame */
@@ -32,6 +34,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
   let raceId;
   /** @type {Scene} */
   let scene;
+  let sceneMessage;
   let revision = 0, seq = 0;
   let accumulator = 0, lastTick = simulationNow();
   let speed = 1, boostUntil = 0;
@@ -79,7 +82,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
   /** @param {import('ws').WebSocket} ws @param {import('../src/lan/protocol').ServerMessage | string} value */
   const send = (ws, value) => {
     if (ws.readyState !== WebSocket.OPEN) return;
-    if (ws.bufferedAmount > 1024 * 1024) return ws.terminate();
+    if (ws.bufferedAmount > MAX_LAN_BUFFERED_BYTES) return ws.terminate();
     ws.send(typeof value === 'string' ? value : JSON.stringify(value));
   };
   /** @param {Session} session @returns {import('../src/lan/protocol').Identity} */
@@ -89,13 +92,14 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     scene = { type: 'scene', raceId, revision: ++revision, stage: race.stage, settings: { ...settings },
       entities, fixed: entities.map((e) => fixed.has(e.shape)),
       balls: race.balls.map(({ id, name, color }) => ({ id, name, color })) };
-    for (const ws of clients.keys()) send(ws, scene);
+    sceneMessage = JSON.stringify(encodeScene(scene));
+    for (const ws of clients.keys()) send(ws, sceneMessage);
   }
   function prepare() {
     raceId = randomUUID();
     accumulator = 0; boostOwner = null;
     race.prepare(settings.stage ?? stages[settings.mapId],
-      parseNames(settings.names));
+      parseNames(settings.names), settings.dolphins);
     makeScene();
   }
   function playbackRate() {
@@ -143,13 +147,21 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     if (msg.type === 'configure') {
       requireThat(race.state !== 'running' && race.state !== 'paused', '진행 중인 경기는 먼저 다시 준비해 주세요.');
       const s = msg.settings;
-      requireThat(allowedKeys(s, ['names', 'mapId', 'order', 'picks', 'stage']) && typeof s.names === 'string'
+      requireThat(allowedKeys(s, ['names', 'mapId', 'order', 'picks', 'stage', 'dolphins']) && typeof s.names === 'string'
         && s.names.length <= 15000 && Number.isInteger(s.mapId) && !!stages[s.mapId], '경기 설정이 올바르지 않습니다.');
       const names = parseNames(s.names);
       if (names.length) winningRange(s.order, names.length, s.picks);
       else requireThat(['asc', 'desc'].includes(s.order) && s.picks === 0, '경기 설정이 올바르지 않습니다.');
-      settings = { ...s, ...(s.stage !== undefined ? { stage: validateStage(s.stage) } : {}) };
-      prepare();
+      const stage = s.stage !== undefined ? validateStage(s.stage) : stages[s.mapId];
+      const dolphins = s.dolphins === undefined ? {} : { dolphins: validateDolphins(s.dolphins, stage) };
+      const next = { ...s, ...dolphins, ...(s.stage !== undefined ? { stage } : {}) };
+      const onlyDolphins = race.state === 'ready' && next.names === settings.names && next.mapId === settings.mapId
+        && next.order === settings.order && next.picks === settings.picks
+        && JSON.stringify(next.stage) === JSON.stringify(settings.stage)
+        && JSON.stringify(next.dolphins) !== JSON.stringify(settings.dolphins);
+      settings = next;
+      if (onlyDolphins) { race.dolphins = validateDolphins(settings.dolphins, race.stage); makeScene(); }
+      else prepare();
     } else if (msg.type === 'start') {
       requireThat(race.state === 'ready', '다시 준비한 뒤 시작해 주세요.');
       race.startRace(winningRange(settings.order, race.balls.length, settings.picks), settings.order);
@@ -241,7 +253,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
         send(ws, result); broadcast();
       });
       const entities = race.physics.getEntities(), snapshot = frame(entities);
-      send(ws, scene); send(ws, { ...snapshot, springs: race.springStatuses(session, entities) }); send(ws, identity(session));
+      send(ws, sceneMessage); send(ws, { ...snapshot, springs: race.springStatuses(session, entities) }); send(ws, identity(session));
     });
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, host, () => resolve(undefined)); });
@@ -262,7 +274,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
   const snapshots = setInterval(broadcast, 50);
   const heartbeat = setInterval(() => {
     for (const [ws, client] of clients) {
-      if (!client.alive || ws.bufferedAmount > 1024 * 1024) { ws.terminate(); continue; }
+      if (!client.alive || ws.bufferedAmount > MAX_LAN_BUFFERED_BYTES) { ws.terminate(); continue; }
       client.alive = false; ws.ping();
     }
     for (const [key, value] of attempts) if (value.until < Date.now()) attempts.delete(key);

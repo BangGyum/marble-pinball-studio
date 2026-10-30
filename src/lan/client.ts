@@ -8,7 +8,10 @@ import { parseNames, winningRange, type WinnerOrder } from '../model';
 import { MapLibrary } from '../map-library';
 import { el, toast, message, STALLED_MESSAGE } from '../ui';
 import type { Command, Frame, Identity, Info, Scene, ServerMessage, Settings } from './protocol';
-import { serializeCommand } from './protocol';
+import { decodeScene, serializeCommand } from './protocol';
+import { DolphinSettingsPanel } from '../dolphin-settings';
+import '../dolphin.css';
+import { validateDolphins } from '../dolphin';
 
 const view = new LanView(el<HTMLCanvasElement>('game'));
 const rankings = new Rankings((id) => selectBall(view.focusedBallId === id ? null : id));
@@ -23,6 +26,11 @@ let preferredPicks = 2, customStage: StageDef | undefined;
 const library = new MapLibrary(stages, hiddenStages);
 let inputTimer: ReturnType<typeof setTimeout>, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
+const dolphinPanel = new DolphinSettingsPanel(el('dolphin-settings'), (settings, commit) => {
+  view.setDolphins(settings);
+  if (commit) void prepareUI();
+}, show => view.setDolphinPreview(show), () => view.showDolphinLayout());
+view.onDolphinChange = (settings, commit) => { dolphinPanel.moved(settings); if (commit) void prepareUI(); };
 try {
   library.load(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));
 } catch { toast('저장된 맵을 읽지 못했어요.'); }
@@ -61,6 +69,7 @@ resultLayout.observe(rankingList); resultLayout.observe(view.canvas);
 function updateControls() {
   const hosting = identity.role === 'host', playing = frame?.state === 'running' || frame?.state === 'paused';
   document.body.dataset.role = identity.role; view.canControl = hosting;
+  dolphinPanel.setLocked(!hosting || !online || !frame || !!playing);
   document.querySelectorAll<HTMLElement>('[data-host]').forEach((item) => { item.hidden = !hosting; });
   for (const id of ['names', 'map-select', 'winner-mode', 'winner-count', 'shuffle', 'record', 'edit-current', 'editor-open'])
     (el(id) as HTMLInputElement).disabled = !hosting || !online || !!playing;
@@ -106,7 +115,9 @@ function inputSettings(): Settings {
   updatePicks(count);
   if (count) winningRange(order.value as WinnerOrder, count, Number(picks.value));
   const builtin = map.id.startsWith('builtin-') ? Number(map.id.slice(8)) : 0;
+  dolphinPanel.setStage(map.stage);
   return { names: names.value, mapId: builtin, order: order.value as WinnerOrder, picks: Number(picks.value),
+    dolphins: dolphinPanel.value,
     ...(map.id.startsWith('builtin-') && map.stage === stages[builtin] ? {} : { stage: map.stage }) };
 }
 async function prepare(force = false) {
@@ -135,7 +146,8 @@ async function connect() {
       const incoming = JSON.parse(event.data) as ServerMessage;
       if (incoming.type === 'scene') {
         const first = !scene, different = scene?.raceId !== incoming.raceId;
-        scene = incoming; view.setScene(incoming);
+        scene = decodeScene(incoming); view.setScene(scene);
+        dolphinPanel.setStage(scene.stage, scene.settings.dolphins ?? validateDolphins(undefined, scene.stage));
         if (different) {
           frame = undefined; selectBall(null); collapse(false);
           names.value = scene.settings.names; order.value = scene.settings.order; preferredPicks = scene.settings.picks || 2;
@@ -212,7 +224,7 @@ view.onZoomChange = (zoom) => {
 el('zoom-out').addEventListener('click', () => view.setZoom(view.zoom / 1.2));
 el('zoom-in').addEventListener('click', () => view.setZoom(view.zoom * 1.2));
 el('zoom-reset').addEventListener('click', () => view.setZoom(1));
-el('follow').addEventListener('click', () => { view.follow(); selectBall(null); });
+el('follow').addEventListener('click', () => { view.follow(true); selectBall(null); });
 document.addEventListener('pointerdown', (event) => {
   if (view.focusedBallId !== null && event.target instanceof Node && !rankingList.contains(event.target)) selectBall(null);
 });

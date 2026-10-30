@@ -1,0 +1,22 @@
+.control-panel:has(.dolphin-settings) { grid-template-columns: minmax(220px, 1.1fr) minmax(260px, 1fr) minmax(290px, 1fr); gap: 20px; }
+.dolphin-settings { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; background: var(--panel); }
+.dolphin-settings:has([role="switch"]:checked) { border-color: var(--accent); }
+.dolphin-heading label { display: flex; justify-content: space-between; align-items: center; gap: 16px; cursor: pointer; }
+.dolphin-heading input { appearance: none; width: 42px; height: 24px; border-radius: 20px; background: var(--line); padding: 3px; margin: 0; cursor: pointer; flex: none; }
+.dolphin-heading input::before { content: ''; display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--text); }
+.dolphin-heading input:checked { background: var(--accent); }
+.dolphin-heading input:checked::before { transform: translateX(17px); background: var(--bg); }
+.dolphin-settings fieldset { border: 0; padding: 0; margin: 14px 0 0; min-width: 0; }
+.dolphin-field { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 8px; margin-top: 10px; font-size: .8125rem; }
+.dolphin-field input { width: 100%; min-width: 0; padding: 7px; }
+.dolphin-stepper, .dolphin-spacing, .dolphin-preview { display: flex; align-items: center; gap: 7px; }
+.dolphin-stepper input { text-align: center; }
+.dolphin-spacing input[type="number"] { width: 62px; flex: none; }
+.dolphin-spacing input[type="range"] { accent-color: var(--accent); padding: 0; }
+.dolphin-preview { justify-content: space-between; flex-wrap: wrap; margin-top: 12px; }
+.dolphin-preview button { font-size: .75rem; padding: 6px 8px; }
+.dolphin-settings p { font-size: .7rem; color: var(--muted); line-height: 1.5; margin: 10px 0 0; }
+.dolphin-settings input:disabled { opacity: .5; }
+@media (max-width: 1100px) { .control-panel:has(.dolphin-settings) { grid-template-columns: minmax(220px, 1fr) minmax(270px, 1fr); } .dolphin-settings { grid-column: 1 / -1; } }
+@media (min-width: 621px) and (max-width: 1100px) { .dolphin-settings fieldset { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; } .dolphin-settings p { grid-column: 1 / -1; } .dolphin-settings fieldset[hidden] { display: none; } }
+@media (max-width: 620px) { .control-panel:has(.dolphin-settings) { grid-template-columns: minmax(0, 1fr); } .dolphin-settings { grid-column: auto; } }

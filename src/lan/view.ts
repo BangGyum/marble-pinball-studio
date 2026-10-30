@@ -13,6 +13,9 @@ import type { Scene, Frame } from './protocol';
 import type { Ball } from '../race';
 import type { StageDef } from '../data/maps';
 import type { MapEntityState } from '../types/MapEntity.type';
+import { validateDolphins, type DolphinSettings } from '../dolphin';
+import { DolphinRenderer } from '../dolphin-render';
+import { DolphinDrag } from '../dolphin-drag';
 
 export class LanView {
   private focusedId: number | null = null;
@@ -55,7 +58,21 @@ export class LanView {
   private drainCueDone = false;
   private recorder = new Recorder();
   private recordStop?: ReturnType<typeof setTimeout>;
+  private dolphinRenderer = new DolphinRenderer();
+  private dolphinDrag: DolphinDrag;
+  private dolphinDraft?: DolphinSettings;
+  private dolphinOverview = false;
+  private dolphinPreview = true;
+  private readyCamera = { x: 12.85, y: 4 };
+  private noDolphins: DolphinSettings = { enabled: false, rows: [], interval: 20 };
+  get dolphins() { return this.dolphinDraft ?? this.scene?.settings.dolphins ?? this.noDolphins; }
+  onDolphinChange: (settings: DolphinSettings, commit: boolean) => void = () => {};
   constructor(readonly canvas: HTMLCanvasElement) {
+    this.dolphinDrag = new DolphinDrag(canvas, () => this.canControl && this.state === 'ready' && this.dolphinPreview,
+      () => this.dolphins, () => this.scene?.stage, (index, y, commit) => {
+        const rows = [...this.dolphins.rows]; rows[index] = y;
+        this.setDolphins({ ...this.dolphins, rows }); this.onDolphinChange(this.dolphins, commit);
+      });
     this.springControls = new SpringControls(canvas, index => this.onSpring(index), () => this.state === 'running');
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     new ResizeObserver(() => {
@@ -96,7 +113,23 @@ export class LanView {
     requestAnimationFrame(render);
   }
   get arrivals() { return this.balls.filter((ball) => ball.rank).sort((a, b) => a.rank! - b.rank!); }
-  follow() { this.manual = null; this.renderDirty = true; }
+  setDolphins(settings: DolphinSettings) {
+    if (this.state !== 'ready' || !this.scene || !this.canControl) return;
+    this.dolphinDraft = validateDolphins(settings, this.scene.stage);
+    if (!settings.enabled && this.dolphinOverview) { this.dolphinOverview = false; this.camera = { ...this.readyCamera }; this.manual = null; }
+    this.renderDirty = true;
+  }
+  setDolphinPreview(show: boolean) { this.dolphinPreview = show; this.renderDirty = true; }
+  showDolphinLayout(resetZoom = true) {
+    if (this.state !== 'ready' || !this.scene || !this.dolphins.enabled) return;
+    this.dolphinOverview = true; this.manual = null;
+    if (resetZoom) { this.zoom = 1; this.onZoomChange(1); }
+    this.camera = { x: (this.scene.stage.width ?? 26) / 2, y: this.scene.stage.goalY / 2 - this.height * .07 / this.viewScale() }; this.renderDirty = true;
+  }
+  follow(closeOverview = false) {
+    if (closeOverview && this.state === 'ready' && this.dolphinOverview) { this.dolphinOverview = false; this.camera = { ...this.readyCamera }; }
+    this.manual = null; this.renderDirty = true;
+  }
   setZoom(value: number) {
     if (!Number.isFinite(value)) return;
     this.zoom = Math.max(.35, Math.min(3, value)); this.renderDirty = true; this.onZoomChange(this.zoom);
@@ -108,6 +141,8 @@ export class LanView {
     if (visible) { this.renderDirty = true; this.lastDraw = 0; }
   }
   setScene(scene: Scene) {
+    this.dolphinDraft = undefined;
+    if (!scene.settings.dolphins?.enabled) this.dolphinOverview = false;
     if (this.scene?.raceId !== scene.raceId || this.scene.revision !== scene.revision) {
       this.marbleElasticity.reset(); this.elasticFrameSeq = -1;
     }
@@ -117,10 +152,12 @@ export class LanView {
       this.cache = new RenderCache();
       const count = scene.balls.length, rows = Math.ceil(count / 10), offset = (scene.stage.spawnX ?? 12.85) - 12.85;
       this.camera = { x: offset + (count < 10 ? 10.1 + (Math.max(1, count) - 1) * .305 : 12.85), y: 5 - (rows - 1) * .31 };
+      this.readyCamera = { ...this.camera };
       this.balls = scene.balls.map((b) => ({ ...b, x: 0, y: 0, angle: 0, stuck: 0 }));
     }
     this.springControls.reset();
     this.scene = scene; this.playback.reset();
+    if (this.dolphinOverview && this.dolphins.enabled && this.state === 'ready') this.showDolphinLayout(false);
     this.renderDirty = true;
     this.entities = scene.entities.map(entity => ({ ...entity }));
     this.positions = new WeakMap(); this.bridgeIds = new WeakMap();
@@ -136,9 +173,14 @@ export class LanView {
     if (frame.state !== this.state) this.renderDirty = true;
     if (frame.state !== 'running') { this.marbleElasticity.reset(); this.elasticFrameSeq = -1; }
     this.springControls.setStatuses(frame.springs ?? []);
+    if (frame.state === 'running' && this.state === 'ready' && this.dolphinOverview) {
+      this.camera = { ...this.readyCamera }; this.manual = null; this.dolphinOverview = false;
+    }
     this.state = frame.state; this.playback.push(frame);
   }
   private viewScale() {
+    if (this.state === 'ready' && this.dolphinOverview && this.scene)
+      return Math.min(Math.max(1, this.width - 180) / ((this.scene.stage.width ?? 26) + 4), Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)) * this.zoom;
     return (this.state === 'ready'
       ? Math.min(this.width / 13, this.height / Math.max(10, Math.ceil(this.balls.length / 10) * .7 + 4), 100)
       : Math.min(this.width / 20, this.height / 13, 70)) * this.zoom;
@@ -221,6 +263,9 @@ export class LanView {
     }
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
     drawMapOverlay(ctx, scene.stage, entities, scale, true, view);
+    if (this.state === 'ready') {
+      if (this.dolphinPreview) this.dolphinRenderer.guides(ctx, scene.stage, this.dolphins, scale);
+    } else this.dolphinRenderer.draw(ctx, scene.stage, this.dolphins, elapsed, view);
     ctx.shadowBlur = 0; ctx.strokeStyle = '#65efda'; ctx.lineWidth = 2 / scale; ctx.setLineDash([.35, .3]);
     ctx.beginPath(); ctx.moveTo(0, scene.stage.goalY); ctx.lineTo(scene.stage.width ?? 26, scene.stage.goalY); ctx.stroke(); ctx.setLineDash([]);
     ctx.font = 12 / scale + 'px sans-serif'; ctx.fillStyle = '#65efda'; ctx.fillText(scene.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, scene.stage.goalY - .4);
@@ -243,6 +288,9 @@ export class LanView {
       drawFunnelEntryCue(ctx, scene.stage, (now - this.drainCueAt) / 1000, scale);
     ctx.restore();
     this.renderMinimap(entities, elapsed, cam);
+    this.dolphinDrag.setView({ x: w * .56 - cam.x * scale, y: h * .43 - cam.y * scale,
+      scale, width: (scene.stage.width ?? 26) * scale, height: scene.stage.goalY * scale },
+      { x: this.minimap.x, y: this.minimap.y, scale: this.minimap.scale, width: this.minimap.w, height: this.minimap.h });
     this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h, scene.stage);
     ctx.textAlign = 'right'; ctx.font = '12px sans-serif'; ctx.fillStyle = '#728393';
     ctx.fillText((balls.length - active.length) + ' / ' + balls.length + ' 도착', w - 24, h - 20);
@@ -270,6 +318,7 @@ export class LanView {
     this.cache.drawMinimap(ctx, this.minimapStage!, entities, scale, Math.min(devicePixelRatio, 2));
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
     drawMapOverlay(ctx, scene.stage, entities, scale);
+    if (this.state === 'ready' && this.dolphinPreview) this.dolphinRenderer.guides(ctx, scene.stage, this.dolphins, scale, true);
     for (const ball of this.balls) if (!ball.rank) {
       ctx.globalAlpha = bridgeBallOpacity(scene.stage, ball);
       ctx.fillStyle = ball.id === this.focusedBallId ? '#fff3a8' : ball.color; ctx.beginPath();
