@@ -28,23 +28,25 @@ async function connect(port, host = false) {
   const frozen = performance.now(), app = await createLanServer({ port: 0, simulationNow: () => frozen }), clients = [];
   try {
     const host = await connect(app.port, true), guest = await connect(app.port); clients.push(host, guest);
-    const dolphins = { enabled: true, rows: [12, 22, 32], interval: 7 };
+    const dolphins = { enabled: true, rows: [12, 22, 32], interval: 5, size:150 };
     const settings = { names: 'a,b,c,d', mapId: 0, order: 'asc', picks: 1, dolphins };
     assert.equal((await guest.command({ type: 'configure', settings })).ok, false, 'viewer cannot change dolphin settings');
     assert.equal((await host.command({ type: 'configure', settings })).ok, true);
-    await guest.until(() => guest.scene.settings.dolphins?.interval === 7);
+    await guest.until(() => guest.scene.settings.dolphins?.interval === 5);
     assert.deepEqual(guest.scene.settings.dolphins, dolphins); assert.deepEqual(app.race.dolphins, dolphins);
     const preparedId = host.scene.raceId, preparedBalls = JSON.stringify(app.race.balls);
     dolphins.interval = 9;
+    dolphins.size = 200;
     assert.equal((await host.command({ type:'configure', settings })).ok,true);
     assert.equal(host.scene.raceId,preparedId,'changing only dolphin options preserves the prepared race');
     assert.equal(JSON.stringify(app.race.balls),preparedBalls,'dolphin options do not reshuffle the prepared marbles');
     await guest.until(()=>guest.scene.settings.dolphins?.interval===9);
+    assert.equal(guest.scene.settings.dolphins.size,200);assert.equal(app.race.dolphins.size,200);
     assert.equal((await host.command({ type:'configure', settings })).ok,true);
     assert.notEqual(host.scene.raceId,preparedId,'explicit reconfigure with identical options still shuffles a new round');
     const raceId = host.scene.raceId;
-    for (const invalid of [{ ...dolphins, interval: 0 }, { ...dolphins, rows: [12, 12] }, { ...dolphins, rows: [999] },
-      { ...dolphins, rows: Array(7).fill(12) }, { ...dolphins, unexpected: true }]) {
+    for (const invalid of [{ ...dolphins, interval: 4.99 }, { ...dolphins, rows: [12, 12] }, { ...dolphins, rows: [999] },
+      { ...dolphins, rows: Array(7).fill(12) }, { ...dolphins, unexpected: true },{...dolphins,size:49},{...dolphins,size:201}]) {
       assert.equal((await host.command({ type: 'configure', settings: { ...settings, dolphins: invalid } })).ok, false);
       assert.equal(host.scene.raceId, raceId, 'invalid settings preserve the prepared race');
     }

@@ -1,5 +1,5 @@
 import type { StageDef } from './stage-def';
-import { dolphinPose, dolphinWave, DOLPHIN_DURATION, DOLPHIN_WIDTH, type DolphinSettings } from './dolphin';
+import { dolphinPose, dolphinScale, dolphinWave, DOLPHIN_DURATION, DOLPHIN_SWIM, DOLPHIN_WIDTH, type DolphinSettings } from './dolphin';
 import { sceneColor } from './scene-theme';
 
 type View = { left: number; right: number; top: number; bottom: number };
@@ -7,9 +7,11 @@ export class DolphinRenderer {
   private body?: HTMLCanvasElement;
   private splash?: HTMLCanvasElement;
   private width = -1;
+  private effectScale = -1;
   private events: { at: number; x: number }[] = [];
   private guidePath?: Path2D;
   private guideWidth = -1;
+  private guideScale = -1;
   private drawBody(ctx: CanvasRenderingContext2D) {
     if (this.body) {
       const height = DOLPHIN_WIDTH * this.body.height / this.body.width;
@@ -40,13 +42,11 @@ export class DolphinRenderer {
   }
   guides(ctx: CanvasRenderingContext2D, stage: StageDef, settings: DolphinSettings, scale: number, mini = false) {
     if (!settings.enabled) return;
-    const width = stage.width ?? 26;
-    const transform = ctx.getTransform();
-    this.load(Math.ceil(DOLPHIN_WIDTH * Math.hypot(transform.a, transform.b) / 128) * 128);
-    if (!mini && this.guideWidth !== width) {
-      this.guidePath = new Path2D(); this.guideWidth = width;
+    const width = stage.width ?? 26, factor = dolphinScale(settings);
+    if (!mini && (this.guideWidth !== width || this.guideScale !== factor)) {
+      this.guidePath = new Path2D(); this.guideWidth = width; this.guideScale = factor;
       for (let i = 0; i <= 90; i++) {
-        const p = dolphinPose(stage, 0, i / 90 * DOLPHIN_DURATION);
+        const p = dolphinPose(stage, 0, i / 90 * DOLPHIN_DURATION, 1, factor);
         i ? this.guidePath.lineTo(p.x, p.y) : this.guidePath.moveTo(p.x, p.y);
       }
     }
@@ -57,53 +57,51 @@ export class DolphinRenderer {
       if (!mini) {
         ctx.fillText(`↕ ${index + 1}번 줄`, .3, row - 5 / scale);
         ctx.save(); ctx.globalAlpha = .35; ctx.translate(0, row); ctx.stroke(this.guidePath!); ctx.restore();
-        const p = dolphinPose(stage, row, DOLPHIN_DURATION / 2);
-        ctx.save(); ctx.translate(p.x, p.y); ctx.scale(index % 2 ? -1 : 1, 1); ctx.globalAlpha = .35; this.drawBody(ctx); ctx.restore();
       }
     });
     ctx.restore();
   }
-  draw(ctx: CanvasRenderingContext2D, stage: StageDef, settings: DolphinSettings, elapsed: number, view: View) {
+  draw(ctx: CanvasRenderingContext2D, stage: StageDef, settings: DolphinSettings, elapsed: number, view: View, preview = false) {
     if (!settings.enabled) return;
-    const transform = ctx.getTransform();
-    this.load(Math.ceil(DOLPHIN_WIDTH * Math.hypot(transform.a, transform.b) / 128) * 128);
-    const { time, wave } = dolphinWave(settings, elapsed);
+    const transform = ctx.getTransform(), factor = dolphinScale(settings);
+    this.load(Math.ceil(DOLPHIN_WIDTH * factor * Math.hypot(transform.a, transform.b) / 128) * 128);
+    const { time, wave } = dolphinWave(settings, elapsed, preview);
     if (time > DOLPHIN_DURATION + .65) return;
-    if (this.width !== (stage.width ?? 26)) {
-      this.width = stage.width ?? 26;
+    if (this.width !== (stage.width ?? 26) || this.effectScale !== factor) {
+      this.width = stage.width ?? 26; this.effectScale = factor;
       this.events = Array.from({ length: 6 }, (_, i) => {
         const hop = Math.floor(i / 2), exiting = i % 2 === 0, period = DOLPHIN_DURATION / 3;
-        let lo = (hop + (exiting ? 0 : .5)) * period, hi = (hop + (exiting ? .15 : .85)) * period;
+        let lo = (hop + (exiting ? 0 : .5)) * period, hi = (hop + (exiting ? DOLPHIN_SWIM / 2 : 1 - DOLPHIN_SWIM / 2)) * period;
         for (let j = 0; j < 24; j++) {
-          const at = (lo + hi) / 2, p = dolphinPose(stage, 0, at), front = p.y + Math.sin(p.angle) * 62 / 36;
+          const at = (lo + hi) / 2, p = dolphinPose(stage, 0, at, 1, factor), front = p.y + Math.sin(p.angle) * 62 / 36 * factor;
           if (exiting ? front > 0 : front < 0) lo = at; else hi = at;
         }
-        const at = (lo + hi) / 2, p = dolphinPose(stage, 0, at);
-        return { at, x: p.x + Math.cos(p.angle) * 62 / 36 };
+        const at = (lo + hi) / 2, p = dolphinPose(stage, 0, at, 1, factor);
+        return { at, x: p.x + Math.cos(p.angle) * 62 / 36 * factor };
       });
     }
     settings.rows.forEach((row, index) => {
-      if (row < view.top - 3 || row > view.bottom + 5) return;
-      const direction = (wave + index) % 2 ? -1 : 1, p = dolphinPose(stage, row, time, direction);
+      if (row < view.top - 3 * factor || row > view.bottom + 5 * factor) return;
+      const direction = (wave + index) % 2 ? -1 : 1, p = dolphinPose(stage, row, time, direction, factor);
       ctx.save();
       for (const event of this.events) {
         const age = time - event.at;
         if (age < 0 || age > .65) continue;
-        const progress = age / .65, width = 105 / 36 * (.45 + Math.sin(progress * Math.PI / 2) * .7);
+        const progress = age / .65, width = 105 / 36 * factor * (.45 + Math.sin(progress * Math.PI / 2) * .7);
         const x = direction === 1 ? event.x : this.width - event.x;
         if (x + width < view.left || x - width > view.right) continue;
         ctx.globalAlpha = Math.min(1, age / .045) * (1 - progress) * .92;
         if (this.splash) {
           const height = width * this.splash.height / this.splash.width;
-          ctx.drawImage(this.splash, x - width / 2, row + 4 / 36 - height, width, height);
+          ctx.drawImage(this.splash, x - width / 2, row + 4 / 36 * factor - height, width, height);
         } else {
-          ctx.strokeStyle = '#76bdce'; ctx.lineWidth = .04; ctx.beginPath(); ctx.ellipse(x, row, width / 2, .12, 0, 0, Math.PI * 2); ctx.stroke();
+          ctx.strokeStyle = '#76bdce'; ctx.lineWidth = .04 * factor; ctx.beginPath(); ctx.ellipse(x, row, width / 2, .12 * factor, 0, 0, Math.PI * 2); ctx.stroke();
         }
       }
       ctx.globalAlpha = 1;
-      if (time <= DOLPHIN_DURATION && p.x + 3 >= view.left && p.x - 3 <= view.right) {
+      if (time <= DOLPHIN_DURATION && p.x + 3 * factor >= view.left && p.x - 3 * factor <= view.right) {
         ctx.beginPath(); ctx.rect(view.left, view.top, view.right - view.left, Math.max(0, row - view.top)); ctx.clip();
-        ctx.translate(p.x, p.y); ctx.scale(direction, 1); ctx.rotate(p.angle);
+        ctx.translate(p.x, p.y); ctx.scale(direction * factor, factor); ctx.rotate(p.angle);
         this.drawBody(ctx);
       }
       ctx.restore();

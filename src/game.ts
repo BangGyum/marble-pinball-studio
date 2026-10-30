@@ -12,7 +12,7 @@ import { drawMarble } from './marble-art';
 import { MarbleElasticity } from './marble-elasticity';
 import { getSceneTheme, sceneColor } from './scene-theme';
 import { drawFunnelEntryCue } from './funnel-art';
-import { validateDolphins, type DolphinSettings } from './dolphin';
+import { DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from './dolphin';
 import { DolphinRenderer } from './dolphin-render';
 import { DolphinDrag } from './dolphin-drag';
 import type { MapEntityState } from './types/MapEntity.type';
@@ -52,6 +52,8 @@ export class Game extends Race {
   private dolphinDrag: DolphinDrag;
   private dolphinOverview = false;
   private dolphinPreview = true;
+  private dolphinPreviewElapsed = DOLPHIN_DURATION / 2;
+  private dolphinPreviewLast = 0;
   private readyCamera = { x: 12.85, y: 3 };
   onDolphinChange: (settings: DolphinSettings, commit: boolean) => void = () => {};
   constructor(readonly canvas: HTMLCanvasElement) {
@@ -119,6 +121,7 @@ export class Game extends Race {
   }
   prepare(stage: StageDef, names: string[], dolphins?: DolphinSettings) {
     this.dolphinOverview = false;
+    this.dolphinPreviewElapsed = DOLPHIN_DURATION / 2; this.dolphinPreviewLast = 0;
     this.drainCueAt = 0;
     this.drainCueDone = false;
     this.stopRecording();
@@ -145,7 +148,7 @@ export class Game extends Race {
     if (!settings.enabled && this.dolphinOverview) { this.dolphinOverview = false; this.camera = { ...this.readyCamera }; this.manual = null; }
     this.renderDirty = true; this.render();
   }
-  setDolphinPreview(show: boolean) { this.dolphinPreview = show; this.renderDirty = true; }
+  setDolphinPreview(show: boolean) { this.dolphinPreview = show; this.dolphinPreviewLast = 0; this.renderDirty = true; }
   showDolphinLayout() {
     if (this.state !== 'ready' || !this.dolphins.enabled) return;
     this.dolphinOverview = true; this.manual = null;
@@ -187,6 +190,7 @@ export class Game extends Race {
   }
   setVisible(visible: boolean) {
     this.visible = visible;
+    this.dolphinPreviewLast = 0;
     this.accumulator = 0;
     this.last = 0;
     if (visible) {
@@ -219,10 +223,18 @@ export class Game extends Race {
     const delta = this.last ? Math.min((now - this.last) / 1000, 0.1) : 0;
     this.last = now;
     if (!this.visible) {
+      this.dolphinPreviewLast = 0;
       this.accumulator = 0;
       this.frameId = requestAnimationFrame((t) => this.frame(t));
       return;
     }
+    const previewing = this.state === 'ready' && this.dolphinPreview && this.dolphins?.enabled &&
+      !this.reducedMotion?.matches && (typeof document === 'undefined' || !document.hidden);
+    if (previewing) {
+      const gap = now - this.dolphinPreviewLast;
+      if (this.dolphinPreviewLast && gap < 250) this.dolphinPreviewElapsed += Math.max(0, Math.min(.1, gap / 1000));
+      this.dolphinPreviewLast = now;
+    } else this.dolphinPreviewLast = 0;
     if (this.state === 'running') {
       this.accumulator += delta * this.speed * (this.fastForward ? 2 : 1) * this.finishSlowdown();
       const physicsStart = performance.now();
@@ -244,7 +256,7 @@ export class Game extends Race {
       // Under load the race slows down instead of creating a catch-up workload next frame.
       if (this.accumulator >= 1 / 60) this.accumulator %= 1 / 60;
     }
-    if (this.state === 'running' || this.recording || this.renderDirty || this.cameraMoving ||
+    if (this.state === 'running' || previewing || this.recording || this.renderDirty || this.cameraMoving ||
       (this.winners.length && now - this.winnerAt < 1400) ||
       (this.drainCueAt && now - this.drainCueAt < 450) || now - this.lastFrameDraw >= 100) {
       this.lastFrameDraw = now; this.renderDirty = false;
@@ -329,7 +341,11 @@ export class Game extends Race {
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
     drawMapOverlay(ctx, this.stage, entities, scale, true, view);
     if (this.state === 'ready') {
-      if (this.dolphinPreview) this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale);
+      if (this.dolphinPreview) {
+        this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale);
+        this.dolphinRenderer.draw(ctx, this.stage, this.dolphins,
+          this.reducedMotion?.matches ? DOLPHIN_DURATION / 2 : this.dolphinPreviewElapsed, view, true);
+      }
     } else this.dolphinRenderer.draw(ctx, this.stage, this.dolphins, Math.max(0, this.elapsed - (1 - blend) / 60), view);
     ctx.shadowBlur = 0;
     ctx.strokeStyle = sceneColor('#65efda');

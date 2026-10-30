@@ -4,7 +4,7 @@ import type { IPhysics } from './IPhysics';
 import type { StageDef } from './data/maps';
 import { shuffled, type WinnerOrder } from './model';
 import { WallGuard, WALL_GUARD_MAX_SPEED } from './wall-guard';
-import { dolphinBounce, dolphinPose, dolphinWave, DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from './dolphin';
+import { dolphinBounce, dolphinPose, dolphinScale, dolphinWave, DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from './dolphin';
 
 export type Ball = {
   id: number;
@@ -67,7 +67,7 @@ export class Race {
   protected winnerOrder: WinnerOrder = 'asc';
   range: [number, number] = [1, 1];
   elapsed = 0;
-  dolphins: DolphinSettings = { enabled: false, rows: [], interval: 20 };
+  dolphins: DolphinSettings = { enabled: false, rows: [], interval: 5 };
   private dolphinContacts = new Set<string>();
   onFinish: (winners: Ball[]) => void = () => {};
   private walls?: WallGuard;
@@ -225,10 +225,11 @@ export class Race {
   private stepDolphins(dt: number, elapsed: number) {
     const { wave, time } = dolphinWave(this.dolphins, elapsed);
     if (time + dt > DOLPHIN_DURATION) { this.dolphinContacts.clear(); return; }
+    const scale = dolphinScale(this.dolphins);
     const touching = new Set<string>();
     const poses = this.dolphins.rows.map((row, index) => {
       const direction = (wave + index) % 2 ? -1 : 1;
-      const before = dolphinPose(this.stage, row, time, direction), p = dolphinPose(this.stage, row, time + dt, direction);
+      const before = dolphinPose(this.stage, row, time, direction, scale), p = dolphinPose(this.stage, row, time + dt, direction, scale);
       const motion = { vx: (p.x - before.x) / dt, vy: (p.y - before.y) / dt,
         omega: direction * Math.atan2(Math.sin(p.angle - before.angle), Math.cos(p.angle - before.angle)) / dt };
       return { p, motion, index };
@@ -237,7 +238,7 @@ export class Race {
       if (ball.rank) continue;
       const pos = this.physics.getMarblePosition(ball.id);
       for (const { p, motion, index } of poses) {
-        if (Math.abs(pos.x - p.x) > 3 || Math.abs(pos.y - p.y) > 3) continue;
+        if (Math.abs(pos.x - p.x) > 3 * scale || Math.abs(pos.y - p.y) > 3 * scale) continue;
         const contact = dolphinBounce({ ...pos, ...this.physics.getMarbleVelocity(ball.id) }, p, motion);
         if (!contact) continue;
         const key = `${index}:${ball.id}`; touching.add(key);

@@ -13,7 +13,7 @@ import type { Scene, Frame } from './protocol';
 import type { Ball } from '../race';
 import type { StageDef } from '../data/maps';
 import type { MapEntityState } from '../types/MapEntity.type';
-import { validateDolphins, type DolphinSettings } from '../dolphin';
+import { DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from '../dolphin';
 import { DolphinRenderer } from '../dolphin-render';
 import { DolphinDrag } from '../dolphin-drag';
 
@@ -63,8 +63,10 @@ export class LanView {
   private dolphinDraft?: DolphinSettings;
   private dolphinOverview = false;
   private dolphinPreview = true;
+  private dolphinPreviewElapsed = DOLPHIN_DURATION / 2;
+  private dolphinPreviewLast = 0;
   private readyCamera = { x: 12.85, y: 4 };
-  private noDolphins: DolphinSettings = { enabled: false, rows: [], interval: 20 };
+  private noDolphins: DolphinSettings = { enabled: false, rows: [], interval: 5 };
   get dolphins() { return this.dolphinDraft ?? this.scene?.settings.dolphins ?? this.noDolphins; }
   onDolphinChange: (settings: DolphinSettings, commit: boolean) => void = () => {};
   constructor(readonly canvas: HTMLCanvasElement) {
@@ -119,7 +121,7 @@ export class LanView {
     if (!settings.enabled && this.dolphinOverview) { this.dolphinOverview = false; this.camera = { ...this.readyCamera }; this.manual = null; }
     this.renderDirty = true;
   }
-  setDolphinPreview(show: boolean) { this.dolphinPreview = show; this.renderDirty = true; }
+  setDolphinPreview(show: boolean) { this.dolphinPreview = show; this.dolphinPreviewLast = 0; this.renderDirty = true; }
   showDolphinLayout(resetZoom = true) {
     if (this.state !== 'ready' || !this.scene || !this.dolphins.enabled) return;
     this.dolphinOverview = true; this.manual = null;
@@ -138,6 +140,7 @@ export class LanView {
   stopRecording() { clearTimeout(this.recordStop); this.recorder.stop(); this.recording = false; }
   setVisible(visible: boolean) {
     this.visible = visible;
+    this.dolphinPreviewLast = 0;
     if (visible) { this.renderDirty = true; this.lastDraw = 0; }
   }
   setScene(scene: Scene) {
@@ -147,6 +150,7 @@ export class LanView {
       this.marbleElasticity.reset(); this.elasticFrameSeq = -1;
     }
     if (this.scene?.raceId !== scene.raceId) {
+      this.dolphinPreviewElapsed = DOLPHIN_DURATION / 2; this.dolphinPreviewLast = 0;
       this.drainCueAt = 0; this.drainCueDone = false;
       this.stopRecording(); this.winnerAt = 0; this.manual = null;
       this.cache = new RenderCache();
@@ -186,8 +190,15 @@ export class LanView {
       : Math.min(this.width / 20, this.height / 13, 70)) * this.zoom;
   }
   private frame(now: number) {
-    if (!this.visible) return;
-    if (this.state !== 'running' && !this.recording && !this.renderDirty && !this.cameraMoving && !this.playbackMoving &&
+    if (!this.visible) { this.dolphinPreviewLast = 0; return; }
+    const previewing = this.state === 'ready' && this.dolphinPreview && this.dolphins?.enabled &&
+      !this.reducedMotion?.matches && (typeof document === 'undefined' || !document.hidden);
+    if (previewing) {
+      const gap = now - this.dolphinPreviewLast;
+      if (this.dolphinPreviewLast && gap < 250) this.dolphinPreviewElapsed += Math.max(0, Math.min(.1, gap / 1000));
+      this.dolphinPreviewLast = now;
+    } else this.dolphinPreviewLast = 0;
+    if (this.state !== 'running' && !previewing && !this.recording && !this.renderDirty && !this.cameraMoving && !this.playbackMoving &&
       (!this.winnerAt || now - this.winnerAt >= 1400) &&
       (!this.drainCueAt || now - this.drainCueAt >= 450) && now - this.lastFrameDraw < 100) return;
     this.lastFrameDraw = now; this.renderDirty = false; this.draw(now);
@@ -264,7 +275,11 @@ export class LanView {
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
     drawMapOverlay(ctx, scene.stage, entities, scale, true, view);
     if (this.state === 'ready') {
-      if (this.dolphinPreview) this.dolphinRenderer.guides(ctx, scene.stage, this.dolphins, scale);
+      if (this.dolphinPreview) {
+        this.dolphinRenderer.guides(ctx, scene.stage, this.dolphins, scale);
+        this.dolphinRenderer.draw(ctx, scene.stage, this.dolphins,
+          this.reducedMotion?.matches ? DOLPHIN_DURATION / 2 : this.dolphinPreviewElapsed, view, true);
+      }
     } else this.dolphinRenderer.draw(ctx, scene.stage, this.dolphins, elapsed, view);
     ctx.shadowBlur = 0; ctx.strokeStyle = '#65efda'; ctx.lineWidth = 2 / scale; ctx.setLineDash([.35, .3]);
     ctx.beginPath(); ctx.moveTo(0, scene.stage.goalY); ctx.lineTo(scene.stage.width ?? 26, scene.stage.goalY); ctx.stroke(); ctx.setLineDash([]);
