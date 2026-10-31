@@ -82,6 +82,44 @@ console.log('PASS dolphin size/bounds, legacy default, actual/preview timing, LA
   try {
     assert.ok(await run() === await run({ ...settings, enabled: false }), 'disabled dolphins preserve exact physics');
     assert.ok(await run(settings) === await run({...settings,size:100}),'legacy and explicit 100% sizes preserve exact physics');
+    // A separating overlap must not consume the first impact when a real roof reflects the ball back.
+    for (const direction of [1, -1]) {
+      const effect = { enabled: true, rows: [32], interval: 5, size: 100 }, scale = dolphinScale(effect);
+      const time = midpoint + (direction === -1 ? effect.interval : 0), dt = 1 / 240;
+      const p = dolphinPose(stage, 32, midpoint + dt, direction, scale);
+      const local = { x: 5 / 36 * scale + n.x * (14 / 36 * scale + .24),
+        y: 5 / 36 * scale + n.y * (14 / 36 * scale + .24) };
+      const position = { x: p.x + direction * (Math.cos(p.angle) * local.x - Math.sin(p.angle) * local.y),
+        y: p.y + Math.sin(p.angle) * local.x + Math.cos(p.angle) * local.y };
+      const roof = { type: 'static', position: { x: position.x, y: position.y - .31 },
+        shape: { type: 'box', width: 6, height: .05, rotation: 0 },
+        props: { density: 1, restitution: 1, angularVelocity: 0 } };
+      race.prepare({ ...stage, entities: [roof] }, ['roof contact'], effect); race.startRace([1, 1]); race.elapsed = time;
+      race.physics.placeMarble(0, position.x, position.y); race.physics.setMarbleVelocity(0, direction * 11.5, -10);
+      const original = race.stepDolphins, samples = [];
+      race.stepDolphins = function(dt, elapsed) {
+        const { time } = dolphinWave(effect, elapsed), before = dolphinPose(stage, 32, time, direction, scale);
+        const pose = dolphinPose(stage, 32, time + dt, direction, scale);
+        const motion = { vx: (pose.x - before.x) / dt, vy: (pose.y - before.y) / dt,
+          omega: direction * Math.atan2(Math.sin(pose.angle - before.angle), Math.cos(pose.angle - before.angle)) / dt };
+        const velocity = this.physics.getMarbleVelocity(0), position = this.physics.getMarblePosition(0);
+        const expected = dolphinBounce({ ...position, ...velocity }, pose, motion), prior = this.dolphinContacts.has('0:0');
+        original.call(this, dt, elapsed);
+        samples.push({ prior, expected, velocity, after: this.physics.getMarbleVelocity(0) });
+      };
+      try { for (let i = 0; i < 3; i++) race.advance(); }
+      finally { race.stepDolphins = original; }
+      assert.equal(samples[0].expected.hit, false, 'the initial overlap is separating');
+      const incoming = samples.find(sample => sample.expected?.hit);
+      assert.ok(incoming, 'the real roof reflects the marble into the dolphin');
+      assert.equal(incoming.prior, false, 'a separating-only overlap never locks the first impact');
+      near(incoming.after.vx, incoming.expected.vx, 'first incoming contact reflects horizontal velocity', 1e-5);
+      near(incoming.after.vy, incoming.expected.vy, 'first incoming contact reflects vertical velocity', 1e-5);
+      const repeated = samples.filter(sample => sample.prior && sample.expected);
+      assert.ok(repeated.length, 'the impact remains tracked while the surfaces overlap');
+      for (const sample of repeated) assert.deepEqual(sample.after, sample.velocity, 'continuous contact never reapplies an impulse');
+    }
+    console.log('PASS first dolphin impact after a real roof rebound and continuous-contact suppression in both directions');
     race.prepare(stage, ['contact'], { enabled: true, rows: [20], interval: 20 }); race.startRace([1, 1]);
     race.elapsed = midpoint; const p = dolphinPose(stage, 20, midpoint);
     race.physics.placeMarble(0, p.x, p.y - .4); race.physics.setMarbleVelocity(0, 0, 10);

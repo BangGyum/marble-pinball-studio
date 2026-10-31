@@ -65,6 +65,9 @@ async function rejected(data, expectedMessage) {
     await rejected(envelope({ ...empty, note: 'a'.repeat(MAX_MAP_FILE_BYTES) }), /1MB/);
     await rejected({ ...envelope(empty), format: 'other-map' }, /내보낸 맵/);
     await rejected({ ...envelope(empty), version: 2 }, /내보낸 맵/);
+    await rejected(envelope({ ...empty, art: { style: 'twin-funnel', contours: [] } }), /입체 출구/);
+    for (const style of ['crossway', 'fracture-canyon', 'bounce-stairs'])
+      await rejected(envelope({ ...empty, art: { style, contours: [] } }), /배경 장식/);
     const wall = points => ({ position: { x: 0, y: 0 }, type: 'static',
       shape: { type: 'polyline', rotation: 0, points }, props: { density: 1, restitution: 0, angularVelocity: 0 } });
     await rejected(envelope({ ...empty, entities: Array.from({ length: 12 }, () =>

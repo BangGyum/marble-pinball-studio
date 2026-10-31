@@ -38,6 +38,19 @@ for (let i = 0; i < 200; i++) {
 console.log('PASS wall grid follows line length, grid corners and crossing direction/layer');
 
 stages.forEach(validateStage);
+for (const style of ['crossway', 'fracture-canyon', 'bounce-stairs']) {
+  assert.throws(() => validateStage({ ...stage([]), art: { style, contours: [] } }), /배경 장식/,
+    `${style} requires an outline before rendering`);
+  assert.doesNotThrow(() => validateStage({ ...stage([]), art: { style, contours: [[[0, 0], [1, 0], [1, 1]]] } }));
+}
+const twin = stages.find(map => map.art?.style === 'twin-funnel');
+assert.throws(() => validateStage({ ...twin, exitBridge: undefined }), /입체 출구/,
+  'twin funnel scenery requires its bridge even when contours are present');
+assert.throws(() => validateStage({ ...stage([]), art: { style: 'twin-funnel', contours: [] } }), /입체 출구/);
+for (const style of ['roundhouse', 'orbital-lock'])
+  assert.doesNotThrow(() => validateStage({ ...stage([]), art: { style, contours: [] } }),
+    `${style} supports scenery without contours`);
+console.log('PASS style-specific scenery requirements and supported empty contours');
 const pins = Array.from({ length: 2000 }, (_, i) => ({ position: { x: i % 40, y: 20 + Math.floor(i / 40) }, type: 'static',
   shape: { type: 'circle', radius: .1 }, props: { density: 1, restitution: 0, angularVelocity: 0 } }));
 assert.equal(validateStage(stage(pins)).entities.length, 2000, 'ordinary maps keep their entity limit');

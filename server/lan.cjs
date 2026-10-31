@@ -188,7 +188,9 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
     if (!allowedHosts().has(req.headers.host ?? '')) return json(res, 403, { error: '허용되지 않은 접속 주소입니다.' });
-    const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+    let url;
+    try { url = new URL(req.url ?? '/', `http://${req.headers.host}`); }
+    catch { return json(res, 400, { error: '요청 주소가 올바르지 않습니다.' }); }
     if (req.method === 'POST' && ['/api/session', '/api/host-session'].includes(url.pathname)) {
       if (!validOrigin(req)) return json(res, 403, { error: '접속 출처를 확인할 수 없습니다.' });
       const isHost = url.pathname === '/api/host-session';

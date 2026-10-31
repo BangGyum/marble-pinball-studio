@@ -241,8 +241,10 @@ export class Race {
         if (Math.abs(pos.x - p.x) > 3 * scale || Math.abs(pos.y - p.y) > 3 * scale) continue;
         const contact = dolphinBounce({ ...pos, ...this.physics.getMarbleVelocity(ball.id) }, p, motion);
         if (!contact) continue;
-        const key = `${index}:${ball.id}`; touching.add(key);
-        if (contact.hit && !this.dolphinContacts.has(key)) this.physics.setMarbleVelocity(ball.id, contact.vx, contact.vy);
+        const key = `${index}:${ball.id}`, alreadyHit = this.dolphinContacts.has(key);
+        // Only an applied impact locks this contact until the surfaces separate.
+        if (contact.hit || alreadyHit) touching.add(key);
+        if (contact.hit && !alreadyHit) this.physics.setMarbleVelocity(ball.id, contact.vx, contact.vy);
       }
     }
     this.dolphinContacts = touching;

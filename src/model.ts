@@ -94,6 +94,7 @@ export function validateStage(value: unknown): StageDef {
   )
     throw new Error('올바른 맵 파일이 아니에요. 맵 이름, 결승선, 장애물을 확인해 주세요.');
   if (s.art !== undefined && (!s.art || !(ART_STYLES as readonly string[]).includes(s.art.style) || !Array.isArray(s.art.contours) ||
+    (s.art.contours.length === 0 && ['crossway', 'fracture-canyon', 'bounce-stairs'].includes(s.art.style)) ||
     s.art.contours.length > 20 || s.art.contours.some((points) => !Array.isArray(points) ||
       points.length < 3 || points.length > 1000 || points.some((p) => !Array.isArray(p) || p.length !== 2 ||
         !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))))
@@ -102,6 +103,8 @@ export function validateStage(value: unknown): StageDef {
     s.art.arrows.some((a) => !Array.isArray(a) || a.length !== 3 ||
       !finite(a[0], -1000, 1000) || !finite(a[1], -1000, 1000) || !finite(a[2], -100, 100))))
     throw new Error('맵 방향 표시가 올바르지 않아요.');
+  if (s.art?.style === 'twin-funnel' && !s.exitBridge)
+    throw new Error('쌍둥이 와류 배경에는 입체 출구가 필요해요.');
   if (s.exitBridge !== undefined) {
     const transfers = s.exitBridge?.transfers;
     if (transfers !== undefined && (!Array.isArray(transfers) || transfers.length > 10))

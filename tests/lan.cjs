@@ -51,6 +51,17 @@ async function connect(port, cookie, options = {}) {
   const clients = [];
   try {
     const port = app.port;
+    for (const route of ['http://[', 'http://127.0.0.1:invalid/']) {
+      const response = await request(port, route);
+      assert.equal(response.status, 400, 'malformed request targets are rejected without terminating the server');
+      const body = JSON.parse(response.body);
+      assert.deepEqual(Object.keys(body), ['error']);
+      assert.equal(typeof body.error, 'string');
+      const health = await request(port, '/api/health');
+      assert.equal(health.status, 200, 'the server still serves requests after each invalid URL');
+      assert.equal(JSON.parse(health.body).ok, true);
+    }
+    console.log('PASS malformed unauthenticated URLs return JSON 400 and LAN health stays available');
     const serialized = serializeCommand({ type: 'start', requestId: 'size_check', raceId: 'race' });
     assert.equal(JSON.parse(serialized).type, 'start');
     const emptyCommand = { type: 'configure', requestId: 'size_check', raceId: 'race',
@@ -170,6 +181,15 @@ async function connect(port, cookie, options = {}) {
     await host.command({ type: 'speed', value: 1 });
     const custom = { ...host.scene.stage, title: '편집 맵 검증' };
     assert.equal((await host.command({ type: 'configure', settings: { ...settings, stage: { ...custom, goalY: -1 } } })).ok, false);
+    const revision = host.scene.revision, raceId = host.scene.raceId;
+    for (const style of ['twin-funnel', 'crossway', 'fracture-canyon', 'bounce-stairs']) {
+      const invalid = { ...custom, exitBridge: undefined, art: { style, contours: [] } };
+      const result = await host.command({ type: 'configure', settings: { ...settings, stage: invalid } });
+      assert.equal(result.ok, false, 'invalid scenery cannot be broadcast to LAN renderers');
+      assert.match(result.error, /입체 출구|배경 장식/);
+      assert.equal(host.scene.revision, revision, 'rejected scenery preserves the current scene');
+      assert.equal(host.scene.raceId, raceId, 'rejected scenery preserves the prepared race');
+    }
     assert.equal((await host.command({ type: 'configure', settings: { ...settings, stage: custom } })).ok, true);
     await guest2.until(() => guest2.scene.stage.title === custom.title);
     assert.equal(app.race.stage.title, custom.title);

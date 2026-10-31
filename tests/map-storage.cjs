@@ -11,12 +11,13 @@ const storageFor = (raw) => {
 };
 const good = { id: 'good', stage: blankStage() };
 const bad = { id: 'bad', stage: { ...blankStage(), goalY: -1 } };
-const raw = JSON.stringify([good, bad, null]);
+const badArt = { id: 'bad-art', stage: { ...blankStage(), art: { style: 'twin-funnel', contours: [] } } };
+const raw = JSON.stringify([good, bad, badArt, null]);
 const storage = storageFor(raw);
 let invalid = 0;
 const recovered = readSavedMaps(storage, count => { invalid = count; });
 assert.deepEqual(recovered, [good]);
-assert.equal(invalid, 2);
+assert.equal(invalid, 3);
 assert.equal(storage.getItem(MAPS_KEY), raw, 'loading must not rewrite damaged data');
 const added = { id: 'new', stage: blankStage() };
 saveMaps(storage, [...recovered, added]);
