@@ -49,6 +49,19 @@ const near = (ball, points) => points.some((a, i) => {
         'both marbles reach the physical finish chute');
     }
     console.log('PASS canyon upper guide approach at 3 speeds without wedged marbles');
+    for (const [x, y, vx, minimum] of [[54, 36, 2, 33.5], [53.5, 55.5, 3, 52.5]]) {
+      race.prepare(stage, ['upward rebound']); physics.start();
+      physics.placeMarble(0, x, y); physics.setMarbleVelocity(0, vx, -20);
+      let minY = y;
+      for (let i = 0; i < 30; i++) { physics.step(1 / 60); minY = Math.min(minY, physics.getMarblePosition(0).y); }
+      assert.ok(minY > minimum, `upward rebound cannot enter the sealed right-bank guide at ${y}`);
+    }
+    console.log('PASS upward rebounds cannot enter either upper or middle right-bank pocket');
+    race.prepare(stage, ['inlet rock']); physics.start();
+    physics.placeMarble(0, 40.835, 20.254); physics.setMarbleVelocity(0, 0, 0);
+    for (let i = 0; i < 180; i++) physics.step(1 / 60);
+    assert.ok(physics.getMarblePosition(0).y > 24, 'the pointed inlet rock has no invisible backing shelf');
+    console.log('PASS inlet rock releases a resting marble without a random unsticking impulse');
     for (const count of (process.argv[2] ? [Number(process.argv[2])] : [1, 20, 40])) {
       for (const initial of (process.argv[3] ? [Number(process.argv[3])] : [123456, 271828, 314159, 161803, 57721, 141421])) {
         let seed = initial;
@@ -74,8 +87,8 @@ const near = (ball, points) => points.some((a, i) => {
           }
           if (steps % 3 === 0) for (const [index, e] of physics.entities.entries()) {
             const s = e.shape;
-            const isBridge = s.type === 'polyline' && s.points.length === 2 && Math.abs(s.points[1][0] - s.points[0][0]) > 12;
-            if (!isBridge && !s.boostSpeed && !e.timedGate) continue;
+            const isBridge = s.type === 'polyline' && (s.points.length === 2 || s.solid && !e.timedGate) && Math.abs(s.points[1][0] - s.points[0][0]) > 12;
+            if (!isBridge && !s.boostSpeed && !e.timedGate && !(e.moving && s.type === 'box')) continue;
             let edge = e.body.GetContactList();
             while (B.getPointer(edge)) {
               if (edge.contact.IsTouching() && edge.other.GetType() === B.b2_dynamicBody) {
@@ -108,6 +121,11 @@ const near = (ball, points) => points.some((a, i) => {
       assert.ok(contactIds.has(hatchIndex), 'the opening bridge must affect the race');
       for (const [index, entity] of stage.entities.entries()) if (entity.shape.boostSpeed !== undefined)
         assert.ok(contactIds.has(index), 'every boost pad, including the spring, must meet real marble paths: ' + index);
+      const side = stage.entities.flatMap((e, i) => e.type === 'kinematic' && e.shape.type === 'box' && e.position.y > 60 && e.position.y < 90 ? [i] : []);
+      const final = stage.entities.flatMap((e, i) => e.type === 'kinematic' && e.shape.type === 'box' && e.position.y > 100 ? [i] : []);
+      assert.equal(side.length, 2); assert.equal(final.length, 2);
+      assert.ok(side.some(i => contactIds.has(i)), 'the return rotor must meet the outside route');
+      assert.ok(final.some(i => contactIds.has(i)), 'the final rotor must meet the finish approach');
     }
     console.log('PASS canyon containment, both routes, bridges, boosters, finish and saved-map compatibility');
   } finally { Math.random = random; physics.clearMarbles(); physics.clear(); }

@@ -26,7 +26,7 @@ const inside = (p, points) => {
   return hit;
 };
 const walls = stage => stage.entities.filter(e =>
-  e.type === 'static' && e.shape.type === 'polyline' && !e.shape.solid && !e.shape.collisionLayer
+  e.type === 'static' && e.shape.type === 'polyline' && !e.shape.collisionLayer
 ).flatMap(e => segments(e.shape.points.map(p => rotate(p, e.shape.rotation, e.position))));
 function inTrack(stage, p) {
   if (stage === orbitalLock) {
@@ -70,6 +70,7 @@ function boostInTrack(stage, index) {
 freeRotor(orbitalLock, 20);
 freeRotor(fractureCanyon, 31);
 freeRotor(fractureCanyon, 32);
+for (const index of [9, 10, 23, 24]) freeRotor(fractureCanyon, index);
 for (const index of [18, 22, 23, 25]) boostInTrack(neonHourglass, index);
 boostInTrack(pinballCascade, 34);
 const jump = pinballCascade.entities[34].shape;

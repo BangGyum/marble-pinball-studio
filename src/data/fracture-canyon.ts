@@ -25,12 +25,27 @@ const islands: Point[][] = [
   [[22, 66], [26, 69], [25, 72], [24, 75], [20, 77], [18, 73], [19, 68], [22, 66]],
   [[42, 60], [46, 62], [48, 66], [46, 71], [47, 75], [45, 78], [40, 81], [38, 76], [39, 70], [38.5, 66], [42, 60]],
 ];
+// Closed guide pockets are rock in the scenery as well as unreachable in physics.
+const guides: Point[][] = [
+  [[59, 18], ...curve([57.5, 25], [58, 29], [54, 33], [49, 35]), [56, 33]],
+  [[60, 42], ...curve([59, 44], [58, 48], [55, 50], [51, 52]), [55, 53]],
+  [[59, 65], ...curve([58, 65], [57, 69], [54, 73], [49, 75]), [56, 76]],
+];
+const pockets = guides.map(points => {
+  const start = right.findIndex(p => p[0] === points[0][0] && p[1] === points[0][1]);
+  const end = right.findIndex(p => p[0] === points.at(-1)![0] && p[1] === points.at(-1)![1]);
+  return [...points, ...right.slice(start, end + 1).reverse().slice(1)];
+});
+// The pointed inlet rock needs one convex fixture: thick edge strips protrude at its tip.
+const inletRock: MapEntity = { position: { x: 0, y: 0 }, type: 'static',
+  shape: { type: 'polyline', points: islands[0], rotation: 0, solid: true, hidden: true, color: purple },
+  props: { density: 1, restitution: 0.05, angularVelocity: 0 } };
 const rail = (points: Point[], backing: number, color: string): MapEntity => {
   const e = wall(points, backing); e.shape.color = color; return e;
 };
-const boost = (x: number, y: number, rotation: number, speed = 26): MapEntity => ({
+const boost = (x: number, y: number, rotation: number, speed = 26, thickness = 0.6): MapEntity => ({
   position: { x, y }, type: 'static',
-  shape: { type: 'box', width: 0.95, height: 0.6, rotation, boostSpeed: speed, color: green },
+  shape: { type: 'box', width: 0.95, height: thickness, rotation, boostSpeed: speed, color: green },
   props: { density: 1, restitution: 0, angularVelocity: 0 },
 });
 const rotor = (x: number, y: number, radius: number, speed: number): MapEntity[] => [
@@ -41,36 +56,42 @@ const rotor = (x: number, y: number, radius: number, speed: number): MapEntity[]
     props: { density: 1, restitution: 0.2, angularVelocity: 0 } },
 ];
 const bridgeSlope = Math.atan2(10, 36);
-const bridge = (a: Point, b: Point): MapEntity => rail([a, b], a[0] < b[0] ? -0.65 : 0.65, purple);
-const hatch: MapEntity = { position: { x: 29, y: 31 + 15 * 10 / 36 }, type: 'kinematic',
+const bridge = (a: Point, b: Point, depth = 0.65): MapEntity => {
+  const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy);
+  const backing = a[0] < b[0] ? -depth : depth, nx = dy / length * backing, ny = -dx / length * backing;
+  // A solid deck avoids overlapping edge/backing contacts on the shallow slopes.
+  return { position: { x: 0, y: 0 }, type: 'static',
+    shape: { type: 'polyline', solid: true, rotation: 0, color: purple,
+      points: [a, b, [b[0] + nx, b[1] + ny], [a[0] + nx, a[1] + ny], a] },
+    props: { density: 1, restitution: 0.05, angularVelocity: 0 } };
+};
+const hatch: MapEntity = { position: { x: 35, y: 54 + 15 * 10 / 36 }, type: 'kinematic',
   shape: { type: 'polyline', solid: true, rotation: 0, color: purple,
-    points: [[0, 0], [6, 6 * 10 / 36], [6, 6 * 10 / 36 + 0.38], [0, 0.38], [0, 0]] },
+    points: [[0, 0], [-6, 6 * 10 / 36], [-6, 6 * 10 / 36 + 0.38], [0, 0.38], [0, 0]] },
   props: { density: 1, restitution: 0.05, angularVelocity: 0,
-    timedGate: { period: 4.8, openFor: 2.4, phase: 1.2, angle: 1.05, releaseAfter: 28 } } };
+    timedGate: { period: 4.8, openFor: 2.4, phase: 1.2, angle: -1.05, releaseAfter: 28 } } };
+const jump = boost(21.7, 79.65, -0.22, 24); jump.shape.color = '#ffc668';
 
 export const fractureCanyon: StageDef = {
   title: '균열 협곡', width: 64, spawnX: 32, goalY: 106, zoomY: 101, randomizeStart: true,
-  art: { style: 'fracture-canyon', contours: [[...left, ...right.slice().reverse()], ...islands],
-    arrows: [[11, 38, Math.PI / 2], [12, 66, Math.PI / 2], [52, 50, Math.PI / 2], [32, 102, Math.PI / 2]] },
+  art: { style: 'fracture-canyon', contours: [[...left, ...right.slice().reverse()], ...islands, ...pockets],
+    arrows: [[11, 64, Math.PI / 2], [32, 63, Math.PI / 2], [52, 50, Math.PI / 2], [32, 99, Math.PI / 2]] },
   entities: [
     rail(left, -0.9, green), rail(right, 0.9, purple),
-    ...islands.map((points, i) => rail(points, -0.7, i % 2 ? green : purple)),
+    ...islands.map((points, i) => i ? rail(points, -0.7, i % 2 ? green : purple) : inletRock),
     ...rotor(32, 12, 3.5, 2.2),
-    bridge([14, 31], [29, 31 + 15 * 10 / 36]), hatch,
-    bridge([35, 31 + 21 * 10 / 36], [50, 41]),
-    bridge([50, 54], [14, 64]), bridge([14, 78], [43, 86.05]),
-    // Join the guide to the outer rim so marbles cannot enter the dead-end gap behind it.
-    rail([[59, 18], ...curve([57.5, 25], [58, 29], [54, 33], [49, 35])], 0.6, purple),
-    rail(curve([59, 44], [58, 48], [55, 50], [51, 52]), 0.6, purple),
-    // Close the outer pocket so upward rebounds cannot wedge behind this guide.
-    rail([[59, 65], ...curve([58, 65], [57, 69], [54, 73], [49, 75]), [56, 76]], 0.6, purple),
+    bridge([14, 31], [50, 41]),
+    bridge([50, 54], [35, 54 + 15 * 10 / 36]), hatch,
+    bridge([29, 54 + 21 * 10 / 36], [14, 64]), bridge([14, 78], [43, 86.05]),
+    ...guides.map(points => rail(points, 0.6, purple)),
     rail([[5, 26], [11, 29]], -0.6, green),
     rail([[6, 48], [11, 51]], -0.6, green),
     rail([[6, 68], [11, 71]], -0.6, green),
-    ...rotor(13, 46, 2.4, -1.5),
-    boost(23, 33.1, bridgeSlope), boost(39, 56.5, Math.PI - bridgeSlope),
-    boost(11, 40, Math.PI / 2, 29), boost(12, 69, Math.PI / 2, 29),
-    boost(21.7, 79.65, -0.22, 24),
-    ...rotor(47, 86, 2, -1.3),
+    ...rotor(14.5, 74.2, 2.4, 1.5),
+    boost(45.3, 38.8, bridgeSlope), boost(39, 56.1, Math.PI - bridgeSlope),
+    boost(32, 67, Math.PI / 2, 23, 2), boost(10.05, 69.4, Math.atan2(3, 5), 24),
+    jump,
+    ...rotor(32, 104.3, 0.95, -2.7),
+    bridge([29, 101], [32, 102], 0.45), bridge([35, 102], [33.7, 103.5], 0.45),
   ],
 };

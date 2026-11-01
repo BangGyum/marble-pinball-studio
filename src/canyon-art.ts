@@ -49,6 +49,13 @@ function paintCanyon(ctx: Context, stage: StageDef, texture?: HTMLImageElement) 
     ctx.lineJoin = 'round'; ctx.strokeStyle = sceneColor('#00000099'); ctx.lineWidth = 0.55; ctx.stroke();
     ctx.strokeStyle = sceneColor(i % 2 ? '#8cb95755' : '#9a73c755'); ctx.lineWidth = 0.28; ctx.stroke();
   });
+  for (const e of stage.entities ?? []) {
+    const s = e.shape;
+    if (s.type !== 'polyline' || !s.hidden || !s.solid) continue;
+    ctx.save(); ctx.translate(e.position.x, e.position.y); ctx.rotate(s.rotation);
+    ctx.beginPath(); path(ctx, s.points); ctx.strokeStyle = sceneColor(s.color ?? '#b58aff'); ctx.lineWidth = 0.15; ctx.stroke();
+    ctx.restore();
+  }
   for (const [x, y, angle] of stage.art!.arrows ?? []) {
     ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.strokeStyle = sceneColor(x < 32 ? '#aeff78' : '#c89aff'); ctx.lineWidth = 0.14;
     for (const offset of [-0.7, 0, 0.7]) {
@@ -58,6 +65,28 @@ function paintCanyon(ctx: Context, stage: StageDef, texture?: HTMLImageElement) 
   }
   ctx.textAlign = 'center'; ctx.font = '700 0.65px system-ui'; ctx.fillStyle = sceneColor('#a3b9aa');
   ctx.fillText('FRACTURE', 13.5, 6); ctx.fillStyle = sceneColor('#b0a2c4'); ctx.fillText('CANYON', 50.5, 6);
+  const label = (text: string, x: number, y: number, target: Point, color: string) => {
+    ctx.strokeStyle = sceneColor(color + '80'); ctx.lineWidth = 0.06;
+    ctx.beginPath(); ctx.moveTo(x, y + 0.5); ctx.lineTo(x, y + 1.1); ctx.lineTo(...target); ctx.stroke();
+    ctx.font = '700 0.72px system-ui'; ctx.lineWidth = 0.2; ctx.strokeStyle = sceneColor('#030609');
+    ctx.strokeText(text, x, y); ctx.fillStyle = sceneColor(color); ctx.fillText(text, x, y);
+  };
+  const entities = stage.entities ?? [];
+  const accelerator = entities.find(e => e.shape.type === 'box' && e.shape.boostSpeed && e.position.y < 45 && Math.abs(e.shape.rotation) < 0.5);
+  if (accelerator) label('가속 다리', accelerator.position.x, accelerator.position.y - 4.3,
+    [accelerator.position.x, accelerator.position.y - 0.7], '#a6ff63');
+  const gate = entities.find(e => e.props.timedGate);
+  if (gate) label('개폐 다리', gate.position.x - 7, gate.position.y - 4,
+    [gate.position.x - 2.5, gate.position.y + 0.7], '#c8a4ff');
+  const chute = entities.find(e => e.shape.type === 'box' && e.shape.boostSpeed && e.shape.height > 1.5);
+  if (chute) label('낙하 지름길', chute.position.x + 6, chute.position.y - 1,
+    [chute.position.x + 0.5, chute.position.y], '#a6ff63');
+  const jump = entities.find(e => e.shape.type === 'box' && e.shape.boostSpeed && e.shape.rotation < 0);
+  if (jump) label('도약 패드', jump.position.x + 7, jump.position.y + 7,
+    [jump.position.x, jump.position.y + 0.8], '#ffc668');
+  const final = entities.find(e => e.type === 'kinematic' && e.shape.type === 'box' && e.position.y > 100);
+  if (final) label('결승 로터', final.position.x + 9, final.position.y - 4.5,
+    [final.position.x + 1.2, final.position.y], '#c8a4ff');
   // The painted finish has an open bottom, matching the real exit.
   for (let row = 0; row < 2; row++) for (let col = 0; col < 12; col++) {
     ctx.fillStyle = sceneColor((row + col) % 2 ? '#0a1210' : '#a9d6a9');
@@ -99,9 +128,12 @@ export function drawCanyonDevices(ctx: Context, entities: MapEntityState[], scal
     if (s.type === 'polyline' && s.points.length === 2 && Math.abs(s.points[1][0] - s.points[0][0]) > 12) {
       bridgeDeck(ctx, s.points[0], s.points[1], s.points[0][0] < s.points[1][0] ? '#a6ff63' : '#b58aff');
     } else if (s.type === 'polyline' && s.solid) {
-      bridgeDeck(ctx, s.points[0], s.points[1], '#b58aff');
-      ctx.beginPath(); ctx.arc(0, 0, 0.38, 0, Math.PI * 2); ctx.fillStyle = sceneColor('#9b7fc5'); ctx.fill();
-      ctx.beginPath(); ctx.arc(0, 0, 0.17, 0, Math.PI * 2); ctx.fillStyle = sceneColor('#16231b'); ctx.fill();
+      const hinged = s.points[0][0] === 0 && s.points[0][1] === 0;
+      bridgeDeck(ctx, s.points[0], s.points[1], hinged || s.points[0][0] > s.points[1][0] ? '#b58aff' : '#a6ff63');
+      if (hinged) {
+        ctx.beginPath(); ctx.arc(0, 0, 0.38, 0, Math.PI * 2); ctx.fillStyle = sceneColor('#9b7fc5'); ctx.fill();
+        ctx.beginPath(); ctx.arc(0, 0, 0.17, 0, Math.PI * 2); ctx.fillStyle = sceneColor(Math.abs(e.angle) > 0.5 ? '#a6ff63' : '#b58aff'); ctx.fill();
+      }
     } else if (s.type === 'box' && s.boostSpeed === undefined) {
       ctx.rotate(s.rotation);
       const material = ctx.createLinearGradient(0, -s.height, 0, s.height);
@@ -111,7 +143,7 @@ export function drawCanyonDevices(ctx: Context, entities: MapEntityState[], scal
       ctx.strokeStyle = sceneColor('#caffe1'); ctx.lineWidth = 0.06 + 0.3 / scale; ctx.stroke();
     } else if (s.type === 'box' && s.boostSpeed !== undefined && s.rotation < 0) {
       // The spring is drawn behind the accelerating pad, along its actual impulse direction.
-      ctx.rotate(s.rotation); ctx.strokeStyle = sceneColor('#c7ff94'); ctx.lineWidth = 0.13;
+      ctx.rotate(s.rotation); ctx.strokeStyle = sceneColor(s.color ?? '#c7ff94'); ctx.lineWidth = 0.13;
       ctx.beginPath(); ctx.moveTo(-2.3, 0);
       for (let i = 0; i < 13; i++) ctx.lineTo(-2.3 + i * 0.11, i % 2 ? 0.4 : -0.4);
       ctx.lineTo(-0.9, 0); ctx.stroke();

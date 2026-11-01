@@ -28,10 +28,20 @@ const { drawEntities } = require('../src/draw.ts');
 const { drawRoundhouseArt } = require('../src/roundhouse-art.ts');
 const { drawOrbitalArt } = require('../src/orbital-art.ts');
 const { orbitalLock } = require('../src/data/orbital-lock.ts');
+const { fractureCanyon } = require('../src/data/fracture-canyon.ts');
 const { drawMapOverlay } = require('../src/map-art.ts');
 const { visibleArt } = require('../src/art-visibility.ts');
 const { Game } = require('../src/game.ts');
 const { LanView } = require('../src/lan/view.ts');
+
+const canyonMini = new RenderCache(), canyonEntities = fractureCanyon.entities.map(e => ({
+  x: e.position.x, y: e.position.y, angle: 0, shape: e.shape, life: -1,
+}));
+canyonMini.drawMinimap(ctx, fractureCanyon, canyonEntities, 2, 1);
+const canyonPaints = () => calls.filter(call => call[0] === 'fillText' && call[1] === 'CANYON').length;
+assert.equal(canyonPaints(), 1, 'the canyon minimap paints the same rock scenery as the main view');
+canyonMini.drawMinimap(ctx, fractureCanyon, canyonEntities, 2, 1);
+assert.equal(canyonPaints(), 1, 'the static canyon minimap scenery is cached');
 
 const backgrounds = new BackgroundCache(200, 100), stages = [{}, {}, {}];
 let painted = 0;
