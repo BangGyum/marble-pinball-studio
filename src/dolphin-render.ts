@@ -1,6 +1,7 @@
 import type { StageDef } from './stage-def';
 import { dolphinPose, dolphinScale, dolphinWave, DOLPHIN_DURATION, DOLPHIN_SWIM, DOLPHIN_WIDTH, type DolphinSettings } from './dolphin';
 import { sceneColor } from './scene-theme';
+import { DOLPHIN_HEIGHT, DOLPHIN_OUTLINE, DOLPHIN_SPRITE_RECT } from './dolphin-hitbox';
 
 type View = { left: number; right: number; top: number; bottom: number };
 export class DolphinRenderer {
@@ -14,20 +15,18 @@ export class DolphinRenderer {
   private guideScale = -1;
   private drawBody(ctx: CanvasRenderingContext2D) {
     if (this.body) {
-      const height = DOLPHIN_WIDTH * this.body.height / this.body.width;
-      ctx.drawImage(this.body, -DOLPHIN_WIDTH / 2, -height / 2, DOLPHIN_WIDTH, height); return;
+      ctx.drawImage(this.body, -DOLPHIN_WIDTH / 2, -DOLPHIN_HEIGHT / 2, DOLPHIN_WIDTH, DOLPHIN_HEIGHT); return;
     }
     // Keep the collision visible while the texture is loading, including late LAN joins.
-    ctx.fillStyle = '#76bdce'; ctx.beginPath(); ctx.ellipse(0, 0, 1.5, .4, -.08, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(1.2, -.15); ctx.lineTo(2, .05); ctx.lineTo(1.2, .2);
-    ctx.moveTo(-1.3, 0); ctx.lineTo(-2, -.4); ctx.lineTo(-1.8, 0); ctx.lineTo(-2, .4); ctx.lineTo(-1.3, .1);
-    ctx.moveTo(-.4, -.3); ctx.lineTo(-.5, -.8); ctx.lineTo(.2, -.35); ctx.fill();
+    ctx.fillStyle = '#76bdce'; ctx.beginPath(); ctx.moveTo(...DOLPHIN_OUTLINE[0]);
+    for (let i = 1; i < DOLPHIN_OUTLINE.length; i++) ctx.lineTo(...DOLPHIN_OUTLINE[i]);
+    ctx.closePath(); ctx.fill();
   }
   private load(width = 384) {
     width = Math.min(1675, Math.max(384, width));
     if (this.body && this.body.width >= width && this.splash) return true;
     if (typeof document === 'undefined') return false;
-    const crop = (id: string, rect: number[], width: number) => {
+    const crop = (id: string, rect: readonly number[], width: number) => {
       const image = document.getElementById(id) as HTMLImageElement | null;
       if (!image) return;
       image.loading = 'eager';
@@ -36,7 +35,7 @@ export class DolphinRenderer {
       canvas.getContext('2d')!.drawImage(image, rect[0], rect[1], rect[2], rect[3], 0, 0, canvas.width, canvas.height);
       return canvas;
     };
-    if (!this.body || this.body.width < width) this.body = crop('dolphin-sprite', [53, 102, 1675, 626], width) ?? this.body;
+    if (!this.body || this.body.width < width) this.body = crop('dolphin-sprite', DOLPHIN_SPRITE_RECT, width) ?? this.body;
     this.splash ??= crop('dolphin-splash', [69, 133, 1651, 671], 320);
     return !!this.body && !!this.splash;
   }

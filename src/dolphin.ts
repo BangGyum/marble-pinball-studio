@@ -1,8 +1,9 @@
 import type { StageDef } from './stage-def';
+import { dolphinSurface, DOLPHIN_SPRITE_WIDTH } from './dolphin-hitbox';
 
 export type DolphinSettings = { enabled: boolean; rows: number[]; interval: number; size?: number };
 export const DOLPHIN_DURATION = 4.35;
-export const DOLPHIN_WIDTH = 4;
+export const DOLPHIN_WIDTH = DOLPHIN_SPRITE_WIDTH;
 export const DOLPHIN_BASE_SCALE = 3;
 export const DOLPHIN_SWIM = .08;
 export const MAX_DOLPHIN_ROWS = 6;
@@ -51,26 +52,33 @@ export function dolphinWave(settings: DolphinSettings, elapsed: number, preview 
   const wave = Math.floor((elapsed + 1e-9) / interval);
   return { wave, time: Math.max(0, elapsed - wave * interval) };
 }
-export function dolphinBounce(ball: { x: number; y: number; vx: number; vy: number }, p: DolphinPose,
-  motion: { vx: number; vy: number; omega: number }) {
+export function dolphinContact(ball: { x: number; y: number }, p: DolphinPose) {
   const c = Math.cos(p.angle), s = Math.sin(p.angle), dx = (ball.x - p.x) * p.direction, dy = ball.y - p.y;
   const scale = p.scale ?? 1;
-  const x = dx * c + dy * s, y = -dx * s + dy * c, ax = -38 / 36 * scale, ay = 10 / 36 * scale, sx = 86 / 36 * scale, sy = -10 / 36 * scale;
-  const radius = 14 / 36 * scale, t = Math.max(0, Math.min(1, ((x - ax) * sx + (y - ay) * sy) / (sx * sx + sy * sy)));
-  const qx = ax + sx * t, qy = ay + sy * t, distance = Math.hypot(x - qx, y - qy);
-  if (distance >= radius + .25) return;
-  const nx = distance > 1e-8 ? (x - qx) / distance : sy / Math.hypot(sx, sy);
-  const ny = distance > 1e-8 ? (y - qy) / distance : -sx / Math.hypot(sx, sy);
-  const rx = p.direction * (c * (qx + nx * radius) - s * (qy + ny * radius));
-  const ry = s * (qx + nx * radius) + c * (qy + ny * radius);
-  if (p.y + ry > p.waterY) return;
+  const surface = dolphinSurface((dx * c + dy * s) / scale, (-dx * s + dy * c) / scale, .25 / scale,
+    { x: s, y: c, limit: (p.waterY - p.y) / scale });
+  if (!surface) return;
+  const { nx, ny } = surface;
+  const rx = p.direction * scale * (c * surface.x - s * surface.y);
+  const ry = scale * (s * surface.x + c * surface.y);
   const normalX = p.direction * (c * nx - s * ny), normalY = s * nx + c * ny;
-  const inward = (ball.vx - motion.vx + motion.omega * ry) * normalX +
-    (ball.vy - motion.vy - motion.omega * rx) * normalY;
+  return { rx, ry, normalX, normalY };
+}
+export function dolphinBounce(ball: { x: number; y: number; vx: number; vy: number }, p: DolphinPose,
+  motion: { vx: number; vy: number; omega: number }, initialImpact = true, contact = dolphinContact(ball, p)) {
+  if (!contact) return;
+  const { rx, ry, normalX, normalY } = contact;
+  const wallX = motion.vx - motion.omega * ry, wallY = motion.vy + motion.omega * rx;
+  const inward = (ball.vx - wallX) * normalX + (ball.vy - wallY) * normalY;
   if (inward >= 0) return { vx: ball.vx, vy: ball.vy, hit: false };
   // Velocity only: Box2D resolves walls; the effect never teleports a marble across them.
-  const impulse = -(1 + (inward < -.28 ? .55 : 0)) * inward;
+  const impulse = -(1 + (initialImpact && inward < -.28 ? .55 : 0)) * inward;
   const vx = ball.vx + impulse * normalX, vy = ball.vy + impulse * normalY, speed = Math.hypot(vx, vy);
   const limit = Math.min(1, 30 / Math.max(1e-9, speed));
-  return { vx: vx * limit, vy: vy * limit, hit: true };
+  // A fast surface must still carry the marble outward after limiting the bounce speed.
+  const carry = Math.max(0, -((vx * limit - wallX) * normalX + (vy * limit - wallY) * normalY));
+  const carriedX = vx * limit + carry * normalX, carriedY = vy * limit + carry * normalY;
+  // Rapid waterline turns must not turn the contact constraint into an extreme launch.
+  const safety = Math.min(1, 60 / Math.max(1e-9, Math.hypot(carriedX, carriedY)));
+  return { vx: carriedX * safety, vy: carriedY * safety, hit: true };
 }

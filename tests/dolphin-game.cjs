@@ -51,16 +51,31 @@ for (const time of [0, .5, 1.5, 1.933, 3, 5.7]) {
   const a = dolphinPose(stage, 20, time), b = dolphinPose(stage, 20, time, -1);
   near(a.x + b.x, 26, 'mirrored dolphin positions'); near(a.y, b.y, 'mirrored dolphin heights');
 }
-const n = { x: -10 / Math.hypot(86, -10), y: -86 / Math.hypot(86, -10) }, tangent = { x: -n.y, y: n.x };
+// The straight upper-back edge in the source outline runs from pixel (1170,225) to (1273,227).
+const surfacePoint = { x: (1221.5 - 53 - 1675 / 2) * 4 / 1675, y: (226 - 102 - 626 / 2) * 4 / 1675 };
+const n = { x: 2 / Math.hypot(103, 2), y: -103 / Math.hypot(103, 2) }, tangent = { x: -n.y, y: n.x };
 const pose = { x: 13, y: 20, angle: 0, direction: 1, waterY: 30 };
-const ball = { x: 13 + 5 / 36 + n.x * .63, y: 20 + 5 / 36 + n.y * .63,
+const ball = { x: 13 + surfacePoint.x + n.x * .24, y: 20 + surfacePoint.y + n.y * .24,
   vx: -n.x * 10 + tangent.x * 3, vy: -n.y * 10 + tangent.y * 3 };
 const velocity = dolphinBounce(ball, pose, { vx: 0, vy: 0, omega: 0 }); assert.ok(velocity?.hit);
 near(velocity.vx * n.x + velocity.vy * n.y, 5.5, 'normal reflection');
 near(velocity.vx * tangent.x + velocity.vy * tangent.y, 3, 'tangential momentum');
+const sustained = dolphinBounce(ball, pose, { vx: 0, vy: 0, omega: 0 }, false);
+near(sustained.vx * n.x + sustained.vy * n.y, 0, 'sustained contact removes inward motion without another bounce');
+near(sustained.vx * tangent.x + sustained.vy * tangent.y, 3, 'sustained contact preserves tangential momentum');
+const fastWall = { vx: n.x * 40, vy: n.y * 40, omega: 0 };
+for (const initialImpact of [true, false]) {
+  const pushed = dolphinBounce({ ...ball, vx: 0, vy: 0 }, pose, fastWall, initialImpact);
+  assert.ok((pushed.vx - fastWall.vx) * n.x + (pushed.vy - fastWall.vy) * n.y >= -1e-6,
+    'the speed limit must not leave the marble moving into a faster dolphin');
+  const rapidTurn = dolphinBounce({ ...ball, vx: 0, vy: 0 }, pose,
+    { vx: n.x * 120, vy: n.y * 120, omega: 0 }, initialImpact);
+  assert.ok(Math.hypot(rapidTurn.vx, rapidTurn.vy) <= 60 + 1e-6,
+    'fast waterline turns cannot launch a marble at an unbounded speed');
+}
 assert.equal(dolphinBounce({ ...ball, y: ball.y + 20 }, { ...pose, y: 40 }, { vx: 0, vy: 0, omega: 0 }), undefined, 'submerged surfaces do not hit');
 for(const scale of [1.5,3,6]) {
-  const point={...ball,x:13+5/36*scale+n.x*(14/36*scale+.24),y:20+5/36*scale+n.y*(14/36*scale+.24)};
+  const point={...ball,x:13+surfacePoint.x*scale+n.x*.24,y:20+surfacePoint.y*scale+n.y*.24};
   const result=dolphinBounce(point,{...pose,scale},{vx:0,vy:0,omega:0});
   assert.ok(result?.hit); near(result.vx*n.x+result.vy*n.y,5.5,'scaled surface has the same normal reflection');
   assert.equal(dolphinBounce({...point,x:point.x+n.x*.02,y:point.y+n.y*.02},{...pose,scale},{vx:0,vy:0,omega:0}),undefined,
@@ -87,8 +102,7 @@ console.log('PASS dolphin size/bounds, legacy default, actual/preview timing, LA
       const effect = { enabled: true, rows: [32], interval: 5, size: 100 }, scale = dolphinScale(effect);
       const time = midpoint + (direction === -1 ? effect.interval : 0), dt = 1 / 240;
       const p = dolphinPose(stage, 32, midpoint + dt, direction, scale);
-      const local = { x: 5 / 36 * scale + n.x * (14 / 36 * scale + .24),
-        y: 5 / 36 * scale + n.y * (14 / 36 * scale + .24) };
+      const local = { x: surfacePoint.x * scale + n.x * .24, y: surfacePoint.y * scale + n.y * .24 };
       const position = { x: p.x + direction * (Math.cos(p.angle) * local.x - Math.sin(p.angle) * local.y),
         y: p.y + Math.sin(p.angle) * local.x + Math.cos(p.angle) * local.y };
       const roof = { type: 'static', position: { x: position.x, y: position.y - .31 },
@@ -103,7 +117,8 @@ console.log('PASS dolphin size/bounds, legacy default, actual/preview timing, LA
         const motion = { vx: (pose.x - before.x) / dt, vy: (pose.y - before.y) / dt,
           omega: direction * Math.atan2(Math.sin(pose.angle - before.angle), Math.cos(pose.angle - before.angle)) / dt };
         const velocity = this.physics.getMarbleVelocity(0), position = this.physics.getMarblePosition(0);
-        const expected = dolphinBounce({ ...position, ...velocity }, pose, motion), prior = this.dolphinContacts.has('0:0');
+        const prior = this.dolphinContacts.has('0:0');
+        const expected = dolphinBounce({ ...position, ...velocity }, pose, motion, !prior);
         original.call(this, dt, elapsed);
         samples.push({ prior, expected, velocity, after: this.physics.getMarbleVelocity(0) });
       };
@@ -117,12 +132,44 @@ console.log('PASS dolphin size/bounds, legacy default, actual/preview timing, LA
       near(incoming.after.vy, incoming.expected.vy, 'first incoming contact reflects vertical velocity', 1e-5);
       const repeated = samples.filter(sample => sample.prior && sample.expected);
       assert.ok(repeated.length, 'the impact remains tracked while the surfaces overlap');
-      for (const sample of repeated) assert.deepEqual(sample.after, sample.velocity, 'continuous contact never reapplies an impulse');
+      for (const sample of repeated) {
+        const expected = sample.expected.hit ? sample.expected : sample.velocity;
+        near(sample.after.vx, expected.vx, 'sustained contact applies only the inward-velocity constraint', 1e-5);
+        near(sample.after.vy, expected.vy, 'sustained contact applies no repeated restitution', 1e-5);
+      }
     }
-    console.log('PASS first dolphin impact after a real roof rebound and continuous-contact suppression in both directions');
+    console.log('PASS first dolphin impact after a real roof rebound and single restitution in both directions');
+    {
+      const effect = { enabled: true, rows: [32], interval: 5, size: 100 }, dt = 1 / 240, scale = dolphinScale(effect);
+      const a = dolphinPose(stage, 32, midpoint, 1, scale), p = dolphinPose(stage, 32, midpoint + dt, 1, scale);
+      const local = { x: surfacePoint.x * scale + n.x * .24, y: surfacePoint.y * scale + n.y * .24 };
+      const position = { x: p.x + Math.cos(p.angle) * local.x - Math.sin(p.angle) * local.y,
+        y: p.y + Math.sin(p.angle) * local.x + Math.cos(p.angle) * local.y };
+      const nx = Math.cos(p.angle) * n.x - Math.sin(p.angle) * n.y, ny = Math.sin(p.angle) * n.x + Math.cos(p.angle) * n.y;
+      const rx = position.x - p.x - nx * .24, ry = position.y - p.y - ny * .24;
+      const omega = Math.atan2(Math.sin(p.angle - a.angle), Math.cos(p.angle - a.angle)) / dt;
+      const wall = { vx: (p.x - a.x) / dt - omega * ry, vy: (p.y - a.y) / dt + omega * rx };
+      race.prepare(stage, ['continuous contact'], effect); race.startRace([1, 1]);
+      race.physics.placeMarble(0, position.x, position.y); race.physics.setMarbleVelocity(0, 0, 10);
+      race.stepDolphins(dt, midpoint);
+      assert.ok(race.dolphinContacts.has('0:0'), 'the initial bounce is tracked');
+      for (let i = 0; i < 3; i++) {
+        // Another force may push the ball inward again before it separates from the dolphin.
+        race.physics.setMarbleVelocity(0, wall.vx - nx * 2, wall.vy - ny * 2);
+        const before = race.physics.getMarblePosition(0);
+        race.stepDolphins(dt, midpoint);
+        const v = race.physics.getMarbleVelocity(0);
+        near((v.vx - wall.vx) * nx + (v.vy - wall.vy) * ny, 0, 'continued contact stops inward motion without another launch', 1e-5);
+        assert.deepEqual(race.physics.getMarblePosition(0), before, 'dolphin contact never teleports a ball through map walls');
+      }
+      console.log('PASS sustained dolphin contact prevents inward motion without repeated restitution or teleportation');
+    }
     race.prepare(stage, ['contact'], { enabled: true, rows: [20], interval: 20 }); race.startRace([1, 1]);
-    race.elapsed = midpoint; const p = dolphinPose(stage, 20, midpoint);
-    race.physics.placeMarble(0, p.x, p.y - .4); race.physics.setMarbleVelocity(0, 0, 10);
+    race.elapsed = midpoint; const p = dolphinPose(stage, 20, midpoint + 1 / 240), contactScale = dolphinScale(race.dolphins);
+    const contactX = surfacePoint.x * contactScale + n.x * .24, contactY = surfacePoint.y * contactScale + n.y * .24;
+    race.physics.placeMarble(0, p.x + Math.cos(p.angle) * contactX - Math.sin(p.angle) * contactY,
+      p.y + Math.sin(p.angle) * contactX + Math.cos(p.angle) * contactY);
+    race.physics.setMarbleVelocity(0, 0, 30);
     let impacts = 0; const setVelocity = race.physics.setMarbleVelocity.bind(race.physics);
     race.physics.setMarbleVelocity = (...args) => { impacts++; setVelocity(...args); };
     race.advance(); assert.ok(impacts > 0, 'the real Box2D race receives the dolphin impact');
@@ -131,6 +178,33 @@ console.log('PASS dolphin size/bounds, legacy default, actual/preview timing, LA
     race.elapsed=midpoint;const scale=dolphinScale({size:200}),large=dolphinPose(stage,20,midpoint,1,scale);
     race.physics.placeMarble(0,large.x+1.55*scale,large.y);race.physics.setMarbleVelocity(0,-10,0);impacts=0;
     race.advance();assert.ok(impacts>0,'large dolphin contacts beyond the original 3-unit broad phase are included');
+    {
+      const effect = { enabled: true, rows: [20], interval: 5, size: 200 }, dt = 1 / 240;
+      race.prepare(stage, names, effect); race.startRace([1, 100]);
+      const p = dolphinPose(stage, 20, midpoint + dt, 1, dolphinScale(effect));
+      const x = (400.5 - 53 - 1675 / 2) * 4 / 1675 * p.scale, y = (650.5 - 102 - 626 / 2) * 4 / 1675 * p.scale;
+      const position = { x: p.x + Math.cos(p.angle) * x - Math.sin(p.angle) * y,
+        y: p.y + Math.sin(p.angle) * x + Math.cos(p.angle) * y };
+      assert.equal(dolphinBounce({ ...position, vx: 0, vy: 0 }, p, { vx: 0, vy: 0, omega: 0 }), undefined,
+        'the transparent tail gap lies inside the broad phase but outside the real outline');
+      for (const ball of race.balls) race.physics.placeMarble(ball.id, position.x, position.y);
+      const velocity = race.physics.getMarbleVelocity.bind(race.physics); let reads = 0;
+      race.physics.getMarbleVelocity = id => { reads++; return velocity(id); };
+      try { race.stepDolphins(dt, midpoint); }
+      finally { race.physics.getMarbleVelocity = velocity; }
+      assert.equal(reads, 0, '100 marbles in transparent space do not read WASM velocities or create contacts');
+      assert.equal(race.dolphinContacts.size, 0);
+      console.log('PASS dolphin broad-phase misses avoid all 100 unnecessary WASM velocity reads');
+    }
+    {
+      const canyon = stages.find(map => map.title === '균열 협곡');
+      race.prepare(canyon, ['upward rebound']); race.physics.start();
+      race.physics.placeMarble(0, 55, 78); race.physics.setMarbleVelocity(0, 2, -20);
+      let minY = 78;
+      for (let i = 0; i < 30; i++) { race.physics.step(1 / 60); minY = Math.min(minY, race.physics.getMarblePosition(0).y); }
+      assert.ok(minY > 75.5, 'an upward dolphin rebound cannot enter the dead-end pocket behind the lower canyon guide');
+    }
+    console.log('PASS upward canyon rebounds stay outside the closed guide pocket');
     for (const size of (process.argv.includes('--sizes')?[50,100,200]:[100])) for (const map of stages) {
       race.prepare(map, names, { enabled: true, rows: dolphinRows(map, 6, 20), interval: 5, size }); race.startRace([1, 1]);
       for (let i = 0; i < (process.argv.includes('--finish') ? 60 * 650 : 720) && race.state === 'running'; i++) {

@@ -62,7 +62,8 @@ export const fractureCanyon: StageDef = {
     // Join the guide to the outer rim so marbles cannot enter the dead-end gap behind it.
     rail([[59, 18], ...curve([57.5, 25], [58, 29], [54, 33], [49, 35])], 0.6, purple),
     rail(curve([59, 44], [58, 48], [55, 50], [51, 52]), 0.6, purple),
-    rail(curve([58, 65], [57, 69], [54, 73], [49, 75]), 0.6, purple),
+    // Close the outer pocket so upward rebounds cannot wedge behind this guide.
+    rail([[59, 65], ...curve([58, 65], [57, 69], [54, 73], [49, 75]), [56, 76]], 0.6, purple),
     rail([[5, 26], [11, 29]], -0.6, green),
     rail([[6, 48], [11, 51]], -0.6, green),
     rail([[6, 68], [11, 71]], -0.6, green),

@@ -2,7 +2,7 @@
 .dolphin-settings { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; background: var(--panel); }
 .dolphin-settings:has([role="switch"]:checked) { border-color: var(--accent); }
 .dolphin-heading label { display: flex; justify-content: space-between; align-items: center; gap: 16px; cursor: pointer; }
-.dolphin-heading input { appearance: none; width: 42px; height: 24px; border-radius: 20px; background: var(--line); padding: 3px; margin: 0; cursor: pointer; flex: none; }
+.dolphin-heading input[role="switch"] { appearance: none; width: 42px; height: 24px; border-radius: 20px; background: var(--line); padding: 3px; margin: 0; cursor: pointer; flex: none; }
 .dolphin-heading input::before { content: ''; display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--text); }
 .dolphin-heading input:checked { background: var(--accent); }
 .dolphin-heading input:checked::before { transform: translateX(17px); background: var(--bg); }

@@ -4,7 +4,8 @@ import type { IPhysics } from './IPhysics';
 import type { StageDef } from './data/maps';
 import { shuffled, type WinnerOrder } from './model';
 import { WallGuard, WALL_GUARD_MAX_SPEED } from './wall-guard';
-import { dolphinBounce, dolphinPose, dolphinScale, dolphinWave, DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from './dolphin';
+import { dolphinBounce, dolphinContact, dolphinPose, dolphinScale, dolphinWave, DOLPHIN_DURATION, DOLPHIN_WIDTH, validateDolphins, type DolphinSettings } from './dolphin';
+import { DOLPHIN_HEIGHT } from './dolphin-hitbox';
 
 export type Ball = {
   id: number;
@@ -69,6 +70,7 @@ export class Race {
   elapsed = 0;
   dolphins: DolphinSettings = { enabled: false, rows: [], interval: 5 };
   private dolphinContacts = new Set<string>();
+  private dolphinNextContacts = new Set<string>();
   onFinish: (winners: Ball[]) => void = () => {};
   private walls?: WallGuard;
   private progressAt = 0;
@@ -84,6 +86,7 @@ export class Race {
     this.stage = stage;
     this.dolphins = effect;
     this.dolphinContacts = new Set();
+    this.dolphinNextContacts = new Set();
     this.arrivals = [];
     this.winners = [];
     this.winnerAt = 0;
@@ -226,27 +229,33 @@ export class Race {
     const { wave, time } = dolphinWave(this.dolphins, elapsed);
     if (time + dt > DOLPHIN_DURATION) { this.dolphinContacts.clear(); return; }
     const scale = dolphinScale(this.dolphins);
-    const touching = new Set<string>();
+    const touching = this.dolphinNextContacts; touching.clear();
     const poses = this.dolphins.rows.map((row, index) => {
       const direction = (wave + index) % 2 ? -1 : 1;
       const before = dolphinPose(this.stage, row, time, direction, scale), p = dolphinPose(this.stage, row, time + dt, direction, scale);
       const motion = { vx: (p.x - before.x) / dt, vy: (p.y - before.y) / dt,
         omega: direction * Math.atan2(Math.sin(p.angle - before.angle), Math.cos(p.angle - before.angle)) / dt };
-      return { p, motion, index };
+      const c = Math.abs(Math.cos(p.angle)), s = Math.abs(Math.sin(p.angle));
+      return { p, motion, index, halfWidth: (DOLPHIN_WIDTH * c + DOLPHIN_HEIGHT * s) * scale / 2 + .25,
+        halfHeight: (DOLPHIN_WIDTH * s + DOLPHIN_HEIGHT * c) * scale / 2 + .25 };
     });
     for (const ball of this.balls) {
       if (ball.rank) continue;
       const pos = this.physics.getMarblePosition(ball.id);
-      for (const { p, motion, index } of poses) {
-        if (Math.abs(pos.x - p.x) > 3 * scale || Math.abs(pos.y - p.y) > 3 * scale) continue;
-        const contact = dolphinBounce({ ...pos, ...this.physics.getMarbleVelocity(ball.id) }, p, motion);
-        if (!contact) continue;
+      for (const { p, motion, index, halfWidth, halfHeight } of poses) {
+        if (Math.abs(pos.x - p.x) > halfWidth || Math.abs(pos.y - p.y) > halfHeight || pos.y > p.waterY + .25) continue;
+        // Only real outline contacts need WASM velocities and restitution tracking.
+        const surface = dolphinContact(pos, p);
+        if (!surface) continue;
         const key = `${index}:${ball.id}`, alreadyHit = this.dolphinContacts.has(key);
-        // Only an applied impact locks this contact until the surfaces separate.
+        const contact = dolphinBounce({ ...pos, ...this.physics.getMarbleVelocity(ball.id) }, p, motion, !alreadyHit, surface);
+        if (!contact) continue;
+        // Restitution happens once; inward motion is constrained throughout contact.
         if (contact.hit || alreadyHit) touching.add(key);
-        if (contact.hit && !alreadyHit) this.physics.setMarbleVelocity(ball.id, contact.vx, contact.vy);
+        if (contact.hit) this.physics.setMarbleVelocity(ball.id, contact.vx, contact.vy);
       }
     }
+    this.dolphinNextContacts = this.dolphinContacts;
     this.dolphinContacts = touching;
   }
 }
