@@ -200,7 +200,7 @@ export class Game extends Race {
     }
   }
   private viewScale() {
-    if (this.stage.goalArea)
+    if (this.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview))
       return Math.min(Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.stage.width ?? 26) + 4),
         Math.max(1, this.height - 45) / (this.stage.goalY + 4)) * this.zoom;
     if (this.state === 'ready' && this.dolphinOverview)
@@ -309,7 +309,7 @@ export class Game extends Race {
     const target = this.focusBall(active);
     const scale = this.viewScale();
     this.cameraMoving = false;
-    if (this.stage.goalArea && this.zoom <= 1 && !this.manual) {
+    if (this.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview) && this.zoom <= 1 && !this.manual) {
       this.camera = { x: (this.stage.width ?? 26) / 2, y: this.stage.goalY / 2 - h * .07 / scale };
     } else if (this.state !== 'ready' && target && !this.manual) {
       // Same easing as 0.06 / 0.13 per frame at 60Hz, independent of the display refresh rate.

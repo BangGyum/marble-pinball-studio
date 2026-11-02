@@ -184,7 +184,7 @@ export class LanView {
     this.state = frame.state; this.playback.push(frame);
   }
   private viewScale() {
-    if (this.scene?.stage.goalArea)
+    if (this.scene?.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview))
       return Math.min(Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.scene.stage.width ?? 26) + 4),
         Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)) * this.zoom;
     if (this.state === 'ready' && this.dolphinOverview && this.scene)
@@ -251,7 +251,7 @@ export class LanView {
     const target = selected ?? active[Math.min(active.length - 1, Math.max(0, lastWinningRank - (balls.length - active.length) - 1))];
     const scale = this.viewScale();
     this.cameraMoving = false;
-    if (scene.stage.goalArea && this.zoom <= 1 && !this.manual && !selected) {
+    if (scene.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview) && this.zoom <= 1 && !this.manual && !selected) {
       this.camera = { x: (scene.stage.width ?? 26) / 2, y: scene.stage.goalY / 2 - h * .07 / scale };
     } else if (target && !this.manual && (this.state !== 'ready' || selected)) {
       this.camera.x += (target.x - this.camera.x) * (1 - Math.pow(.94, dt * 60));
