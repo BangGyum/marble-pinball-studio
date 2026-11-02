@@ -4,6 +4,7 @@ import type { IPhysics } from './IPhysics';
 import type { StageDef } from './data/maps';
 import { shuffled, type WinnerOrder } from './model';
 import { WallGuard, WALL_GUARD_MAX_SPEED } from './wall-guard';
+import { finishFraction, raceProgress } from './finish';
 import { dolphinBounce, dolphinContact, dolphinPose, dolphinScale, dolphinWave, DOLPHIN_DURATION, DOLPHIN_WIDTH, validateDolphins, type DolphinSettings } from './dolphin';
 import { DOLPHIN_HEIGHT } from './dolphin-hitbox';
 
@@ -20,7 +21,7 @@ export type Ball = {
   // Position one physics step earlier, for drawing between steps.
   px?: number;
   py?: number;
-  // Deepest point reached, when, and how many stillness nudges since then.
+  // Best depth (or proximity to a circular finish), when, and stillness nudges since then.
   best?: number;
   progressAt?: number;
   shakes?: number;
@@ -30,7 +31,7 @@ export type Ball = {
 };
 
 const STEP = 1 / 60;
-// Only a new depth record this far below the previous one counts as progress.
+// Only this much improvement in depth or distance to the circular finish counts as progress.
 const PROGRESS = 0.5;
 // A still marble that this many nudges could not free is wedged in a pocket.
 const TRAPPED_SHAKES = 8;
@@ -60,7 +61,7 @@ export class Race {
   balls: Ball[] = [];
   arrivals: Ball[] = [];
   winners: Ball[] = [];
-  // 'stalled' when the remaining marbles were ranked by depth instead of arriving.
+  // 'stalled' when remaining marbles were ranked by proximity instead of arriving.
   finishReason?: 'arrived' | 'stalled';
   // Marbles returned to their previous position after being pushed through a wall.
   rescues = 0;
@@ -129,9 +130,9 @@ export class Race {
     else if (this.state === 'paused') this.state = 'running';
   }
 
-  // Unfinished marbles, deepest first.
+  // Unfinished marbles, closest to the finish first.
   racing() {
-    return this.balls.filter((b) => !b.rank).sort((a, b) => b.y - a.y);
+    return this.balls.filter((b) => !b.rank).sort((a, b) => raceProgress(this.stage, b) - raceProgress(this.stage, a));
   }
 
   // The marble deciding the last winning place. The camera and the finish slow motion follow it.
@@ -141,7 +142,9 @@ export class Race {
 
   finishSlowdown() {
     const target = this.focusBall();
-    return !this.winners.length && target && target.y > this.stage.goalY - 4 ? 0.45 : 1;
+    const goal = this.stage.goalArea;
+    return !this.winners.length && target && (goal
+      ? raceProgress(this.stage, target) > -goal.radius - 2 : target.y > this.stage.goalY - 4) ? 0.45 : 1;
   }
 
   advance() {
@@ -160,7 +163,7 @@ export class Race {
         p = { x: ball.x, y: ball.y, angle: ball.angle };
         this.rescues++;
       }
-      const oldY = ball.y;
+      const fraction = finishFraction(this.stage, ball, p);
       const still = Math.hypot(p.x - ball.x, p.y - ball.y) < 0.0002;
       ball.stuck = still ? ball.stuck + STEP : 0;
       if (!still) ball.movingFor = (ball.movingFor ?? 0) + STEP;
@@ -175,8 +178,9 @@ export class Race {
         ball.stuck = 0;
         ball.shakes = (ball.shakes ?? 0) + 1;
       }
-      if (ball.best === undefined || p.y > ball.best + PROGRESS) {
-        ball.best = p.y;
+      const progress = raceProgress(this.stage, p);
+      if (ball.best === undefined || progress > ball.best + PROGRESS) {
+        ball.best = progress;
         ball.progressAt = this.progressAt = this.elapsed;
         ball.shakes = 0;
       }
@@ -190,8 +194,7 @@ export class Race {
       ball.y = p.y;
       ball.angle = p.angle;
       if (onBridge !== undefined) ball.onBridge = onBridge;
-      if (p.y >= this.stage.goalY)
-        crossing.push({ ball, fraction: (this.stage.goalY - oldY) / Math.max(0.000001, p.y - oldY) });
+      if (fraction !== undefined) crossing.push({ ball, fraction });
     }
     crossing.sort((a, b) => a.fraction - b.fraction || a.ball.id - b.ball.id);
     for (const { ball } of crossing) this.arrive(ball);

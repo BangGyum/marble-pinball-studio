@@ -75,7 +75,7 @@ async function connect(port, cookie, options = {}) {
       settings: { names: '가'.repeat(Math.ceil(MAX_LAN_MESSAGE_BYTES / 3)), mapId: 0, order: 'asc', picks: 1 } }),
     /너무 커서 전송할 수 없어요/, 'UTF-8 message size is rejected before opening a pending request');
     assert.equal(app.info().maps[0].title, '네온 잭팟', 'map order must never overwrite a different map title');
-    assert.equal(app.info().maps.length, 16);
+    assert.equal(app.info().maps.length, 17);
     assert.ok(!app.info().maps.some(map => ['네온 모래시계', '스프링 놀이터', '역전 사다리'].includes(map.title)));
     assert.ok(app.info().maps.every(map => stages[map.id].title === map.title), 'hidden maps do not shift the exposed LAN ids');
     const guestSession = await request(port, '/api/session', { method: 'POST' });
@@ -229,7 +229,7 @@ async function connect(port, cookie, options = {}) {
     await host.command({ type: 'reset' });
     assert.equal((await host.command({ type: 'configure', settings: { ...settings,
       stage: { ...rapids, art: { style: 'unknown', contours: [] } } } })).ok, false);
-    for (const title of ['네온 핀볼 폭포', '카오스 시계탑', '오비탈 락', '끝없는 나선', '쌍둥이 와류']) {
+    for (const title of ['네온 핀볼 폭포', '카오스 시계탑', '오비탈 락', '끝없는 나선', '쌍둥이 와류', '떠도는 입구']) {
       // Keep independent map scenarios below the real server's 30 commands/second limit.
       await delay(1050);
       const stage = stages.find(s => s.title === title), mapId = stages.indexOf(stage);
@@ -239,6 +239,7 @@ async function connect(port, cookie, options = {}) {
       assert.deepEqual(guest2.scene.stage.art, stage.art);
       assert.deepEqual(guest2.scene.stage.exitBridge, stage.exitBridge, 'spectators receive the same elevated outlet geometry');
       assert.deepEqual(guest2.scene.stage.windZones, stage.windZones, 'annular wind boundaries survive scene serialization');
+      assert.deepEqual(guest2.scene.stage.goalArea, stage.goalArea, 'central finish reaches spectators intact');
       const slides = stage.entities.flatMap((e, i) => e.props.sliding ? [i] : []);
       assert.ok(slides.every(i => !guest2.scene.fixed[i]), 'moving platforms cannot be statically cached');
       await host.command({ type: 'start' });

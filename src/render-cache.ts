@@ -2,6 +2,8 @@ import { drawLadderArt } from './ladder-art';
 import { drawFunnelArt } from './funnel-art';
 import { drawTwinFunnelArt } from './twin-funnel-art';
 import { drawCanyonArt } from './canyon-art';
+import { drawOrbitingGateArt } from './orbiting-gate-art';
+import { drawGoalArea } from './finish';
 import type { Ball } from './game';
 import type { StageDef } from './data/maps';
 import type { MapEntityState } from './types/MapEntity.type';
@@ -12,12 +14,14 @@ import { getSceneTheme, type SceneTheme } from './scene-theme';
 
 type Sprite = { canvas: OffscreenCanvas; width: number; height: number; left: number; top: number };
 
-function drawMinimapArt(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef) {
+function drawMinimapArt(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number) {
   // These maps use scenery in place of hidden collision rails. The minimap caches it once.
   if (stage.art?.style === 'reversal-ladder') drawLadderArt(ctx, stage, false);
   if (stage.art?.style === 'infinite-funnel') drawFunnelArt(ctx, stage, 1, false);
   if (stage.art?.style === 'twin-funnel') drawTwinFunnelArt(ctx, stage, 1, false);
   if (stage.art?.style === 'fracture-canyon') drawCanyonArt(ctx, stage, false);
+  if (stage.art?.style === 'orbiting-gate') drawOrbitingGateArt(ctx, stage, false);
+  drawGoalArea(ctx, stage, scale);
 }
 
 export class RenderCache {
@@ -79,7 +83,7 @@ export class RenderCache {
     // Elevated geometry is drawn by the overlay, with the same mouth clipping as the main view.
     if (stage.exitBridge) entities = entities.filter(e => e.shape.collisionLayer !== 2);
     if (typeof OffscreenCanvas === 'undefined' || scale <= 0) {
-      drawMinimapArt(ctx, stage);
+      drawMinimapArt(ctx, stage, scale);
       drawEntities(ctx, entities, scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
       return;
     }
@@ -94,7 +98,7 @@ export class RenderCache {
       );
       const mapCtx = canvas.getContext('2d')!;
       mapCtx.scale(scale * dpr, scale * dpr);
-      drawMinimapArt(mapCtx, stage);
+      drawMinimapArt(mapCtx, stage, scale);
       drawEntities(mapCtx, entities.filter((e) => fixed.has(e.shape)), scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
       cached = this.minimap = { stage, scale, dpr, theme: getSceneTheme(), canvas, fixed };
     }

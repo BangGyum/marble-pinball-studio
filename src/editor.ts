@@ -4,6 +4,7 @@ import type { MapEntity } from './types/MapEntity.type';
 import { drawEntities } from './draw';
 import { drawMapArt, drawMapOverlay } from './map-art';
 import { drawWind } from './wind-render';
+import { drawGoalArea } from './finish';
 import { el, toast, message } from './ui';
 import { getSceneTheme, sceneColor } from './scene-theme';
 
@@ -588,20 +589,22 @@ export class Editor {
       life: e.props.life ?? -1,
     }));
     drawEntities(c, entities, SCALE, this.selected, false, undefined, !!this.stage.art, this.stage.art?.style === 'reversal-ladder');
-    if (liveArt) drawMapOverlay(c, this.stage, entities, SCALE, false);
+    if (liveArt || this.stage.art?.style === 'orbiting-gate') drawMapOverlay(c, this.stage, entities, SCALE, false);
     drawWind(c, this.stage.windZones ?? [], 0, SCALE);
-    c.setLineDash([0.5, 0.3]);
-    c.strokeStyle = sceneColor('#65efda');
-    c.lineWidth = 2 / SCALE;
-    c.beginPath();
-    c.moveTo(0, this.stage.goalY);
-    c.lineTo(this.stage.width ?? 26, this.stage.goalY);
-    c.stroke();
-    c.setLineDash([]);
-    c.fillStyle = sceneColor('#65efda');
-    c.font = '.5px sans-serif';
-    c.textAlign = 'left';
-    c.fillText('FINISH · 결승선', 1, this.stage.goalY + 1);
+    if (!drawGoalArea(c, this.stage, SCALE)) {
+      c.setLineDash([0.5, 0.3]);
+      c.strokeStyle = sceneColor('#65efda');
+      c.lineWidth = 2 / SCALE;
+      c.beginPath();
+      c.moveTo(0, this.stage.goalY);
+      c.lineTo(this.stage.width ?? 26, this.stage.goalY);
+      c.stroke();
+      c.setLineDash([]);
+      c.fillStyle = sceneColor('#65efda');
+      c.font = '.5px sans-serif';
+      c.textAlign = 'left';
+      c.fillText('FINISH · 결승선', 1, this.stage.goalY + 1);
+    }
     if (this.drag && this.wallEnd) {
       c.strokeStyle = sceneColor('#fff');
       c.lineWidth = 2 / SCALE;

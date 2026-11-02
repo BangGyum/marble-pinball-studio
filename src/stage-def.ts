@@ -1,6 +1,6 @@
 import type { MapEntity } from './types/MapEntity.type';
 
-export const ART_STYLES = ['reversal-ladder', 'roundhouse', 'rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway', 'switchback-express', 'infinite-funnel', 'twin-funnel', 'bounce-stairs'] as const;
+export const ART_STYLES = ['reversal-ladder', 'roundhouse', 'rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway', 'switchback-express', 'infinite-funnel', 'twin-funnel', 'bounce-stairs', 'orbiting-gate'] as const;
 
 type BridgeArea = { x: number; y: number; width: number; height: number };
 type Bridge = { entry: BridgeArea; deck: [number, number][] };
@@ -44,6 +44,8 @@ export type StageDef = {
   randomizeStart?: boolean;
   vortex?: { x: number; y: number; radius: number; speed: number; gust?: number };
   windZones?: WindZone[];
+  // Circular finish; goalY remains the map height used for framing and the minimap.
+  goalArea?: { x: number; y: number; radius: number };
   goalY: number;
   zoomY: number;
 };

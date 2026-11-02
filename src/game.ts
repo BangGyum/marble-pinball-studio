@@ -1,5 +1,6 @@
 import { SpringControls } from './spring-controls';
 import { Race } from './race';
+import { drawGoalArea } from './finish';
 import type { StageDef } from './data/maps';
 import { drawEntities } from './draw';
 import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from './map-art';
@@ -199,6 +200,9 @@ export class Game extends Race {
     }
   }
   private viewScale() {
+    if (this.stage.goalArea)
+      return Math.min(Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.stage.width ?? 26) + 4),
+        Math.max(1, this.height - 45) / (this.stage.goalY + 4)) * this.zoom;
     if (this.state === 'ready' && this.dolphinOverview)
       return Math.min(Math.max(1, this.width - 180) / ((this.stage.width ?? 26) + 4), Math.max(1, this.height - 45) / (this.stage.goalY + 4)) * this.zoom;
     const base =
@@ -305,7 +309,9 @@ export class Game extends Race {
     const target = this.focusBall(active);
     const scale = this.viewScale();
     this.cameraMoving = false;
-    if (this.state !== 'ready' && target && !this.manual) {
+    if (this.stage.goalArea && this.zoom <= 1 && !this.manual) {
+      this.camera = { x: (this.stage.width ?? 26) / 2, y: this.stage.goalY / 2 - h * .07 / scale };
+    } else if (this.state !== 'ready' && target && !this.manual) {
       // Same easing as 0.06 / 0.13 per frame at 60Hz, independent of the display refresh rate.
       this.camera.x += (at(target.px, target.x) - this.camera.x) * (1 - Math.pow(0.94, dt * 60));
       this.camera.y += (at(target.py, target.y) - this.camera.y) * (1 - Math.pow(0.87, dt * 60));
@@ -348,17 +354,19 @@ export class Game extends Race {
       }
     } else this.dolphinRenderer.draw(ctx, this.stage, this.dolphins, Math.max(0, this.elapsed - (1 - blend) / 60), view);
     ctx.shadowBlur = 0;
-    ctx.strokeStyle = sceneColor('#65efda');
-    ctx.lineWidth = 2 / scale;
-    ctx.setLineDash([0.35, 0.3]);
-    ctx.beginPath();
-    ctx.moveTo(0, this.stage.goalY);
-    ctx.lineTo(this.stage.width ?? 26, this.stage.goalY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.font = `${12 / scale}px sans-serif`;
-    ctx.fillStyle = sceneColor('#65efda');
-    ctx.fillText(this.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, this.stage.goalY - 0.4);
+    if (!drawGoalArea(ctx, this.stage, scale)) {
+      ctx.strokeStyle = sceneColor('#65efda');
+      ctx.lineWidth = 2 / scale;
+      ctx.setLineDash([0.35, 0.3]);
+      ctx.beginPath();
+      ctx.moveTo(0, this.stage.goalY);
+      ctx.lineTo(this.stage.width ?? 26, this.stage.goalY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.font = `${12 / scale}px sans-serif`;
+      ctx.fillStyle = sceneColor('#65efda');
+      ctx.fillText(this.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, this.stage.goalY - 0.4);
+    }
     for (const b of active) {
       const x = at(b.px, b.x), y = at(b.py, b.y);
       const labelMargin = Math.max(1, (b.name.length * 17) / scale);

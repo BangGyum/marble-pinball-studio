@@ -3,6 +3,7 @@ import type { SavedMap } from './model';
 import { drawEntities } from './draw';
 import { drawMapArt, drawMapOverlay } from './map-art';
 import { drawWind } from './wind-render';
+import { drawGoalArea } from './finish';
 import { drawMarble } from './marble-art';
 import { el } from './ui';
 import { GalleryIntro } from './gallery-intro';
@@ -10,6 +11,7 @@ import { MapTransition } from './map-transition';
 import { getSceneTheme, sceneColor } from './scene-theme';
 
 const details: Record<string, [string, string, string]> = {
+  '떠도는 입구': ['회전 · 포획', '공도 돌고 입구도 돌아요. 움직이는 틈을 통과해 중앙 배수구에 들어가면 도착!', '#ffd184'],
   '끝없는 나선': ['깔때기 · 나선', '큰 깔때기를 네 바퀴 돌아 중심으로! 구슬이 모이면 입체 출구로 빠져나옵니다.', '#65efda'],
   '쌍둥이 와류': ['깔때기 · 교차', '시계 방향에서 반시계 방향으로! 두 깔때기의 중심을 고가 통로로 연결합니다.', '#a9bde8'],
   '역전 사다리': ['스프링 · 역전', '금속 경사로 네 단과 왕복 열차. 스프링을 선택하고 SPACE로 순위를 뒤집어 보세요.', '#ebc689'],
@@ -51,11 +53,13 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
   drawWind(ctx, stage.windZones ?? [], 1, scale);
   drawMapOverlay(ctx, stage, entities, scale, false);
   ctx.shadowBlur = 0;
-  ctx.strokeStyle = sceneColor('#91f4de');
-  ctx.lineWidth = 1 / scale;
-  ctx.setLineDash([1.5 / scale, 2 / scale]);
-  ctx.beginPath(); ctx.moveTo(0, stage.goalY); ctx.lineTo(width, stage.goalY); ctx.stroke();
-  ctx.setLineDash([]);
+  if (!drawGoalArea(ctx, stage, scale)) {
+    ctx.strokeStyle = sceneColor('#91f4de');
+    ctx.lineWidth = 1 / scale;
+    ctx.setLineDash([1.5 / scale, 2 / scale]);
+    ctx.beginPath(); ctx.moveTo(0, stage.goalY); ctx.lineTo(width, stage.goalY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
   ['#80f6de', '#ffd784', '#bdabff'].forEach((color, i) =>
     drawMarble(ctx, (stage.spawnX ?? 12.85) + (i - 1) * 0.85, 4, 0.4, color));
   canvas.dataset.rendered = 'true';

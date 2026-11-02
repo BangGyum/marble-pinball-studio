@@ -1,5 +1,6 @@
 import { SpringControls } from '../spring-controls';
 import { drawEntities } from '../draw';
+import { drawGoalArea, raceProgress } from '../finish';
 import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from '../map-art';
 import { drawWind } from '../wind-render';
 import { drawCelebration } from '../celebration';
@@ -183,6 +184,9 @@ export class LanView {
     this.state = frame.state; this.playback.push(frame);
   }
   private viewScale() {
+    if (this.scene?.stage.goalArea)
+      return Math.min(Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.scene.stage.width ?? 26) + 4),
+        Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)) * this.zoom;
     if (this.state === 'ready' && this.dolphinOverview && this.scene)
       return Math.min(Math.max(1, this.width - 180) / ((this.scene.stage.width ?? 26) + 4), Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)) * this.zoom;
     return (this.state === 'ready'
@@ -242,16 +246,19 @@ export class LanView {
     });
     const { balls } = this;
     const selected = balls.find((b) => b.id === this.focusedBallId);
-    const active = balls.filter((b) => !b.rank).sort((a, b) => b.y - a.y);
+    const active = balls.filter((b) => !b.rank).sort((a, b) => raceProgress(scene.stage, b) - raceProgress(scene.stage, a));
     const lastWinningRank = scene.settings.order === 'desc' ? balls.length : scene.settings.picks;
     const target = selected ?? active[Math.min(active.length - 1, Math.max(0, lastWinningRank - (balls.length - active.length) - 1))];
+    const scale = this.viewScale();
     this.cameraMoving = false;
-    if (target && !this.manual && (this.state !== 'ready' || selected)) {
+    if (scene.stage.goalArea && this.zoom <= 1 && !this.manual && !selected) {
+      this.camera = { x: (scene.stage.width ?? 26) / 2, y: scene.stage.goalY / 2 - h * .07 / scale };
+    } else if (target && !this.manual && (this.state !== 'ready' || selected)) {
       this.camera.x += (target.x - this.camera.x) * (1 - Math.pow(.94, dt * 60));
       this.camera.y += (target.y - this.camera.y) * (1 - Math.pow(.87, dt * 60));
       this.cameraMoving = Math.abs(target.x - this.camera.x) + Math.abs(target.y - this.camera.y) > .01;
     }
-    const scale = this.viewScale(), cam = this.manual ?? this.camera;
+    const cam = this.manual ?? this.camera;
     const view = { left: cam.x - w * .56 / scale, right: cam.x + w * .44 / scale,
       top: cam.y - h * .43 / scale, bottom: cam.y + h * .57 / scale };
     const beforePositions = this.framePositions(before), afterPositions = this.framePositions(after), entities = this.entities;
@@ -281,9 +288,11 @@ export class LanView {
           this.reducedMotion?.matches ? DOLPHIN_DURATION / 2 : this.dolphinPreviewElapsed, view, true);
       }
     } else this.dolphinRenderer.draw(ctx, scene.stage, this.dolphins, elapsed, view);
-    ctx.shadowBlur = 0; ctx.strokeStyle = '#65efda'; ctx.lineWidth = 2 / scale; ctx.setLineDash([.35, .3]);
-    ctx.beginPath(); ctx.moveTo(0, scene.stage.goalY); ctx.lineTo(scene.stage.width ?? 26, scene.stage.goalY); ctx.stroke(); ctx.setLineDash([]);
-    ctx.font = 12 / scale + 'px sans-serif'; ctx.fillStyle = '#65efda'; ctx.fillText(scene.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, scene.stage.goalY - .4);
+    if (!drawGoalArea(ctx, scene.stage, scale)) {
+      ctx.shadowBlur = 0; ctx.strokeStyle = '#65efda'; ctx.lineWidth = 2 / scale; ctx.setLineDash([.35, .3]);
+      ctx.beginPath(); ctx.moveTo(0, scene.stage.goalY); ctx.lineTo(scene.stage.width ?? 26, scene.stage.goalY); ctx.stroke(); ctx.setLineDash([]);
+      ctx.font = 12 / scale + 'px sans-serif'; ctx.fillStyle = '#65efda'; ctx.fillText(scene.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, scene.stage.goalY - .4);
+    }
     for (const ball of balls) {
       if (ball.rank && ball !== selected) continue;
       const labelMargin = Math.max(1, ball.name.length * 17 / scale);

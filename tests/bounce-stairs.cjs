@@ -12,7 +12,7 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
 
 (async () => {
   assert.deepEqual(validateStage(stage), stage);
-  assert.equal(stages.at(-1), stage, 'the new map is registered without changing existing built-in IDs');
+  assert.equal(stages[17], stage, 'later maps must preserve the existing bounce-stairs built-in ID');
   const values = new Map(), storage = { getItem: k => values.get(k) ?? null, setItem: (k, v) => values.set(k, v) };
   saveMaps(storage, [{ id: 'bounce-stairs', stage }]);
   assert.deepEqual(readSavedMaps(storage)[0].stage, stage);

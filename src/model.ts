@@ -93,8 +93,17 @@ export function validateStage(value: unknown): StageDef {
     s.entities.length > 2000
   )
     throw new Error('올바른 맵 파일이 아니에요. 맵 이름, 결승선, 장애물을 확인해 주세요.');
+  if (s.goalArea !== undefined) {
+    const goal = s.goalArea;
+    if (!goal || !finite(goal.radius, .5, 30) ||
+      !finite(goal.x, goal.radius, (s.width ?? 26) - goal.radius) ||
+      !finite(goal.y, goal.radius, s.goalY - goal.radius))
+      throw new Error('원형 결승 영역은 맵 안에 있어야 하며 반지름은 0.5~30이어야 해요.');
+  }
+  if (s.art?.style === 'orbiting-gate' && !s.goalArea)
+    throw new Error('떠도는 입구 배경에는 원형 결승 영역이 필요해요.');
   if (s.art !== undefined && (!s.art || !(ART_STYLES as readonly string[]).includes(s.art.style) || !Array.isArray(s.art.contours) ||
-    (s.art.contours.length === 0 && ['crossway', 'fracture-canyon', 'bounce-stairs'].includes(s.art.style)) ||
+    (s.art.contours.length === 0 && ['crossway', 'fracture-canyon', 'bounce-stairs', 'orbiting-gate'].includes(s.art.style)) ||
     s.art.contours.length > 20 || s.art.contours.some((points) => !Array.isArray(points) ||
       points.length < 3 || points.length > 1000 || points.some((p) => !Array.isArray(p) || p.length !== 2 ||
         !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))))

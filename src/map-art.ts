@@ -12,6 +12,7 @@ import { drawHourglassArt } from './hourglass-art';
 import { drawCanyonArt, drawCanyonDevices } from './canyon-art';
 import { drawEntities } from './draw';
 import { drawBounceStairsArt } from './bounce-stairs-art';
+import { drawOrbitingGateArt, drawOrbitingGateMouth } from './orbiting-gate-art';
 import type { MapEntityState } from './types/MapEntity.type';
 import type { ViewBounds } from './art-visibility';
 
@@ -22,6 +23,7 @@ export function drawMapOverlay(ctx: CanvasRenderingContext2D, stage: StageDef, e
   if (stage.art?.style === 'switchback-express') drawExpressDevices(ctx, entities, view);
   if (stage.art?.style === 'crossway') drawCrosswayDevices(ctx, entities, view);
   if (stage.art?.style === 'fracture-canyon') drawCanyonDevices(ctx, entities, scale, view);
+  if (stage.art?.style === 'orbiting-gate') drawOrbitingGateMouth(ctx, entities, scale);
   if (!stage.exitBridge) return;
   ctx.save();
   if (stage.art?.style === 'orbital-lock') {
@@ -69,6 +71,7 @@ export function drawMapArt(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number, cacheBackground = true
 ) {
   if (!stage.art) return;
+  if (stage.art.style === 'orbiting-gate') { drawOrbitingGateArt(ctx, stage, cacheBackground); return; }
   if (stage.art.style === 'twin-funnel') { drawTwinFunnelArt(ctx, stage, 1, cacheBackground); return; }
   if (stage.art.style === 'infinite-funnel') { drawFunnelArt(ctx, stage, 1, cacheBackground); return; }
   if (stage.art.style === 'reversal-ladder') { drawLadderArt(ctx, stage, cacheBackground); return; }

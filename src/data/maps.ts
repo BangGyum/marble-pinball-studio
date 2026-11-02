@@ -16,6 +16,7 @@ import { fractureCanyon } from './fracture-canyon';
 import { switchbackExpress } from './switchback-express';
 import { desireJar } from './desire-jar';
 import { bounceStairs } from './bounce-stairs';
+import { orbitingGate } from './orbiting-gate';
 import type { StageDef } from '../stage-def';
 export { ART_STYLES, type StageDef, type WindZone } from '../stage-def';
 
@@ -38,6 +39,7 @@ export const stages: StageDef[] = [
   infiniteFunnel,
   twinFunnel,
   bounceStairs,
+  orbitingGate,
 ];
 
 export const hiddenStages: StageDef[] = [springLab, reversalLadder];
