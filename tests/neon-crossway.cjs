@@ -49,6 +49,11 @@ const inside = (ball, points) => {
   assert.deepEqual(readSavedMaps(storage)[0].stage, stage);
   const race = new Race(); await race.physics.init();
   const physics = race.physics, B = physics.Box2D, random = Math.random, contacts = new Map();
+  physics.createStage(stage); physics.createMarble(0, 59.93845, 40.93337); physics.start();
+  for (let i = 0; i < 20 * 60 && physics.getMarblePosition(0).y < 50; i++) physics.step(1 / 60);
+  assert.ok(physics.getMarblePosition(0).y >= 50, 'an upward rebound behind the right shelf tip must keep descending');
+  physics.clearMarbles(); physics.clear();
+  console.log('PASS upward dolphin rebounds cannot wedge behind the right crossing shelf');
   const listener = new B.JSContactListener();
   let bodyIndices = new Map(), run = '';
   listener.BeginContact = pointer => {

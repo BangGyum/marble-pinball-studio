@@ -1,7 +1,7 @@
 import type { StageDef } from './stage-def';
 import { dolphinSurface, DOLPHIN_SPRITE_WIDTH } from './dolphin-hitbox';
 
-export type DolphinSettings = { enabled: boolean; rows: number[]; interval: number; size?: number };
+export type DolphinSettings = { enabled: boolean; rows: number[]; interval: number; size?: number; speed?: number };
 export const DOLPHIN_DURATION = 4.35;
 export const DOLPHIN_WIDTH = DOLPHIN_SPRITE_WIDTH;
 export const DOLPHIN_BASE_SCALE = 3;
@@ -20,13 +20,15 @@ export function validateDolphins(value: unknown, stage: StageDef): DolphinSettin
   if (value === undefined) return { enabled: false, rows: dolphinRows(stage), interval: 5 };
   const s = value as DolphinSettings, { min, max } = dolphinBounds(stage);
   if (!s || typeof s !== 'object' || Array.isArray(s) ||
-    Object.keys(s).some(key => !['enabled', 'rows', 'interval', 'size'].includes(key)) || typeof s.enabled !== 'boolean' ||
+    Object.keys(s).some(key => !['enabled', 'rows', 'interval', 'size', 'speed'].includes(key)) || typeof s.enabled !== 'boolean' ||
     !Number.isFinite(s.interval) || s.interval < 5 || s.interval > 120 ||
     (s.size !== undefined && (!Number.isFinite(s.size) || s.size < 50 || s.size > 200)) ||
+    (s.speed !== undefined && (!Number.isFinite(s.speed) || s.speed < .5 || s.speed > 1.5)) ||
     !Array.isArray(s.rows) || !s.rows.length || s.rows.length > MAX_DOLPHIN_ROWS ||
     s.rows.some((y, i) => !Number.isFinite(y) || y < min || y > max || (i > 0 && y - s.rows[i - 1] < .5 - 1e-6)))
-    throw new Error('돌고래 설정을 확인해 주세요. 줄은 1~6개, 출몰 간격은 5~120초, 크기는 50~200%입니다.');
-  return { enabled: s.enabled, rows: [...s.rows], interval: s.interval, ...(s.size === undefined ? {} : { size: s.size }) };
+    throw new Error('돌고래 설정을 확인해 주세요. 줄은 1~6개, 출몰 간격은 5~120초, 크기는 50~200%, 이동 속도는 0.5~1.5배입니다.');
+  return { enabled: s.enabled, rows: [...s.rows], interval: s.interval, ...(s.size === undefined ? {} : { size: s.size }),
+    ...(s.speed === undefined ? {} : { speed: s.speed }) };
 }
 export type DolphinPose = { x: number; y: number; angle: number; direction: number; waterY: number; scale?: number };
 // Ballistic jumps joined by a short, C2-continuous submerged turn, in world units.
@@ -48,9 +50,21 @@ export function dolphinPose(stage: StageDef, row: number, time: number, directio
     y, angle: Math.atan2(vy, distance / DOLPHIN_DURATION), direction, waterY: row, scale };
 }
 export function dolphinWave(settings: DolphinSettings, elapsed: number, preview = false) {
-  const interval = preview ? DOLPHIN_DURATION + .65 : settings.interval;
+  const interval = preview ? (DOLPHIN_DURATION + .65) / (settings.speed ?? 1) : settings.interval;
   const wave = Math.floor((elapsed + 1e-9) / interval);
   return { wave, time: Math.max(0, elapsed - wave * interval) };
+}
+// Travel uses the selected speed; appearances keep their race-time interval.
+// Include older slow waves so a new appearance never cuts a traversal short.
+export function dolphinWaves(settings: DolphinSettings, elapsed: number, preview = false) {
+  const latest = dolphinWave(settings, elapsed, preview), speed = settings.speed ?? 1;
+  const waves: { wave: number; time: number }[] = [];
+  for (let wave = latest.wave, time = latest.time * speed; wave >= 0 && time < DOLPHIN_DURATION + .65;
+    wave--, time += settings.interval * speed) {
+    waves.unshift({ wave, time });
+    if (preview) break;
+  }
+  return waves;
 }
 export function dolphinContact(ball: { x: number; y: number }, p: DolphinPose) {
   const c = Math.cos(p.angle), s = Math.sin(p.angle), dx = (ball.x - p.x) * p.direction, dy = ball.y - p.y;

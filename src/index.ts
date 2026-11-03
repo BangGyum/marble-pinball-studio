@@ -74,8 +74,8 @@ const gallery = new MapGallery((id) => {
   if (!selected) return;
   currentStage = selected.stage;
   mapSelect.value = id;
-  showGame(true);
   prepare();
+  showGame(true);
 });
 const viewHistory = new ViewHistory((view) => {
   if (view === 'game') resumeGame();

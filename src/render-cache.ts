@@ -28,6 +28,13 @@ export class RenderCache {
   private balls = new WeakMap<Ball, { key: string; sprite: Sprite }>();
   private labels = new WeakMap<Ball, { key: string; sprite: Sprite }>();
   private minimap?: { stage: StageDef; scale: number; dpr: number; theme: SceneTheme; canvas: OffscreenCanvas; fixed: Set<MapEntityState['shape']> };
+  private deadline = Infinity;
+  warming = false;
+
+  beginFrame() {
+    this.deadline = performance.now() + 2;
+    this.warming = false;
+  }
 
   drawBall(ctx: CanvasRenderingContext2D, ball: Ball, scale: number, dpr: number, x = ball.x, y = ball.y, squash?: MarbleSquash) {
     // Older browsers can keep using the vector renderer.
@@ -36,6 +43,14 @@ export class RenderCache {
     const resolution = Math.ceil(scale / 8) * 8;
     const key = `${resolution}/${dpr}/${ball.color}`;
     let cached = this.balls.get(ball);
+    const font = Math.min(17, Math.max(12, scale * 0.24)), rasterFont = Math.ceil(font);
+    const labelKey = `${getSceneTheme()}/${rasterFont}/${dpr}/${ball.color}/${ball.name}`;
+    let label = this.labels.get(ball);
+    if ((!cached || cached.key !== key || !label || label.key !== labelKey) && performance.now() >= this.deadline) {
+      // Draw the vector fallback now and build the remaining bitmaps on later frames.
+      this.warming = true;
+      return false;
+    }
     if (!cached || cached.key !== key) {
       const radius = resolution * 0.25, edge = Math.ceil(radius + 14);
       const canvas = new OffscreenCanvas(Math.ceil(edge * 2 * dpr), Math.ceil(edge * 2 * dpr));
@@ -56,9 +71,6 @@ export class RenderCache {
       ctx.drawImage(marble.canvas, x - marble.left / resolution, y - marble.top / resolution, marble.width / resolution, marble.height / resolution);
     }
     // Labels keep the original 12–17 CSS pixel policy, independently of marble zoom.
-    const font = Math.min(17, Math.max(12, scale * 0.24)), rasterFont = Math.ceil(font);
-    const labelKey = `${getSceneTheme()}/${rasterFont}/${dpr}/${ball.color}/${ball.name}`;
-    let label = this.labels.get(ball);
     if (!label || label.key !== labelKey) {
       const canvas = new OffscreenCanvas(1, 1), spriteCtx = canvas.getContext('2d')!;
       spriteCtx.font = `${rasterFont}px sans-serif`;

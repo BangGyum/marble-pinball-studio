@@ -16,6 +16,16 @@ const left: Point[] = [[30, 46.7], [30, 70], ...curve([30, 70], [30, 75], [37, 7
 const right: Point[] = [[34, 46.7], [34, 70], ...curve([34, 70], [34, 71], [40, 70.5], [44, 73]).slice(1),
   ...curve([44, 73], [49, 76], [47, 82], [42, 83]).slice(1), [34, 84.5], [34, 94]];
 const elevated = (entity: MapEntity): MapEntity => ({ ...entity, shape: { ...entity.shape, collisionLayer: 2 } });
+// Trim the backing to the core rim instead of leaving a catch below the transfer mouth.
+const coreRail = (a: Point, b: Point, backing: number): MapEntity => {
+  const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const nx = (b[1] - a[1]) * backing / length, ny = (a[0] - b[0]) * backing / length;
+  const x = b[0] + nx - 32, y = b[1] + ny - 40, radius = Math.hypot(x, y);
+  const entity = wall([a, b]);
+  entity.shape = { type: 'polyline', rotation: 0, color: '#64f4e0', solid: true,
+    points: [a, b, [32 + x * 8 / radius, 40 + y * 8 / radius], [a[0] + nx, a[1] + ny], a] };
+  return entity;
+};
 // Ground-level marbles enter over this one-way lip; the open ramp is drawn instead of its back face.
 const entryBackstop = wall([[30, 46.7], [34, 46.7]], 0.8);
 entryBackstop.shape.hidden = true;
@@ -51,11 +61,12 @@ export const orbitalLock: StageDef = {
     wall(arc(32, 40, 18, -53, 287)),
     wall(arc(32, 40, 13, -51, 285), -0.8),
     wall([outerIn[0], middleOut[0]], 0.8), wall([outerIn[1], middleOut[1]], -0.8),
-    wall([middleIn[0], coreOut[0]], 0.8), wall([middleIn[1], coreOut[1]], -0.8),
+    coreRail(middleIn[0], coreOut[0], 0.8), coreRail(middleIn[1], coreOut[1], -0.8),
     wall(arc(32, 40, 8, -43, 75.52)), wall(arc(32, 40, 8, 104.48, 277)),
     ...gate(outerIn[0], outerIn[1], 9.2, 6.2, 1.4, 6, 24),
     ...gate(middleIn[0], middleIn[1], 6.4, 5.1, 1.4, 4.9, 30),
-    ...gate(coreOut[0], coreOut[1], 5.8, 4.9, 1.3, 4.8, 34),
+    // Fold away from the core so an upward rebound cannot wedge at the released hinge.
+    ...gate(coreOut[0], coreOut[1], 5.8, 4.9, -1.3, 4.8, 34),
     ...paddle(7, 39, 1.8, -2.4), ...paddle(40.2, 26.8, 1.2, 2),
     ...paddle(32, 40, 2.9, -3.4),
     ...[wall(left, -0.8), wall(right, 0.8), entryBackstop,

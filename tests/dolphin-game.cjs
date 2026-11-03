@@ -3,7 +3,7 @@ require.extensions['.ts'] = (module, file) => module._compile(ts.transpileModule
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
 }).outputText, file);
 global.fetch = undefined;
-const { dolphinRows, validateDolphins, dolphinPose, dolphinScale, dolphinBounce, dolphinWave, DOLPHIN_DURATION, DOLPHIN_SWIM, DOLPHIN_WIDTH } = require('../src/dolphin.ts');
+const { dolphinRows, validateDolphins, dolphinPose, dolphinScale, dolphinBounce, dolphinWave, dolphinWaves, DOLPHIN_DURATION, DOLPHIN_SWIM, DOLPHIN_WIDTH } = require('../src/dolphin.ts');
 const { Race } = require('../src/race.ts'), { stages } = require('../src/data/maps.ts');
 const { encodeScene, decodeScene } = require('../src/lan/protocol.ts');
 const near = (a, b, message, epsilon = 1e-6) => assert.ok(Math.abs(a - b) < epsilon, `${message}: ${a} / ${b}`);
@@ -20,18 +20,50 @@ for (const value of [null, [], {}, { enabled: true, rows: [12], interval: 4.99 }
   { enabled: true, rows: Array(7).fill(12), interval: 20 }, { enabled: true, rows: [12], interval: Infinity }])
   assert.throws(() => validateDolphins(value, stage));
 const settings = { enabled: true, rows: [12, 32, 52], interval: 12 };
+const speeds = Array.from({ length: 11 }, (_, i) => (i + 5) / 10);
+for (const speed of speeds) assert.equal(validateDolphins({ ...settings, speed }, stage).speed, speed);
+for (const speed of [.49, 1.51, NaN, Infinity, '1', null]) assert.throws(() => validateDolphins({ ...settings, speed }, stage));
 assert.equal(validateDolphins({ ...settings, size:150 },stage).size,150,'dolphin size is accepted in settings');
 for(const size of [49,201,NaN,Infinity,'100']) assert.throws(()=>validateDolphins({...settings,size},stage));
 const scene = { type: 'scene', raceId: 'audit', revision: 1, stage, settings: { names: 'a', mapId: 0, order: 'asc', picks: 1, dolphins: settings }, entities: [], fixed: [], balls: [] };
 assert.deepEqual(decodeScene(encodeScene(scene)).settings.dolphins, settings);
-scene.settings.dolphins={...settings,size:200};
-assert.deepEqual(decodeScene(encodeScene(scene)).settings.dolphins,scene.settings.dolphins,'LAN wire preserves the size');
+scene.settings.dolphins={...settings,size:200,speed:.5};
+assert.deepEqual(decodeScene(encodeScene(scene)).settings.dolphins,scene.settings.dolphins,'LAN wire preserves size and speed');
 assert.equal(dolphinScale(settings),3); assert.equal(dolphinScale({ ...settings,size:50 }),1.5);
 assert.equal(dolphinWave(settings, 12).wave, 1); near(dolphinWave(settings, 12).time, 0, 'configured wave interval');
 assert.ok(dolphinWave({...settings,interval:120},15,true).time<DOLPHIN_DURATION,'preview repeats during a long actual appearance interval');
 assert.equal(dolphinWave({...settings,interval:120},15).wave,0,'preview does not change actual race timing');
 assert.equal(dolphinWave({...settings,interval:5},5).wave,1,'five-second appearances repeat on time');
 assert.ok(DOLPHIN_DURATION+.65<=5+1e-9,'a full traversal and splash finish before the next default appearance');
+for (const speed of speeds) {
+  const effect = { ...settings, rows: [32], speed };
+  near(dolphinWaves(effect, 2)[0].time, 2 * speed, 'travel clock follows the dolphin speed');
+  assert.equal(dolphinWave(effect, 12).wave, 1, 'appearance interval stays in race seconds');
+  const previewPeriod = (DOLPHIN_DURATION + .65) / speed;
+  assert.equal(dolphinWave(effect, previewPeriod, true).wave, 1, 'preview completes each traversal before repeating');
+  near(dolphinWaves(effect, previewPeriod + 1, true)[0].time, speed, 'preview uses the same speed');
+}
+const overlapping = { ...settings, rows: [32], interval: 5, speed: .5 };
+assert.deepEqual(dolphinWaves(overlapping, 6), [{ wave: 0, time: 3 }, { wave: 1, time: .5 }],
+  'a slow dolphin finishes its traversal while the next five-second appearance begins');
+assert.ok(dolphinWaves(overlapping, 10).every(w => w.wave > 0), 'completed waves leave no stale dolphins');
+{
+  const { DolphinRenderer } = require('../src/dolphin-render.ts'), translations = [];
+  const ctx = new Proxy({ getTransform: () => ({ a: 1, b: 0 }), translate: (x, y) => translations.push({ x, y }) },
+    { get: (o, key) => key in o ? o[key] : () => {} });
+  const renderer = new DolphinRenderer();
+  renderer.draw(ctx, stage, overlapping, 6, { left: -30, right: 60, top: -20, bottom: 120 });
+  assert.equal(translations.length, 2, 'both slow waves are drawn');
+  dolphinWaves(overlapping, 6).forEach(({ wave, time }, i) => {
+    const pose = dolphinPose(stage, 32, time, wave % 2 ? -1 : 1);
+    near(translations[i].x, pose.x, 'drawing and collision share horizontal position');
+    near(translations[i].y, pose.y, 'drawing and collision share jump phase');
+  });
+  const cachedEvents = renderer.events;
+  for (let i = 0; i < 120; i++) renderer.draw(ctx, stage, { ...overlapping, speed: i % 2 ? .5 : 1.5 }, i / 60,
+    { left: -30, right: 60, top: -20, bottom: 120 });
+  assert.equal(renderer.events, cachedEvents, 'speed changes reuse splash geometry instead of rebuilding it every frame');
+}
 const period=DOLPHIN_DURATION/3;
 assert.ok(period*DOLPHIN_SWIM<=.15,'the submerged turn returns to the next jump immediately');
 for(const scale of [1.5,3,6])for(const hop of [0,1]){
@@ -97,6 +129,38 @@ console.log('PASS dolphin size/bounds, legacy default, actual/preview timing, LA
   try {
     assert.ok(await run() === await run({ ...settings, enabled: false }), 'disabled dolphins preserve exact physics');
     assert.ok(await run(settings) === await run({...settings,size:100}),'legacy and explicit 100% sizes preserve exact physics');
+    assert.ok(await run(settings) === await run({ ...settings, speed: 1 }), 'legacy and explicit 1x speeds preserve exact physics');
+    for (const speed of speeds) for (const wave of [0, 1]) {
+      const effect = { enabled: true, rows: [32], interval: 12, speed }, dt = 1 / 240, direction = wave ? -1 : 1;
+      const at = wave * effect.interval + midpoint / speed;
+      const before = dolphinPose(stage, 32, midpoint, direction), p = dolphinPose(stage, 32, midpoint + dt * speed, direction);
+      const motion = { vx: (p.x - before.x) / dt, vy: (p.y - before.y) / dt,
+        omega: direction * Math.atan2(Math.sin(p.angle - before.angle), Math.cos(p.angle - before.angle)) / dt };
+      const local = { x: surfacePoint.x * p.scale + n.x * .24, y: surfacePoint.y * p.scale + n.y * .24 };
+      const position = { x: p.x + direction * (Math.cos(p.angle) * local.x - Math.sin(p.angle) * local.y),
+        y: p.y + Math.sin(p.angle) * local.x + Math.cos(p.angle) * local.y };
+      race.prepare(stage, ['speed contact'], effect); race.startRace([1, 1]);
+      race.physics.placeMarble(0, position.x, position.y); race.physics.setMarbleVelocity(0, 0, 30);
+      const expected = dolphinBounce({ ...position, ...race.physics.getMarbleVelocity(0) }, p, motion);
+      assert.ok(expected?.hit, 'the test marble approaches the moving dolphin');
+      race.stepDolphins(dt, at);
+      const actual = race.physics.getMarbleVelocity(0);
+      near(actual.vx, expected.vx, 'horizontal bounce uses the selected real-time speed', 1e-4);
+      near(actual.vy, expected.vy, 'vertical bounce uses the selected real-time speed', 1e-4);
+      assert.ok(race.dolphinContacts.has(`${wave}:0:0`), 'each appearance tracks its own contact');
+    }
+    {
+      const effect = { enabled: true, rows: [32], interval: 5, speed: .5 }, dt = 1 / 240, at = 6;
+      const p = dolphinPose(stage, 32, at * effect.speed + dt * effect.speed);
+      const local = { x: surfacePoint.x * p.scale + n.x * .24, y: surfacePoint.y * p.scale + n.y * .24 };
+      race.prepare(stage, ['older wave contact'], effect); race.startRace([1, 1]);
+      race.physics.placeMarble(0, p.x + Math.cos(p.angle) * local.x - Math.sin(p.angle) * local.y,
+        p.y + Math.sin(p.angle) * local.x + Math.cos(p.angle) * local.y);
+      race.physics.setMarbleVelocity(0, 0, 30);
+      race.stepDolphins(dt, at);
+      assert.ok(race.dolphinContacts.has('0:0:0'), 'the older slow dolphin remains collidable after the next appearance starts');
+    }
+    console.log('PASS real-speed reflection at every 0.1x step from 0.5 to 1.5x in both directions and collidable overlapping slow waves');
     // A separating overlap must not consume the first impact when a real roof reflects the ball back.
     for (const direction of [1, -1]) {
       const effect = { enabled: true, rows: [32], interval: 5, size: 100 }, scale = dolphinScale(effect);
@@ -117,7 +181,7 @@ console.log('PASS dolphin size/bounds, legacy default, actual/preview timing, LA
         const motion = { vx: (pose.x - before.x) / dt, vy: (pose.y - before.y) / dt,
           omega: direction * Math.atan2(Math.sin(pose.angle - before.angle), Math.cos(pose.angle - before.angle)) / dt };
         const velocity = this.physics.getMarbleVelocity(0), position = this.physics.getMarblePosition(0);
-        const prior = this.dolphinContacts.has('0:0');
+        const prior = this.dolphinContacts.has(`${dolphinWave(effect, elapsed).wave}:0:0`);
         const expected = dolphinBounce({ ...position, ...velocity }, pose, motion, !prior);
         original.call(this, dt, elapsed);
         samples.push({ prior, expected, velocity, after: this.physics.getMarbleVelocity(0) });
@@ -152,7 +216,7 @@ console.log('PASS dolphin size/bounds, legacy default, actual/preview timing, LA
       race.prepare(stage, ['continuous contact'], effect); race.startRace([1, 1]);
       race.physics.placeMarble(0, position.x, position.y); race.physics.setMarbleVelocity(0, 0, 10);
       race.stepDolphins(dt, midpoint);
-      assert.ok(race.dolphinContacts.has('0:0'), 'the initial bounce is tracked');
+      assert.ok(race.dolphinContacts.has('0:0:0'), 'the initial bounce is tracked');
       for (let i = 0; i < 3; i++) {
         // Another force may push the ball inward again before it separates from the dolphin.
         race.physics.setMarbleVelocity(0, wall.vx - nx * 2, wall.vy - ny * 2);
@@ -205,14 +269,15 @@ console.log('PASS dolphin size/bounds, legacy default, actual/preview timing, LA
       assert.ok(minY > 75.5, 'an upward dolphin rebound cannot enter the dead-end pocket behind the lower canyon guide');
     }
     console.log('PASS upward canyon rebounds stay outside the closed guide pocket');
+    for (const speed of (process.argv.includes('--speeds') ? [.5, 1, 1.5] : [1]))
     for (const size of (process.argv.includes('--sizes')?[50,100,200]:[100])) for (const map of stages) {
-      race.prepare(map, names, { enabled: true, rows: dolphinRows(map, 6, 20), interval: 5, size }); race.startRace([1, 1]);
+      race.prepare(map, names, { enabled: true, rows: dolphinRows(map, 6, 20), interval: 5, size, speed }); race.startRace([1, 1]);
       for (let i = 0; i < (process.argv.includes('--finish') ? 60 * 650 : 720) && race.state === 'running'; i++) {
         race.advance();
         for (const b of race.balls) assert.ok([b.x, b.y, b.angle].every(Number.isFinite), `${map.title}: finite marble state`);
       }
       if (process.argv.includes('--finish')) assert.equal(race.state, 'finished', `${map.title}: race completes with dolphins`);
-      console.log(`PASS integrated dolphin physics: ${map.title}, size ${size}%, 100 marbles, 6 rows, 5-second interval, ${race.elapsed.toFixed(1)}s, ${race.finishReason ?? 'running'}`);
+      console.log(`PASS integrated dolphin physics: ${map.title}, size ${size}%, speed ${speed}x, 100 marbles, 6 rows, 5-second interval, ${race.elapsed.toFixed(1)}s, ${race.finishReason ?? 'running'}`);
     }
   } finally { Math.random = random; race.physics.dispose(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

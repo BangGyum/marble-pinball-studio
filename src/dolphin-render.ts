@@ -1,5 +1,5 @@
 import type { StageDef } from './stage-def';
-import { dolphinPose, dolphinScale, dolphinWave, DOLPHIN_DURATION, DOLPHIN_SWIM, DOLPHIN_WIDTH, type DolphinSettings } from './dolphin';
+import { dolphinPose, dolphinScale, dolphinWaves, DOLPHIN_DURATION, DOLPHIN_SWIM, DOLPHIN_WIDTH, type DolphinSettings } from './dolphin';
 import { sceneColor } from './scene-theme';
 import { DOLPHIN_HEIGHT, DOLPHIN_OUTLINE, DOLPHIN_SPRITE_RECT } from './dolphin-hitbox';
 
@@ -64,8 +64,8 @@ export class DolphinRenderer {
     if (!settings.enabled) return;
     const transform = ctx.getTransform(), factor = dolphinScale(settings);
     this.load(Math.ceil(DOLPHIN_WIDTH * factor * Math.hypot(transform.a, transform.b) / 128) * 128);
-    const { time, wave } = dolphinWave(settings, elapsed, preview);
-    if (time > DOLPHIN_DURATION + .65) return;
+    const waves = dolphinWaves(settings, elapsed, preview);
+    if (!waves.length) return;
     if (this.width !== (stage.width ?? 26) || this.effectScale !== factor) {
       this.width = stage.width ?? 26; this.effectScale = factor;
       this.events = Array.from({ length: 6 }, (_, i) => {
@@ -79,7 +79,7 @@ export class DolphinRenderer {
         return { at, x: p.x + Math.cos(p.angle) * 62 / 36 * factor };
       });
     }
-    settings.rows.forEach((row, index) => {
+    for (const { time, wave } of waves) settings.rows.forEach((row, index) => {
       if (row < view.top - 3 * factor || row > view.bottom + 5 * factor) return;
       const direction = (wave + index) % 2 ? -1 : 1, p = dolphinPose(stage, row, time, direction, factor);
       ctx.save();

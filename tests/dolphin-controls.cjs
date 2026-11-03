@@ -3,7 +3,7 @@ require.extensions['.ts'] = (module, file) => module._compile(ts.transpileModule
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
 }).outputText, file);
 const { DolphinSettingsPanel } = require('../src/dolphin-settings.ts'), { DolphinDrag } = require('../src/dolphin-drag.ts');
-const fields = Object.fromEntries(['enabled','fields','minus','plus','count','gap','slider','interval','size','size-slider','preview','overview','hint']
+const fields = Object.fromEntries(['enabled','fields','minus','plus','count','gap','slider','interval','size','size-slider','speed','speed-slider','preview','overview','hint']
   .map(name => [name, { value: '20', checked: false, disabled: false, hidden: false }]));
 const changes = [], root = { classList: { add() {} }, querySelector: selector => fields[/"(.*?)"/.exec(selector)[1]] };
 let overviews = 0;
@@ -26,13 +26,23 @@ fields.size.value='1'; fields.size.oninput(); assert.equal(panel.value.size,150,
 fields.size.value='175'; fields.size.oninput(); assert.equal(panel.value.size,175); assert.equal(fields['size-slider'].value,'175');
 fields.size.value='500'; fields.size.onchange(); assert.equal(panel.value.size,200);
 fields.size.value='0'; fields.size.onchange(); assert.equal(panel.value.size,50);
+assert.equal(fields.speed.value, '1', 'legacy settings display the default 1x speed');
+fields['speed-slider'].value = '0.5'; fields['speed-slider'].oninput();
+assert.equal(panel.value.speed, .5); assert.equal(fields.speed.value, '0.5'); assert.equal(changes.at(-1).commit, false);
+fields['speed-slider'].onchange(); assert.equal(changes.at(-1).commit, true);
+fields.speed.value = '1.3'; fields.speed.oninput(); assert.equal(panel.value.speed, 1.3); assert.equal(fields['speed-slider'].value, '1.3');
+fields.speed.value = '0'; fields.speed.oninput(); assert.equal(panel.value.speed, 1.3, 'partial typing preserves the selected speed');
+fields.speed.onchange(); assert.equal(panel.value.speed, .5);
+fields.speed.value = '3'; fields.speed.onchange(); assert.equal(panel.value.speed, 1.5);
 panel.setLocked(true); const locked = JSON.stringify(panel.value); fields.plus.onclick(); fields.gap.value = '5'; fields.gap.onchange();
 fields['size-slider'].value='150'; fields['size-slider'].oninput(); fields['size-slider'].onchange();
 fields.size.value='150'; fields.size.oninput(); fields.size.onchange();
+fields['speed-slider'].value = '0.8'; fields['speed-slider'].oninput(); fields['speed-slider'].onchange();
+fields.speed.value = '0.8'; fields.speed.oninput(); fields.speed.onchange();
 assert.equal(JSON.stringify(panel.value), locked); assert.equal(fields.enabled.disabled, true);
 panel.setLocked(false); panel.setStage({ ...stage, goalY: 20.345 }); assert.ok(panel.value.rows.at(-1) <= 17.345);
 const manualRows = [14,45,77];
-panel.setStage(JSON.parse(JSON.stringify(stage)), { enabled:true, rows:manualRows, interval:13, size:150 });
+panel.setStage(JSON.parse(JSON.stringify(stage)), { enabled:true, rows:manualRows, interval:13, size:150, speed:1.3 });
 panel.setStage(stage);
 assert.deepEqual(panel.value.rows,manualRows,'LAN scene copies must not replace individually positioned rows');
 fields.interval.value='9'; fields.interval.onchange();
@@ -48,7 +58,8 @@ const serialized = require('node:vm').runInNewContext(ts.transpileModule(setting
 assert.deepEqual(Array.from(serialized.dolphins.rows),manualRows,'the actual LAN command builder keeps manual row positions');
 assert.equal(serialized.dolphins.interval,9);
 assert.equal(serialized.dolphins.size,150,'LAN command retains the selected size');
-console.log('PASS dolphin toggle, row count, spacing/size slider and input, limits, map changes and locked settings');
+assert.equal(serialized.dolphins.speed,1.3,'LAN command retains the selected speed');
+console.log('PASS dolphin toggle, row count, spacing/size/speed slider and input, limits, map changes and locked settings');
 
 global.window = { addEventListener() {} };
 for (const scale of [.5, 3, 70]) {

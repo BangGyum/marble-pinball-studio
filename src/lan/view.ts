@@ -202,7 +202,7 @@ export class LanView {
       if (this.dolphinPreviewLast && gap < 250) this.dolphinPreviewElapsed += Math.max(0, Math.min(.1, gap / 1000));
       this.dolphinPreviewLast = now;
     } else this.dolphinPreviewLast = 0;
-    if (this.state !== 'running' && !previewing && !this.recording && !this.renderDirty && !this.cameraMoving && !this.playbackMoving &&
+    if (this.state !== 'running' && !previewing && !this.recording && !this.renderDirty && !this.cameraMoving && !this.playbackMoving && !this.cache?.warming &&
       (!this.winnerAt || now - this.winnerAt >= 1400) &&
       (!this.drainCueAt || now - this.drainCueAt >= 450) && now - this.lastFrameDraw < 100) return;
     this.lastFrameDraw = now; this.renderDirty = false; this.draw(now);
@@ -293,6 +293,7 @@ export class LanView {
       ctx.beginPath(); ctx.moveTo(0, scene.stage.goalY); ctx.lineTo(scene.stage.width ?? 26, scene.stage.goalY); ctx.stroke(); ctx.setLineDash([]);
       ctx.font = 12 / scale + 'px sans-serif'; ctx.fillStyle = '#65efda'; ctx.fillText(scene.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, scene.stage.goalY - .4);
     }
+    this.cache.beginFrame();
     for (const ball of balls) {
       if (ball.rank && ball !== selected) continue;
       const labelMargin = Math.max(1, ball.name.length * 17 / scale);

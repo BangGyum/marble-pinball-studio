@@ -373,3 +373,53 @@ for (const stage of [infiniteFunnel, twinFunnel]) {
   assert.equal(JSON.stringify(stage), geometry, 'minimap art never changes collision geometry');
 }
 console.log('PASS both funnel minimaps show every rail in desktop/mobile themes, cache warm frames and Game/LAN entry points');
+
+// Simulate costly browser bitmap allocation on the first 100-marble paint.
+{
+  const originalPerformance = global.performance, originalCanvas = global.OffscreenCanvas;
+  let clock = 1000;
+  global.performance = { now: () => clock };
+  global.OffscreenCanvas = class extends originalCanvas {
+    constructor(w, h) { super(w, h); clock += .6; }
+  };
+  try {
+    const balls = Array.from({ length: 100 }, (_, id) => ({ id, name: String(id), color: '#fff', x: 12, y: 4, angle: 0, stuck: 0 }));
+    for (const type of [Game, LanView]) {
+      const renderer = new type(canvas), stage = { title: 'Cold entry', goalY: 100, entities: [] };
+      if (type === Game) {
+        renderer.stage = stage; renderer.physics.getEntities = () => []; renderer.balls = balls;
+        renderer.advance = () => assert.fail('warming a ready screen never advances physics');
+      } else {
+        renderer.setScene({ ...scene, stage, entities: [], fixed: [], balls });
+        renderer.push({ ...frame, positions: [], balls: balls.map(b => [b.id, b.x, b.y, 0, 0]), angles: [] });
+      }
+      const method = type === Game ? 'render' : 'draw', cache = type === Game ? renderer.renderCache : renderer.cache;
+      const draw = renderer[method].bind(renderer); let renders = 0;
+      renderer[method] = () => { renders++; draw(clock); };
+      const before = bitmaps.length; renderer[method]();
+      assert.ok(bitmaps.length - before <= 9, type.name + ': the first paint must not allocate all 200 marble/label bitmaps at once');
+      assert.equal(cache.warming, true);
+      for (let i = 0; i < 100 && cache.warming; i++) { clock += 1000 / 60; renderer.frame(clock); }
+      assert.equal(cache.warming, false, 'all visible sprites eventually finish warming');
+      assert.ok(renders > 15, 'pending cache work keeps the ready screen at full cadence');
+      const warm = bitmaps.length;
+      for (let i = 0; i < 20; i++) { clock += 1000 / 60; renderer.frame(clock); }
+      assert.equal(bitmaps.length, warm, 'warm frames reuse the finished bitmaps');
+      assert.equal(renderer.state, 'ready');
+    }
+    const cache = new RenderCache(), ball = { ...balls[0] };
+    cache.beginFrame(); assert.equal(cache.drawBall(ctx, ball, 40, 1), true);
+    clock += 3;
+    assert.equal(cache.drawBall(ctx, ball, 40, 1), true, 'finished bitmaps remain usable after the budget expires');
+    ball.name = 'Changed label';
+    const before = calls.length, allocated = bitmaps.length;
+    assert.equal(cache.drawBall(ctx, ball, 40, 1), false);
+    assert.equal(bitmaps.length, allocated, 'label invalidation also respects the budget');
+    assert.equal(calls.length, before, 'fallback is selected before painting a partial marble');
+    cache.beginFrame(); assert.equal(cache.drawBall(ctx, ball, 40, 1), true);
+    global.OffscreenCanvas = undefined; cache.beginFrame();
+    assert.equal(cache.drawBall(ctx, ball, 40, 1), false);
+    assert.equal(cache.warming, false, 'vector-only browsers never schedule bitmap warmup');
+  } finally { global.performance = originalPerformance; global.OffscreenCanvas = originalCanvas; }
+  console.log('PASS bounded cold-entry bitmap work, full warmup cadence, unchanged ready physics and stable warm caches');
+}

@@ -260,7 +260,7 @@ export class Game extends Race {
       // Under load the race slows down instead of creating a catch-up workload next frame.
       if (this.accumulator >= 1 / 60) this.accumulator %= 1 / 60;
     }
-    if (this.state === 'running' || previewing || this.recording || this.renderDirty || this.cameraMoving ||
+    if (this.state === 'running' || previewing || this.recording || this.renderDirty || this.cameraMoving || this.renderCache?.warming ||
       (this.winners.length && now - this.winnerAt < 1400) ||
       (this.drainCueAt && now - this.drainCueAt < 450) || now - this.lastFrameDraw >= 100) {
       this.lastFrameDraw = now; this.renderDirty = false;
@@ -367,6 +367,7 @@ export class Game extends Race {
       ctx.fillStyle = sceneColor('#65efda');
       ctx.fillText(this.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, this.stage.goalY - 0.4);
     }
+    this.renderCache.beginFrame();
     for (const b of active) {
       const x = at(b.px, b.x), y = at(b.py, b.y);
       const labelMargin = Math.max(1, (b.name.length * 17) / scale);

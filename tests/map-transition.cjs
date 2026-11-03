@@ -97,3 +97,21 @@ for (const options of [{ reduced: true }, { hidden: true }]) {
   assert.equal(f.gallery.inert || f.game.inert, false);
 }
 console.log('PASS external navigation cancels pending selection and reduced-motion entry remains immediate');
+
+// Selecting a new map prepares it while hidden, before the first visible render.
+{
+  const file = ts.createSourceFile('index.ts', fs.readFileSync('src/index.ts', 'utf8'), ts.ScriptTarget.ES2022);
+  const declaration = file.statements.flatMap(node => ts.isVariableStatement(node) ? [...node.declarationList.declarations] : [])
+    .find(node => node.name.getText(file) === 'gallery');
+  const callback = declaration.initializer.arguments[0];
+  const next = { title: 'Next map' }, calls = [], mapSelect = { value: 'old' };
+  const context = { allMaps: () => [{ id: 'new', stage: next }], currentStage: {}, mapSelect,
+    prepare() { calls.push('prepare'); }, showGame(fromSelection) { assert.equal(fromSelection, true); calls.push('show'); } };
+  const code = ts.transpileModule(`const select = ${callback.getText(file)}; select('new');`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  require('node:vm').runInNewContext(code, context);
+  assert.deepEqual(calls, ['prepare', 'show'], 'the first visible paint must use the selected map, without painting the previous map');
+  assert.equal(context.currentStage, next); assert.equal(mapSelect.value, 'new');
+  console.log('PASS map selection prepares once before revealing the game');
+}

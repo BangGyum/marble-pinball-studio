@@ -40,7 +40,8 @@ export const neonCrossway: StageDef = {
     rail(curve([54, 26], [54, 32], [43, 33], [40, 38]), gold, 0.65),
     rail([[30, 17], [30, 26]], gold), rail([[34, 17], [34, 26]], gold, 0.65),
     rail(curve([4.6, 37], [11, 39], [22, 42], [26, 49]), gold),
-    rail(curve([59.4, 41], [57, 49], [44, 52], [35, 56]), cyan, 0.65),
+    // Join the outer wall so the shelf tip has no pocket for an upward rebound.
+    rail(curve([60.2, 41], [57, 49], [44, 52], [35, 56]), cyan, 0.65),
     rail(curve([29, 59], [25, 60], [21, 62], [18, 64]), cyan, 0.65),
     rail([[30, 42], [30, 49]], gold), rail([[34, 42], [34, 49]], gold, 0.65),
     rail(curve([4, 64], [5, 75], [22, 73], [28, 82]), cyan),
