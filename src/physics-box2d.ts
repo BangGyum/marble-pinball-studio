@@ -4,12 +4,19 @@ import type { StageDef, WindZone } from './data/maps';
 import { windPower } from './wind-power';
 import { timedGateAngle } from './timed-gate';
 import { rotorPower } from './rotor-cycle';
-import type { IPhysics } from './IPhysics';
-import type { MapEntity, MapEntityState } from './types/MapEntity.type';
+import type { IPhysics } from './i-physics';
+import type { MapEntity, MapEntityState } from './types/map-entity';
 
-type PhysicsEntity = { body: Box2D.b2Body; moving: boolean; springAt?: number;
-  sliding?: MapEntity['props']['sliding']; oscillation?: MapEntity['props']['oscillation'];
-  timedGate?: MapEntity['props']['timedGate']; spinCycle?: MapEntity['props']['spinCycle']; spin: number } & MapEntityState;
+type PhysicsEntity = {
+  body: Box2D.b2Body;
+  moving: boolean;
+  springAt?: number;
+  sliding?: MapEntity['props']['sliding'];
+  oscillation?: MapEntity['props']['oscillation'];
+  timedGate?: MapEntity['props']['timedGate'];
+  spinCycle?: MapEntity['props']['spinCycle'];
+  spin: number;
+} & MapEntityState;
 
 const inBridgeArea = (x: number, y: number, area: NonNullable<StageDef['exitBridge']>['entry']) =>
   Math.abs(x - area.x) <= area.width / 2 && Math.abs(y - area.y) <= area.height / 2;
@@ -95,17 +102,23 @@ export class Box2dPhysics implements IPhysics {
     this.motionTime = 0;
     this.vortex = stage.vortex;
     this.windZones = stage.windZones ?? [];
-    this.winds = [
-      ...(this.vortex ? [{ type: 'vortex' as const, ...this.vortex }] : []),
-      ...this.windZones,
-    ].map(wind => ({ wind, pulse: 0, blend: 0, speed: 0, radial: 0 }));
+    this.winds = [...(this.vortex ? [{ type: 'vortex' as const, ...this.vortex }] : []), ...this.windZones].map(
+      (wind) => ({ wind, pulse: 0, blend: 0, speed: 0, radial: 0 })
+    );
     this.exitBridge = stage.exitBridge;
     this.windTime = 0;
     this.randomizeStart = stage.randomizeStart === true;
     this.collisionSubsteps = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.backing) ? 16 : 4;
     this.createEntities(
       (stage.entities ?? []).map((entity) =>
-        this.randomizeStart && !entity.props.oscillation && !entity.props.timedGate && !entity.props.sliding && !(entity.shape.type === 'box' && entity.shape.spring) && entity.position.y < 28 && entity.type === 'kinematic' && entity.shape.type === 'box'
+        this.randomizeStart &&
+        !entity.props.oscillation &&
+        !entity.props.timedGate &&
+        !entity.props.sliding &&
+        !(entity.shape.type === 'box' && entity.shape.spring) &&
+        entity.position.y < 28 &&
+        entity.type === 'kinematic' &&
+        entity.shape.type === 'box'
           ? { ...entity, shape: { ...entity.shape, rotation: entity.shape.rotation + Math.random() * Math.PI * 2 } }
           : entity
       )
@@ -194,8 +207,13 @@ export class Box2dPhysics implements IPhysics {
       B.destroy(fixture);
       B.LeakMitigator.freeFromCache(filter);
       if (entity.props.sliding) {
-        const slide = entity.props.sliding, offset = slide.amplitude * Math.sin(slide.phase), direction = slide.direction ?? 0;
-        this.vector.Set(entity.position.x + Math.cos(direction) * offset, entity.position.y + Math.sin(direction) * offset);
+        const slide = entity.props.sliding,
+          offset = slide.amplitude * Math.sin(slide.phase),
+          direction = slide.direction ?? 0;
+        this.vector.Set(
+          entity.position.x + Math.cos(direction) * offset,
+          entity.position.y + Math.sin(direction) * offset
+        );
         body.SetTransform(this.vector, 0);
       }
       if (entity.props.timedGate) {
@@ -284,7 +302,9 @@ export class Box2dPhysics implements IPhysics {
   }
   setMarbleVelocity(id: number, vx: number, vy: number) {
     const body = this.marbleMap[id];
-    this.vector.Set(vx, vy); body.SetLinearVelocity(this.vector); body.SetAwake(true);
+    this.vector.Set(vx, vy);
+    body.SetLinearVelocity(this.vector);
+    body.SetAwake(true);
   }
   placeMarble(id: number, x: number, y: number) {
     const body = this.marbleMap[id];
@@ -295,14 +315,18 @@ export class Box2dPhysics implements IPhysics {
     body.SetLinearVelocity(this.vector);
     body.SetAwake(true);
   }
-  isMarbleOnBridge(id: number) { return this.bridgeBodies.has(this.marbleMap[id]); }
+  isMarbleOnBridge(id: number) {
+    return this.bridgeBodies.has(this.marbleMap[id]);
+  }
   getEntities(blend = 1): MapEntityState[] {
     // A breakable obstacle removed in the last step shifts indices; draw that frame unblended.
     const previous = blend < 1 && this.previousCount === this.entities.length ? this.previousPoses : undefined;
     return this.entities.map((e, i) => {
       const spring = e.shape.type === 'box' && e.shape.spring;
       const position = e.sliding || spring ? e.body.GetPosition() : undefined;
-      let x = position ? position.x : e.x, y = position ? position.y : e.y, angle = e.moving ? e.body.GetAngle() : 0;
+      let x = position ? position.x : e.x,
+        y = position ? position.y : e.y,
+        angle = e.moving ? e.body.GetAngle() : 0;
       if (previous && e.moving) {
         x = previous[i * 2] + (x - previous[i * 2]) * blend;
         y = this.previousY[i] + (y - this.previousY[i]) * blend;
@@ -312,7 +336,8 @@ export class Box2dPhysics implements IPhysics {
     });
   }
   private recordPoses() {
-    if (this.previousPoses.length < this.entities.length * 2) this.previousPoses = new Float64Array(this.entities.length * 2);
+    if (this.previousPoses.length < this.entities.length * 2)
+      this.previousPoses = new Float64Array(this.entities.length * 2);
     if (this.previousY.length < this.entities.length) this.previousY = new Float64Array(this.entities.length);
     this.entities.forEach((e, i) => {
       if (!e.moving) return;
@@ -329,8 +354,13 @@ export class Box2dPhysics implements IPhysics {
   }
   activateSpring(index: number) {
     const e = this.entities[index];
-    if (!e || e.shape.type !== 'box' || !e.shape.spring ||
-      (e.springAt !== undefined && this.motionTime - e.springAt < 1)) return false;
+    if (
+      !e ||
+      e.shape.type !== 'box' ||
+      !e.shape.spring ||
+      (e.springAt !== undefined && this.motionTime - e.springAt < 1)
+    )
+      return false;
     e.springAt = this.motionTime;
     return true;
   }
@@ -350,20 +380,25 @@ export class Box2dPhysics implements IPhysics {
     if (this.winds.length) {
       this.windTime += seconds;
       for (const sample of this.winds) {
-        const wind = sample.wind, pulse = windPower(wind, this.windTime);
+        const wind = sample.wind,
+          pulse = windPower(wind, this.windTime);
         sample.pulse = pulse;
-        sample.blend = 1 - Math.exp(-(wind.type === 'directional' ? wind.strength ?? 2.4 : 2) * pulse * seconds);
+        sample.blend = 1 - Math.exp(-(wind.type === 'directional' ? (wind.strength ?? 2.4) : 2) * pulse * seconds);
         if (wind.type === 'vortex') {
-          const phase = this.windTime * (wind.period ? Math.PI * 2 / wind.period : 1.7) + (wind.phase ?? 0);
+          const phase = this.windTime * (wind.period ? (Math.PI * 2) / wind.period : 1.7) + (wind.phase ?? 0);
           const gust = wind.gust ?? 0;
           sample.speed = wind.speed * (1 + gust * Math.sin(phase)) * pulse;
-          sample.radial = ((wind.radial ?? 2) - gust * (12 + 12 * Math.sin(this.windTime * 1.1 + (wind.phase ?? 0)))) * pulse;
+          sample.radial =
+            ((wind.radial ?? 2) - gust * (12 + 12 * Math.sin(this.windTime * 1.1 + (wind.phase ?? 0)))) * pulse;
         }
       }
       for (const body of bodies) {
         if (this.bridgeBodies.has(body)) continue;
         const p = body.GetPosition();
-        let vx = 0, vy = 0, totalBlend = 0, gravityCompensation = 0;
+        let vx = 0,
+          vy = 0,
+          totalBlend = 0,
+          gravityCompensation = 0;
         for (const { wind, pulse, blend: zoneBlend, speed, radial } of this.winds) {
           if (wind.type === 'directional') {
             if (Math.abs(p.x - wind.x) > wind.width / 2 || Math.abs(p.y - wind.y) > wind.height / 2) continue;
@@ -374,10 +409,12 @@ export class Box2dPhysics implements IPhysics {
             totalBlend += zoneBlend;
             gravityCompensation += zoneBlend * pulse;
           } else {
-            const dx = p.x - wind.x, dy = p.y - wind.y, distance = Math.hypot(dx, dy);
+            const dx = p.x - wind.x,
+              dy = p.y - wind.y,
+              distance = Math.hypot(dx, dy);
             if (distance < Math.max(0.1, wind.innerRadius ?? 0) || distance >= wind.radius) continue;
-            vx += (-dy / distance * speed + dx / distance * radial) * zoneBlend;
-            vy += (dx / distance * speed + dy / distance * radial) * zoneBlend;
+            vx += ((-dy / distance) * speed + (dx / distance) * radial) * zoneBlend;
+            vy += ((dx / distance) * speed + (dy / distance) * radial) * zoneBlend;
             totalBlend += zoneBlend;
             gravityCompensation += zoneBlend * pulse;
           }
@@ -387,8 +424,10 @@ export class Box2dPhysics implements IPhysics {
         vx /= totalBlend;
         vy /= totalBlend;
         const v = body.GetLinearVelocity();
-        this.vector.Set(v.x + (vx - v.x) * blend,
-          v.y + (vy - v.y) * blend - 10 * seconds * Math.min(1, gravityCompensation / totalBlend));
+        this.vector.Set(
+          v.x + (vx - v.x) * blend,
+          v.y + (vy - v.y) * blend - 10 * seconds * Math.min(1, gravityCompensation / totalBlend)
+        );
         body.SetLinearVelocity(this.vector);
       }
     }
@@ -398,31 +437,44 @@ export class Box2dPhysics implements IPhysics {
     for (let i = 0; i < this.collisionSubsteps; i++) {
       const dt = seconds / this.collisionSubsteps;
       this.motionTime += dt;
-      for (const e of this.springs) if (e.shape.type === 'box' && e.shape.spring) {
-        const spring = e.shape.spring;
-        const t = e.springAt === undefined ? 1 : Math.min(1, this.motionTime - e.springAt);
-        // Fast 120ms stroke, eased return; move through Box2D so marbles receive the impact.
-        const fraction = t < 0.12 ? Math.sin(t / 0.12 * Math.PI / 2) : Math.pow((1 - t) / 0.88, 2);
-        const p = e.body.GetPosition(), amount = spring.distance * fraction;
-        this.vector.Set((e.x + Math.cos(spring.direction) * amount - p.x) / dt,
-          (e.y + Math.sin(spring.direction) * amount - p.y) / dt);
-        e.body.SetLinearVelocity(this.vector);
-      }
-      for (const e of this.sliders) if (e.sliding) {
-        const offset = e.sliding.amplitude * Math.sin(this.motionTime * Math.PI * 2 / e.sliding.period + e.sliding.phase);
-        const direction = e.sliding.direction ?? 0, p = e.body.GetPosition();
-        this.vector.Set((e.x + Math.cos(direction) * offset - p.x) / dt,
-          (e.y + Math.sin(direction) * offset - p.y) / dt);
-        e.body.SetLinearVelocity(this.vector);
-      }
-      for (const e of this.rotators) if (e.oscillation || e.timedGate) {
-        const target = e.timedGate ? timedGateAngle(e.timedGate, this.motionTime)
-          : e.oscillation!.amplitude * Math.sin(this.motionTime * Math.PI * 2 / e.oscillation!.period);
-        // Move through the solver, rather than teleporting a paddle across marbles.
-        e.body.SetAngularVelocity((target - e.body.GetAngle()) / dt);
-      } else if (e.spinCycle) {
-        e.body.SetAngularVelocity(e.spinCycle.idleSpeed + (e.spin - e.spinCycle.idleSpeed) * rotorPower(e.spinCycle, this.motionTime));
-      }
+      for (const e of this.springs)
+        if (e.shape.type === 'box' && e.shape.spring) {
+          const spring = e.shape.spring;
+          const t = e.springAt === undefined ? 1 : Math.min(1, this.motionTime - e.springAt);
+          // Fast 120ms stroke, eased return; move through Box2D so marbles receive the impact.
+          const fraction = t < 0.12 ? Math.sin(((t / 0.12) * Math.PI) / 2) : ((1 - t) / 0.88) ** 2;
+          const p = e.body.GetPosition(),
+            amount = spring.distance * fraction;
+          this.vector.Set(
+            (e.x + Math.cos(spring.direction) * amount - p.x) / dt,
+            (e.y + Math.sin(spring.direction) * amount - p.y) / dt
+          );
+          e.body.SetLinearVelocity(this.vector);
+        }
+      for (const e of this.sliders)
+        if (e.sliding) {
+          const offset =
+            e.sliding.amplitude * Math.sin((this.motionTime * Math.PI * 2) / e.sliding.period + e.sliding.phase);
+          const direction = e.sliding.direction ?? 0,
+            p = e.body.GetPosition();
+          this.vector.Set(
+            (e.x + Math.cos(direction) * offset - p.x) / dt,
+            (e.y + Math.sin(direction) * offset - p.y) / dt
+          );
+          e.body.SetLinearVelocity(this.vector);
+        }
+      for (const e of this.rotators)
+        if (e.oscillation || e.timedGate) {
+          const target = e.timedGate
+            ? timedGateAngle(e.timedGate, this.motionTime)
+            : e.oscillation!.amplitude * Math.sin((this.motionTime * Math.PI * 2) / e.oscillation!.period);
+          // Move through the solver, rather than teleporting a paddle across marbles.
+          e.body.SetAngularVelocity((target - e.body.GetAngle()) / dt);
+        } else if (e.spinCycle) {
+          e.body.SetAngularVelocity(
+            e.spinCycle.idleSpeed + (e.spin - e.spinCycle.idleSpeed) * rotorPower(e.spinCycle, this.motionTime)
+          );
+        }
       beforeSubstep?.(dt, i * dt);
       this.world.Step(dt, 8, this.collisionSubsteps === 4 ? 4 : 8);
       if (this.exitBridge) {
@@ -432,31 +484,42 @@ export class Box2dPhysics implements IPhysics {
           const p = body.GetPosition();
           let crossing = !elevated && inBridgeArea(p.x, p.y, this.exitBridge.entry);
           for (const transfer of this.exitBridge.transfers ?? []) {
-            if (inBridgeArea(p.x, p.y, elevated ? transfer.exit : transfer.entry)) { crossing = true; break; }
+            if (inBridgeArea(p.x, p.y, elevated ? transfer.exit : transfer.entry)) {
+              crossing = true;
+              break;
+            }
           }
           if (!crossing) continue;
           const layer = elevated ? 1 : 2;
-          const fixture = body.GetFixtureList(), filter = fixture.GetFilterData();
-          filter.set_categoryBits(layer); filter.set_maskBits(layer);
+          const fixture = body.GetFixtureList(),
+            filter = fixture.GetFilterData();
+          filter.set_categoryBits(layer);
+          filter.set_maskBits(layer);
           fixture.SetFilterData(filter);
           if (elevated) this.bridgeBodies.delete(body);
           else this.bridgeBodies.add(body);
         }
       }
-      for (const e of this.boosters) if (e.shape.type === 'box' && e.shape.boostSpeed !== undefined) {
-        const dx = Math.cos(e.shape.rotation), dy = Math.sin(e.shape.rotation);
-        let edge = this.leaks.recordLeak(e.body.GetContactList());
-        while (this.Box2D.getPointer(edge)) {
-          if (this.leaks.recordLeak(edge.contact).IsTouching() && edge.other.GetType() === this.Box2D.b2_dynamicBody) {
-            const body = edge.other, v = body.GetLinearVelocity();
-            // Only add speed along the arrow; preserve momentum after leaving the pad.
-            const gain = Math.max(0, e.shape.boostSpeed - (v.x * dx + v.y * dy)) * (1 - Math.exp(-18 * dt));
-            this.vector.Set(v.x + dx * gain, v.y + dy * gain);
-            body.SetLinearVelocity(this.vector);
+      for (const e of this.boosters)
+        if (e.shape.type === 'box' && e.shape.boostSpeed !== undefined) {
+          const dx = Math.cos(e.shape.rotation),
+            dy = Math.sin(e.shape.rotation);
+          let edge = this.leaks.recordLeak(e.body.GetContactList());
+          while (this.Box2D.getPointer(edge)) {
+            if (
+              this.leaks.recordLeak(edge.contact).IsTouching() &&
+              edge.other.GetType() === this.Box2D.b2_dynamicBody
+            ) {
+              const body = edge.other,
+                v = body.GetLinearVelocity();
+              // Only add speed along the arrow; preserve momentum after leaving the pad.
+              const gain = Math.max(0, e.shape.boostSpeed - (v.x * dx + v.y * dy)) * (1 - Math.exp(-18 * dt));
+              this.vector.Set(v.x + dx * gain, v.y + dy * gain);
+              body.SetLinearVelocity(this.vector);
+            }
+            edge = this.leaks.recordLeak(edge.next);
           }
-          edge = this.leaks.recordLeak(edge.next);
         }
-      }
       // A brief bounce can end before the last substep; remember every touching obstacle.
       for (const e of this.breakables) {
         if (this.broken.has(e)) continue;
@@ -477,11 +540,11 @@ export class Box2dPhysics implements IPhysics {
         this.deleteCandidates.push(e.body);
         this.entities.splice(i, 1);
       }
-      this.springs = this.springs.filter(e => !this.broken.has(e));
-      this.sliders = this.sliders.filter(e => !this.broken.has(e));
-      this.rotators = this.rotators.filter(e => !this.broken.has(e));
-      this.boosters = this.boosters.filter(e => !this.broken.has(e));
-      this.breakables = this.breakables.filter(e => !this.broken.has(e));
+      this.springs = this.springs.filter((e) => !this.broken.has(e));
+      this.sliders = this.sliders.filter((e) => !this.broken.has(e));
+      this.rotators = this.rotators.filter((e) => !this.broken.has(e));
+      this.boosters = this.boosters.filter((e) => !this.broken.has(e));
+      this.breakables = this.breakables.filter((e) => !this.broken.has(e));
       this.broken.clear();
     }
   }

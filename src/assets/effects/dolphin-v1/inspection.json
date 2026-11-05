@@ -1,32 +1,16 @@
 {
   "dolphin.png": {
-    "size": [
-      1774,
-      887
-    ],
+    "size": [1774, 887],
     "mode": "RGBA",
     "bytes": 720086,
     "sha256": "e73516bc93611499e87af8b774f559100d71c2ba5c6e31e3e3f1b4d87f3719dc",
-    "alphaRange": [
-      0,
-      255
-    ],
+    "alphaRange": [0, 255],
     "transparentPixelPercent": 70.57,
     "partialAlphaPixelPercent": 29.32,
     "edgeAlphaMax": 0,
     "edgeNonzeroPixels": 0,
-    "alphaBounds": [
-      25,
-      23,
-      1758,
-      865
-    ],
-    "visibleBoundsAlpha16": [
-      63,
-      120,
-      1711,
-      751
-    ],
+    "alphaBounds": [25, 23, 1758, 865],
+    "visibleBoundsAlpha16": [63, 120, 1711, 751],
     "decodedRgbaBytes": 6294152
   },
   "dolphin-tail-fixed.png": {
@@ -44,33 +28,17 @@
     "decodedRgbaBytes": 6294152
   },
   "splash.png": {
-    "size": [
-      1774,
-      887
-    ],
+    "size": [1774, 887],
     "mode": "RGBA",
     "bytes": 1009431,
     "sha256": "7d2c768d6af6066169c9ecc825e5581f83558d8f1cd9ee33670d1af2ddc87fd9",
-    "alphaRange": [
-      0,
-      255
-    ],
+    "alphaRange": [0, 255],
     "transparentPixelPercent": 71.81,
     "partialAlphaPixelPercent": 28.15,
     "edgeAlphaMax": 1,
     "edgeNonzeroPixels": 48,
-    "alphaBounds": [
-      23,
-      17,
-      1764,
-      887
-    ],
-    "visibleBoundsAlpha16": [
-      85,
-      149,
-      1704,
-      788
-    ],
+    "alphaBounds": [23, 17, 1764, 887],
+    "visibleBoundsAlpha16": [85, 149, 1704, 788],
     "decodedRgbaBytes": 6294152
   }
 }

@@ -28,8 +28,8 @@
   a { color: #a1dce2; } #load-state { color: #9dd9c6; } @media(max-width: 850px) { main { padding: 22px 16px; } header { display: block; } .controls { margin-top: 22px; } .stages, .assets { grid-template-columns: 1fr; } }
 </style>
 <main>
-  <header><div><p class="eyebrow">PAUL PINBALL / EFFECT CONCEPT 01</p><h1>돌고래 스플래시</h1><p class="muted">좌우에서 첨벙첨벙. 레일을 지나가며 공을 튕기는 공통 효과 시안.</p></div><div class="controls"><button id="left" aria-pressed="true">왼쪽에서 →</button><button id="right" aria-pressed="false">← 오른쪽에서</button><button id="pause">일시정지</button><button id="replay">다시 보기</button></div></header>
-  <div class="toolbar"><p id="load-state" role="status">투명 이미지 불러오는 중…</p><div class="controls"><button id="jump-still">도약 장면</button><button id="splash-still">첨벙 장면</button></div><label><input id="guide" type="checkbox" checked> 도약 경로 표시</label></div>
+  <header><div><p class="eyebrow">PAUL PINBALL / EFFECT CONCEPT 01</p><h1>돌고래 스플래시</h1><p class="muted">좌우에서 첨벙첨벙. 레일을 지나가며 공을 튕기는 공통 효과 시안.</p></div><div class="controls"><button type="button" id="left" aria-pressed="true">왼쪽에서 →</button><button type="button" id="right" aria-pressed="false">← 오른쪽에서</button><button type="button" id="pause">일시정지</button><button type="button" id="replay">다시 보기</button></div></header>
+  <div class="toolbar"><p id="load-state" role="status">투명 이미지 불러오는 중…</p><div class="controls"><button type="button" id="jump-still">도약 장면</button><button type="button" id="splash-still">첨벙 장면</button></div><label><input id="guide" type="checkbox" checked> 도약 경로 표시</label></div>
   <section class="stages" aria-label="테마별 움직임 비교">
     <article class="panel"><div class="panel-head"><h2>다크 테마</h2><span>본체 약 144px · 공 지름 18px</span></div><canvas id="dark" width="1280" height="680" aria-label="다크 배경의 돌고래 도약 시안"></canvas></article>
     <article class="panel beige"><div class="panel-head"><h2>베이지 테마</h2><span>같은 PNG · 같은 움직임</span></div><canvas id="beige" width="1280" height="680" aria-label="베이지 배경의 돌고래 도약 시안"></canvas></article>

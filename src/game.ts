@@ -8,6 +8,7 @@ import { drawWind } from './wind-render';
 import type { WinnerOrder } from './model';
 import { drawCelebration } from './celebration';
 import { Recorder } from './recorder';
+import { toast } from './ui';
 import { RenderCache } from './render-cache';
 import { drawMarble } from './marble-art';
 import { MarbleElasticity } from './marble-elasticity';
@@ -16,7 +17,7 @@ import { drawFunnelEntryCue } from './funnel-art';
 import { DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from './dolphin';
 import { DolphinRenderer } from './dolphin-render';
 import { DolphinDrag } from './dolphin-drag';
-import type { MapEntityState } from './types/MapEntity.type';
+import type { MapEntityState } from './types/map-entity';
 export type { Ball } from './race';
 export class Game extends Race {
   private reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : undefined;
@@ -30,7 +31,11 @@ export class Game extends Race {
   onZoomChange: (zoom: number) => void = () => {};
   recording = false;
   private ctx: CanvasRenderingContext2D;
-  private recorder = new Recorder();
+  private recorder = new Recorder(() => {
+    this.recording = false;
+    this.renderDirty = true;
+    toast('녹화가 예기치 않게 종료됐어요.');
+  });
   private recordStop: ReturnType<typeof setTimeout> | undefined;
   private last = 0;
   private lastRender = 0;
@@ -45,7 +50,6 @@ export class Game extends Race {
   private width = 1000;
   private height = 600;
   private minimap = { x: 18, y: 20, w: 115, h: 400, scale: 4 };
-  private frameId = 0;
   private renderCache = new RenderCache();
   private marbleElasticity = new MarbleElasticity();
   private springControls: SpringControls;
@@ -59,15 +63,30 @@ export class Game extends Race {
   onDolphinChange: (settings: DolphinSettings, commit: boolean) => void = () => {};
   constructor(readonly canvas: HTMLCanvasElement) {
     super();
-    this.dolphinDrag = new DolphinDrag(canvas, () => this.state === 'ready' && this.dolphinPreview,
-      () => this.dolphins, () => this.stage, (index, y, commit) => {
-        const rows = [...this.dolphins.rows]; rows[index] = y;
-        this.setDolphins({ ...this.dolphins, rows }); this.onDolphinChange(this.dolphins, commit);
-      });
-    this.springControls = new SpringControls(canvas, index => this.activateSpring(index), () => this.state === 'running');
+    this.dolphinDrag = new DolphinDrag(
+      canvas,
+      () => this.state === 'ready' && this.dolphinPreview,
+      () => this.dolphins,
+      () => this.stage,
+      (index, y, commit) => {
+        const rows = [...this.dolphins.rows];
+        rows[index] = y;
+        this.setDolphins({ ...this.dolphins, rows });
+        this.onDolphinChange(this.dolphins, commit);
+      }
+    );
+    this.springControls = new SpringControls(
+      canvas,
+      (index) => this.activateSpring(index),
+      () => this.state === 'running'
+    );
     this.ctx = canvas.getContext('2d', { alpha: false })!;
-    window.addEventListener('pinball-theme-change', () => { this.renderDirty = true; });
-    window.addEventListener('pinball-marble-design-change', () => { this.renderDirty = true; });
+    window.addEventListener('pinball-theme-change', () => {
+      this.renderDirty = true;
+    });
+    window.addEventListener('pinball-marble-design-change', () => {
+      this.renderDirty = true;
+    });
     new ResizeObserver(() => this.resize()).observe(canvas);
     const followMinimap = (e: PointerEvent) => {
       this.renderDirty = true;
@@ -83,7 +102,11 @@ export class Game extends Race {
       this.fastForward = false;
     };
     canvas.addEventListener('pointerdown', (e) => {
-      if (this.springControls.select(e)) { this.fastForward = false; this.renderDirty = true; return; }
+      if (this.springControls.select(e)) {
+        this.fastForward = false;
+        this.renderDirty = true;
+        return;
+      }
       followMinimap(e);
       if (e.pointerType === 'mouse' && e.button === 0 && this.state === 'running') {
         this.fastForward = true;
@@ -119,11 +142,12 @@ export class Game extends Race {
     await this.physics.init();
     this.prepare(stage, names);
     this.resize();
-    this.frameId = requestAnimationFrame((t) => this.frame(t));
+    requestAnimationFrame((t) => this.frame(t));
   }
   prepare(stage: StageDef, names: string[], dolphins?: DolphinSettings) {
     this.dolphinOverview = false;
-    this.dolphinPreviewElapsed = DOLPHIN_DURATION / 2; this.dolphinPreviewLast = 0;
+    this.dolphinPreviewElapsed = DOLPHIN_DURATION / 2;
+    this.dolphinPreviewLast = 0;
     this.drainCueAt = 0;
     this.drainCueDone = false;
     this.stopRecording();
@@ -147,22 +171,38 @@ export class Game extends Race {
   setDolphins(settings: DolphinSettings) {
     if (this.state !== 'ready') return;
     this.dolphins = validateDolphins(settings, this.stage);
-    if (!settings.enabled && this.dolphinOverview) { this.dolphinOverview = false; this.camera = { ...this.readyCamera }; this.manual = null; }
-    this.renderDirty = true; this.render();
+    if (!settings.enabled && this.dolphinOverview) {
+      this.dolphinOverview = false;
+      this.camera = { ...this.readyCamera };
+      this.manual = null;
+    }
+    this.renderDirty = true;
+    this.render();
   }
-  setDolphinPreview(show: boolean) { this.dolphinPreview = show; this.dolphinPreviewLast = 0; this.renderDirty = true; }
+  setDolphinPreview(show: boolean) {
+    this.dolphinPreview = show;
+    this.dolphinPreviewLast = 0;
+    this.renderDirty = true;
+  }
   showDolphinLayout() {
     if (this.state !== 'ready' || !this.dolphins.enabled) return;
-    this.dolphinOverview = true; this.manual = null;
-    this.zoom = 1; this.onZoomChange(1);
-    this.camera = { x: (this.stage.width ?? 26) / 2, y: this.stage.goalY / 2 - this.height * .07 / this.viewScale() };
-    this.renderDirty = true; this.render();
+    this.dolphinOverview = true;
+    this.manual = null;
+    this.zoom = 1;
+    this.onZoomChange(1);
+    this.camera = {
+      x: (this.stage.width ?? 26) / 2,
+      y: this.stage.goalY / 2 - (this.height * 0.07) / this.viewScale(),
+    };
+    this.renderDirty = true;
+    this.render();
   }
   start(range: [number, number], record: boolean, order: WinnerOrder = 'asc') {
     if (!this.balls.length) throw new Error('참가자 이름을 먼저 입력해 주세요.');
     this.fastForward = false;
     if (this.dolphinOverview) this.camera = { ...this.readyCamera };
-    this.dolphinOverview = false; this.manual = null;
+    this.dolphinOverview = false;
+    this.manual = null;
     this.accumulator = 0;
     this.stepped = false;
     if (record) {
@@ -180,7 +220,10 @@ export class Game extends Race {
     this.stepped = false;
   }
   follow(closeOverview = false) {
-    if (closeOverview && this.state === 'ready' && this.dolphinOverview) { this.dolphinOverview = false; this.camera = { ...this.readyCamera }; }
+    if (closeOverview && this.state === 'ready' && this.dolphinOverview) {
+      this.dolphinOverview = false;
+      this.camera = { ...this.readyCamera };
+    }
     this.manual = null;
     this.renderDirty = true;
   }
@@ -202,10 +245,19 @@ export class Game extends Race {
   }
   private viewScale() {
     if (this.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview))
-      return Math.min(Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.stage.width ?? 26) + 4),
-        Math.max(1, this.height - 45) / (this.stage.goalY + 4)) * this.zoom;
+      return (
+        Math.min(
+          Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.stage.width ?? 26) + 4),
+          Math.max(1, this.height - 45) / (this.stage.goalY + 4)
+        ) * this.zoom
+      );
     if (this.state === 'ready' && this.dolphinOverview)
-      return Math.min(Math.max(1, this.width - 180) / ((this.stage.width ?? 26) + 4), Math.max(1, this.height - 45) / (this.stage.goalY + 4)) * this.zoom;
+      return (
+        Math.min(
+          Math.max(1, this.width - 180) / ((this.stage.width ?? 26) + 4),
+          Math.max(1, this.height - 45) / (this.stage.goalY + 4)
+        ) * this.zoom
+      );
     const base =
       this.state === 'ready'
         ? Math.min(this.width / 13, this.height / Math.max(10, Math.ceil(this.balls.length / 10) * 0.7 + 4), 100)
@@ -230,14 +282,18 @@ export class Game extends Race {
     if (!this.visible) {
       this.dolphinPreviewLast = 0;
       this.accumulator = 0;
-      this.frameId = requestAnimationFrame((t) => this.frame(t));
+      requestAnimationFrame((t) => this.frame(t));
       return;
     }
-    const previewing = this.state === 'ready' && this.dolphinPreview && this.dolphins?.enabled &&
-      !this.reducedMotion?.matches && (typeof document === 'undefined' || !document.hidden);
+    const previewing =
+      this.state === 'ready' &&
+      this.dolphinPreview &&
+      this.dolphins?.enabled &&
+      !this.reducedMotion?.matches &&
+      (typeof document === 'undefined' || !document.hidden);
     if (previewing) {
       const gap = now - this.dolphinPreviewLast;
-      if (this.dolphinPreviewLast && gap < 250) this.dolphinPreviewElapsed += Math.max(0, Math.min(.1, gap / 1000));
+      if (this.dolphinPreviewLast && gap < 250) this.dolphinPreviewElapsed += Math.max(0, Math.min(0.1, gap / 1000));
       this.dolphinPreviewLast = now;
     } else this.dolphinPreviewLast = 0;
     if (this.state === 'running') {
@@ -261,21 +317,34 @@ export class Game extends Race {
       // Under load the race slows down instead of creating a catch-up workload next frame.
       if (this.accumulator >= 1 / 60) this.accumulator %= 1 / 60;
     }
-    if (this.state === 'running' || previewing || this.recording || this.renderDirty || this.cameraMoving || this.renderCache?.warming ||
+    if (
+      this.state === 'running' ||
+      previewing ||
+      this.recording ||
+      this.renderDirty ||
+      this.cameraMoving ||
+      this.renderCache?.warming ||
       (this.winners.length && now - this.winnerAt < 1400) ||
-      (this.drainCueAt && now - this.drainCueAt < 450) || now - this.lastFrameDraw >= 100) {
-      this.lastFrameDraw = now; this.renderDirty = false;
+      (this.drainCueAt && now - this.drainCueAt < 450) ||
+      now - this.lastFrameDraw >= 100
+    ) {
+      this.lastFrameDraw = now;
+      this.renderDirty = false;
       this.render();
     }
-    this.frameId = requestAnimationFrame((t) => this.frame(t));
+    requestAnimationFrame((t) => this.frame(t));
   }
   advance() {
     super.advance();
     const now = performance.now();
-    for (const ball of this.balls) if (!ball.rank)
-      this.marbleElasticity?.sample(ball.id, ball.x, ball.y, this.elapsed, now);
-    if (!this.drainCueDone && this.stage.art?.style === 'infinite-funnel' && this.stage.exitBridge &&
-      this.balls.some(ball => ball.onBridge)) {
+    for (const ball of this.balls)
+      if (!ball.rank) this.marbleElasticity?.sample(ball.id, ball.x, ball.y, this.elapsed, now);
+    if (
+      !this.drainCueDone &&
+      this.stage.art?.style === 'infinite-funnel' &&
+      this.stage.exitBridge &&
+      this.balls.some((ball) => ball.onBridge)
+    ) {
       this.drainCueDone = true;
       if (!this.reducedMotion?.matches) this.drainCueAt = performance.now();
     }
@@ -311,12 +380,13 @@ export class Game extends Race {
     const scale = this.viewScale();
     this.cameraMoving = false;
     if (this.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview) && this.zoom <= 1 && !this.manual) {
-      this.camera = { x: (this.stage.width ?? 26) / 2, y: this.stage.goalY / 2 - h * .07 / scale };
+      this.camera = { x: (this.stage.width ?? 26) / 2, y: this.stage.goalY / 2 - (h * 0.07) / scale };
     } else if (this.state !== 'ready' && target && !this.manual) {
       // Same easing as 0.06 / 0.13 per frame at 60Hz, independent of the display refresh rate.
-      this.camera.x += (at(target.px, target.x) - this.camera.x) * (1 - Math.pow(0.94, dt * 60));
-      this.camera.y += (at(target.py, target.y) - this.camera.y) * (1 - Math.pow(0.87, dt * 60));
-      this.cameraMoving = Math.abs(at(target.px, target.x) - this.camera.x) + Math.abs(at(target.py, target.y) - this.camera.y) > 0.01;
+      this.camera.x += (at(target.px, target.x) - this.camera.x) * (1 - 0.94 ** (dt * 60));
+      this.camera.y += (at(target.py, target.y) - this.camera.y) * (1 - 0.87 ** (dt * 60));
+      this.cameraMoving =
+        Math.abs(at(target.px, target.x) - this.camera.x) + Math.abs(at(target.py, target.y) - this.camera.y) > 0.01;
     }
     const cam = this.manual ?? this.camera;
     const view = {
@@ -330,16 +400,26 @@ export class Game extends Race {
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
     drawMapArt(ctx, this.stage, scale);
-    drawEntities(ctx, this.stage.exitBridge ? entities.filter(e => e.shape.collisionLayer !== 2) : entities, scale, -1, true, view, !!this.stage.art, this.stage.art?.style === 'reversal-ladder');
+    drawEntities(
+      ctx,
+      this.stage.exitBridge ? entities.filter((e) => e.shape.collisionLayer !== 2) : entities,
+      scale,
+      -1,
+      true,
+      view,
+      !!this.stage.art,
+      this.stage.art?.style === 'reversal-ladder'
+    );
     if (this.stage.vortex) {
       const wind = this.stage.vortex;
       ctx.shadowBlur = 0;
       ctx.strokeStyle = sceneColor('#64f4e050');
       ctx.lineWidth = 1.5 / scale;
-      const phase = wind.speed / wind.radius * (this.elapsed +
-        (wind.gust ?? 0) * (1 - Math.cos(this.elapsed * 1.7)) / 1.7);
+      const phase =
+        (wind.speed / wind.radius) * (this.elapsed + ((wind.gust ?? 0) * (1 - Math.cos(this.elapsed * 1.7))) / 1.7);
       for (let i = 0; i < 3; i++) {
-        const a = phase + i * Math.PI * 2 / 3, r = wind.radius * 0.7;
+        const a = phase + (i * Math.PI * 2) / 3,
+          r = wind.radius * 0.7;
         ctx.beginPath();
         ctx.arc(wind.x, wind.y, r, a, a + 0.5);
         ctx.stroke();
@@ -350,10 +430,17 @@ export class Game extends Race {
     if (this.state === 'ready') {
       if (this.dolphinPreview) {
         this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale);
-        this.dolphinRenderer.draw(ctx, this.stage, this.dolphins,
-          this.reducedMotion?.matches ? DOLPHIN_DURATION / 2 : this.dolphinPreviewElapsed, view, true);
+        this.dolphinRenderer.draw(
+          ctx,
+          this.stage,
+          this.dolphins,
+          this.reducedMotion?.matches ? DOLPHIN_DURATION / 2 : this.dolphinPreviewElapsed,
+          view,
+          true
+        );
       }
-    } else this.dolphinRenderer.draw(ctx, this.stage, this.dolphins, Math.max(0, this.elapsed - (1 - blend) / 60), view);
+    } else
+      this.dolphinRenderer.draw(ctx, this.stage, this.dolphins, Math.max(0, this.elapsed - (1 - blend) / 60), view);
     ctx.shadowBlur = 0;
     if (!drawGoalArea(ctx, this.stage, scale)) {
       ctx.strokeStyle = sceneColor('#65efda');
@@ -370,15 +457,17 @@ export class Game extends Race {
     }
     this.renderCache.beginFrame();
     for (const b of active) {
-      const x = at(b.px, b.x), y = at(b.py, b.y);
+      const x = at(b.px, b.x),
+        y = at(b.py, b.y);
       const labelMargin = Math.max(1, (b.name.length * 17) / scale);
-      if (
-        y < view.top - 1 || y > view.bottom + 1 ||
-        x < view.left - labelMargin || x > view.right + labelMargin
-      ) continue;
+      if (y < view.top - 1 || y > view.bottom + 1 || x < view.left - labelMargin || x > view.right + labelMargin)
+        continue;
       ctx.globalAlpha = bridgeBallOpacity(this.stage, { x, y, onBridge: b.onBridge });
       const squash = this.marbleElasticity?.effect(b.id, now, this.reducedMotion?.matches ?? false);
-      if (this.renderCache.drawBall(ctx, b, scale, d, x, y, squash)) { ctx.globalAlpha = 1; continue; }
+      if (this.renderCache.drawBall(ctx, b, scale, d, x, y, squash)) {
+        ctx.globalAlpha = 1;
+        continue;
+      }
       drawMarble(ctx, x, y, 0.25, b.color, squash);
       ctx.fillStyle = beige ? '#44382d' : b.color;
       ctx.font = `${Math.min(17, Math.max(12, scale * 0.24)) / scale}px sans-serif`;
@@ -393,11 +482,18 @@ export class Game extends Race {
       drawFunnelEntryCue(ctx, this.stage, (now - this.drainCueAt) / 1000, scale);
     ctx.restore();
     this.renderMinimap(entities, blend);
-    this.dolphinDrag.setView({ x: w * .56 - cam.x * scale, y: h * .43 - cam.y * scale,
-      scale, width: (this.stage.width ?? 26) * scale, height: this.stage.goalY * scale },
-      { x: this.minimap.x, y: this.minimap.y, scale: this.minimap.scale, width: this.minimap.w, height: this.minimap.h });
+    this.dolphinDrag.setView(
+      {
+        x: w * 0.56 - cam.x * scale,
+        y: h * 0.43 - cam.y * scale,
+        scale,
+        width: (this.stage.width ?? 26) * scale,
+        height: this.stage.goalY * scale,
+      },
+      { x: this.minimap.x, y: this.minimap.y, scale: this.minimap.scale, width: this.minimap.w, height: this.minimap.h }
+    );
     this.springControls.setStatuses(this.springStatuses(undefined, entities));
-    this.springControls.draw(ctx, entities, w * .56 - cam.x * scale, h * .43 - cam.y * scale, scale, h, this.stage);
+    this.springControls.draw(ctx, entities, w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale, scale, h, this.stage);
     ctx.textAlign = 'right';
     ctx.font = '12px sans-serif';
     ctx.fillStyle = beige ? '#6f5f4e' : '#728393';
@@ -433,7 +529,8 @@ export class Game extends Race {
     const ctx = this.ctx;
     const mapWidth = this.stage.width ?? 26;
     const scale = Math.min((this.width < 600 ? 75 : 125) / mapWidth, (this.height - 65) / this.stage.goalY);
-    const m = (this.minimap = { x: 16, y: 26, w: mapWidth * scale, h: this.stage.goalY * scale, scale });
+    const m = { x: 16, y: 26, w: mapWidth * scale, h: this.stage.goalY * scale, scale };
+    this.minimap = m;
     ctx.save();
     ctx.beginPath();
     ctx.rect(m.x, m.y, m.w, m.h);
@@ -445,7 +542,8 @@ export class Game extends Race {
     this.renderCache.drawMinimap(ctx, this.stage, entities, scale, Math.min(devicePixelRatio, 2));
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
     drawMapOverlay(ctx, this.stage, entities, scale);
-    if (this.state === 'ready' && this.dolphinPreview) this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale, true);
+    if (this.state === 'ready' && this.dolphinPreview)
+      this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale, true);
     for (const b of this.balls) {
       if (b.rank) continue;
       const x = b.px === undefined ? b.x : b.px + (b.x - b.px) * blend;
@@ -456,7 +554,9 @@ export class Game extends Race {
       ctx.arc(x, y, Math.max(0.23, 1.4 / scale), 0, Math.PI * 2);
       ctx.fill();
       if (getSceneTheme() === 'beige') {
-        ctx.strokeStyle = '#705a40'; ctx.lineWidth = 0.75 / scale; ctx.stroke();
+        ctx.strokeStyle = '#705a40';
+        ctx.lineWidth = 0.75 / scale;
+        ctx.stroke();
       }
     }
     ctx.globalAlpha = 1;

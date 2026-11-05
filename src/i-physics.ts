@@ -1,5 +1,5 @@
 import type { StageDef } from './data/maps';
-import type { MapEntityState } from './types/MapEntity.type';
+import type { MapEntityState } from './types/map-entity';
 
 export interface IPhysics {
   init(): Promise<void>;

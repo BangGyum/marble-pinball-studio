@@ -69,10 +69,20 @@ export function drawCelebration(
     '12px sans-serif',
     sceneColor('#b5d1cc')
   );
-  label('축하합니다!', y - 26, 'bold ' + Math.min(26, Math.max(18, width * 0.024)) + 'px sans-serif', sceneColor('#65efda'));
-  shown.forEach((ball, i) =>
-    label((ball.rank ? ball.rank + '등 · ' : '당첨 · ') + ball.name, y + 6 + i * 24, 'bold 16px sans-serif', beige ? '#44382d' : ball.color)
+  label(
+    '축하합니다!',
+    y - 26,
+    'bold ' + Math.min(26, Math.max(18, width * 0.024)) + 'px sans-serif',
+    sceneColor('#65efda')
   );
+  shown.forEach((ball, i) => {
+    label(
+      (ball.rank ? ball.rank + '등 · ' : '당첨 · ') + ball.name,
+      y + 6 + i * 24,
+      'bold 16px sans-serif',
+      beige ? '#44382d' : ball.color
+    );
+  });
   if (ordered.length > shown.length)
     label(
       '외 ' + (ordered.length - shown.length) + '명 · 전체 결과는 순위 목록에서',

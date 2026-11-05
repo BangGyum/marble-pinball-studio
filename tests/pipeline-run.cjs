@@ -17,7 +17,10 @@ const { validateStage } = require('../src/model.ts');
 
 global.fetch = undefined;
 let seed = 912463;
-Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+Math.random = () => {
+  seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+  return seed / 4294967296;
+};
 
 (async () => {
   validateStage(JSON.parse(JSON.stringify(pipelineRun)));
@@ -42,7 +45,14 @@ Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 429
   const physics = new Box2dPhysics();
   await physics.init();
   const game = Object.create(Game.prototype);
-  Object.assign(game, { physics, springControls: { reset() {} }, springCooldowns: { reset() {} }, recorder: { stop() {} }, render() {}, onFinish() {} });
+  Object.assign(game, {
+    physics,
+    springControls: { reset() {} },
+    springCooldowns: { reset() {} },
+    recorder: { stop() {} },
+    render() {},
+    onFinish() {},
+  });
   let bumpers = [],
     hits = [],
     bodies = new Map();
@@ -126,9 +136,9 @@ Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 429
         ', no escapes or stalls'
     );
   }
-  totalHits.forEach((hit) =>
-    assert.ok(hit / totalMarbles >= 0.25, 'each bumper must affect a meaningful share of marbles')
-  );
+  totalHits.forEach((hit) => {
+    assert.ok(hit / totalMarbles >= 0.25, 'each bumper must affect a meaningful share of marbles');
+  });
   physics.clearMarbles();
   physics.clear();
 })().catch((error) => {

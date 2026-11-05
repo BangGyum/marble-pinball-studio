@@ -1,4 +1,4 @@
-import type { VectorLike } from './VectorLike';
+import type { VectorLike } from './vector-like';
 
 export type EntityShapeTypes = 'box' | 'circle' | 'polyline';
 

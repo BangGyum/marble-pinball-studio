@@ -2,152 +2,284 @@ import { getSceneTheme, sceneColor } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { backgroundCache } from './background-cache';
 import { visibleArt, type ViewBounds } from './art-visibility';
-import type { MapEntityState } from './types/MapEntity.type';
+import type { MapEntityState } from './types/map-entity';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 type Point = [number, number];
 const path = (ctx: Context, points: Point[]) => {
-  ctx.moveTo(...points[0]); points.slice(1).forEach(p => ctx.lineTo(...p)); ctx.closePath();
+  ctx.moveTo(...points[0]);
+  points.slice(1).forEach((p) => {
+    ctx.lineTo(...p);
+  });
+  ctx.closePath();
 };
 
 function paintCanyon(ctx: Context, stage: StageDef, texture?: HTMLImageElement) {
-  const contours = stage.art!.contours, width = stage.width ?? 64, height = stage.goalY + 7;
+  const contours = stage.art!.contours,
+    width = stage.width ?? 64,
+    height = stage.goalY + 7;
   ctx.save();
   const voidLight = ctx.createLinearGradient(0, 0, width, 0);
-  voidLight.addColorStop(0, sceneColor('#08120e')); voidLight.addColorStop(0.48, sceneColor('#030609')); voidLight.addColorStop(1, sceneColor('#100b1b'));
-  ctx.fillStyle = voidLight; ctx.fillRect(0, -32, width, height + 32);
+  voidLight.addColorStop(0, sceneColor('#08120e'));
+  voidLight.addColorStop(0.48, sceneColor('#030609'));
+  voidLight.addColorStop(1, sceneColor('#100b1b'));
+  ctx.fillStyle = voidLight;
+  ctx.fillRect(0, -32, width, height + 32);
   // Both the rock fill and the physics use these same contours.
-  ctx.beginPath(); ctx.rect(0, -32, width, height + 32); path(ctx, contours[0]);
-  contours.slice(1).forEach(p => path(ctx, p));
-  ctx.save(); ctx.clip('evenodd');
-  ctx.fillStyle = sceneColor('#141822'); ctx.fillRect(0, -32, width, height + 32);
+  ctx.beginPath();
+  ctx.rect(0, -32, width, height + 32);
+  path(ctx, contours[0]);
+  contours.slice(1).forEach((p) => {
+    path(ctx, p);
+  });
+  ctx.save();
+  ctx.clip('evenodd');
+  ctx.fillStyle = sceneColor('#141822');
+  ctx.fillRect(0, -32, width, height + 32);
   if (texture) {
     ctx.globalAlpha = getSceneTheme() === 'beige' ? 0.12 : 0.85;
-    for (let y = -32; y < height; y += 24) for (let x = 0; x < width; x += 24)
-      ctx.drawImage(texture, x, y, 24, 24);
+    for (let y = -32; y < height; y += 24) for (let x = 0; x < width; x += 24) ctx.drawImage(texture, x, y, 24, 24);
     ctx.globalAlpha = 1;
   }
   // Large facets keep the rock silhouette legible at both overview and close zoom.
   for (let i = 0; i < 210; i++) {
-    const x = ((i * 17.31) % width), y = -25 + ((i * 11.73) % (height + 25));
+    const x = (i * 17.31) % width,
+      y = -25 + ((i * 11.73) % (height + 25));
     const size = 1.2 + (i % 5) * 0.63;
-    ctx.beginPath(); ctx.moveTo(x, y - size); ctx.lineTo(x + size, y + size * 0.4);
-    ctx.lineTo(x - size * 0.4, y + size * 1.4); ctx.closePath();
-    ctx.fillStyle = sceneColor(i % 3 ? '#03071038' : '#c6b4ff12'); ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x, y - size);
+    ctx.lineTo(x + size, y + size * 0.4);
+    ctx.lineTo(x - size * 0.4, y + size * 1.4);
+    ctx.closePath();
+    ctx.fillStyle = sceneColor(i % 3 ? '#03071038' : '#c6b4ff12');
+    ctx.fill();
     if (i % 5 === 0) {
-      ctx.strokeStyle = sceneColor(x < width / 2 ? '#98ff634a' : '#aa78ff50'); ctx.lineWidth = 0.045; ctx.stroke();
+      ctx.strokeStyle = sceneColor(x < width / 2 ? '#98ff634a' : '#aa78ff50');
+      ctx.lineWidth = 0.045;
+      ctx.stroke();
     }
   }
   const shade = ctx.createLinearGradient(0, 0, width, 0);
-  shade.addColorStop(0, sceneColor('#020407ce')); shade.addColorStop(0.15, sceneColor('#00000000'));
-  shade.addColorStop(0.85, sceneColor('#00000000')); shade.addColorStop(1, sceneColor('#020407ce'));
-  ctx.fillStyle = shade; ctx.fillRect(0, -32, width, height + 32);
+  shade.addColorStop(0, sceneColor('#020407ce'));
+  shade.addColorStop(0.15, sceneColor('#00000000'));
+  shade.addColorStop(0.85, sceneColor('#00000000'));
+  shade.addColorStop(1, sceneColor('#020407ce'));
+  ctx.fillStyle = shade;
+  ctx.fillRect(0, -32, width, height + 32);
   ctx.restore();
   // A wide dark bevel, colored rim and hairline follow the playable boundary exactly.
   contours.forEach((points, i) => {
-    ctx.beginPath(); path(ctx, points);
-    ctx.lineJoin = 'round'; ctx.strokeStyle = sceneColor('#00000099'); ctx.lineWidth = 0.55; ctx.stroke();
-    ctx.strokeStyle = sceneColor(i % 2 ? '#8cb95755' : '#9a73c755'); ctx.lineWidth = 0.28; ctx.stroke();
+    ctx.beginPath();
+    path(ctx, points);
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = sceneColor('#00000099');
+    ctx.lineWidth = 0.55;
+    ctx.stroke();
+    ctx.strokeStyle = sceneColor(i % 2 ? '#8cb95755' : '#9a73c755');
+    ctx.lineWidth = 0.28;
+    ctx.stroke();
   });
   for (const e of stage.entities ?? []) {
     const s = e.shape;
     if (s.type !== 'polyline' || !s.hidden || !s.solid) continue;
-    ctx.save(); ctx.translate(e.position.x, e.position.y); ctx.rotate(s.rotation);
-    ctx.beginPath(); path(ctx, s.points); ctx.strokeStyle = sceneColor(s.color ?? '#b58aff'); ctx.lineWidth = 0.15; ctx.stroke();
+    ctx.save();
+    ctx.translate(e.position.x, e.position.y);
+    ctx.rotate(s.rotation);
+    ctx.beginPath();
+    path(ctx, s.points);
+    ctx.strokeStyle = sceneColor(s.color ?? '#b58aff');
+    ctx.lineWidth = 0.15;
+    ctx.stroke();
     ctx.restore();
   }
   for (const [x, y, angle] of stage.art!.arrows ?? []) {
-    ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.strokeStyle = sceneColor(x < 32 ? '#aeff78' : '#c89aff'); ctx.lineWidth = 0.14;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.strokeStyle = sceneColor(x < 32 ? '#aeff78' : '#c89aff');
+    ctx.lineWidth = 0.14;
     for (const offset of [-0.7, 0, 0.7]) {
-      ctx.beginPath(); ctx.moveTo(offset - 0.3, -0.45); ctx.lineTo(offset + 0.2, 0); ctx.lineTo(offset - 0.3, 0.45); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(offset - 0.3, -0.45);
+      ctx.lineTo(offset + 0.2, 0);
+      ctx.lineTo(offset - 0.3, 0.45);
+      ctx.stroke();
     }
     ctx.restore();
   }
-  ctx.textAlign = 'center'; ctx.font = '700 0.65px system-ui'; ctx.fillStyle = sceneColor('#a3b9aa');
-  ctx.fillText('FRACTURE', 13.5, 6); ctx.fillStyle = sceneColor('#b0a2c4'); ctx.fillText('CANYON', 50.5, 6);
+  ctx.textAlign = 'center';
+  ctx.font = '700 0.65px system-ui';
+  ctx.fillStyle = sceneColor('#a3b9aa');
+  ctx.fillText('FRACTURE', 13.5, 6);
+  ctx.fillStyle = sceneColor('#b0a2c4');
+  ctx.fillText('CANYON', 50.5, 6);
   const label = (text: string, x: number, y: number, target: Point, color: string) => {
-    ctx.strokeStyle = sceneColor(color + '80'); ctx.lineWidth = 0.06;
-    ctx.beginPath(); ctx.moveTo(x, y + 0.5); ctx.lineTo(x, y + 1.1); ctx.lineTo(...target); ctx.stroke();
-    ctx.font = '700 0.72px system-ui'; ctx.lineWidth = 0.2; ctx.strokeStyle = sceneColor('#030609');
-    ctx.strokeText(text, x, y); ctx.fillStyle = sceneColor(color); ctx.fillText(text, x, y);
+    ctx.strokeStyle = sceneColor(color + '80');
+    ctx.lineWidth = 0.06;
+    ctx.beginPath();
+    ctx.moveTo(x, y + 0.5);
+    ctx.lineTo(x, y + 1.1);
+    ctx.lineTo(...target);
+    ctx.stroke();
+    ctx.font = '700 0.72px system-ui';
+    ctx.lineWidth = 0.2;
+    ctx.strokeStyle = sceneColor('#030609');
+    ctx.strokeText(text, x, y);
+    ctx.fillStyle = sceneColor(color);
+    ctx.fillText(text, x, y);
   };
   const entities = stage.entities ?? [];
-  const accelerator = entities.find(e => e.shape.type === 'box' && e.shape.boostSpeed && e.position.y < 45 && Math.abs(e.shape.rotation) < 0.5);
-  if (accelerator) label('가속 다리', accelerator.position.x, accelerator.position.y - 4.3,
-    [accelerator.position.x, accelerator.position.y - 0.7], '#a6ff63');
-  const gate = entities.find(e => e.props.timedGate);
-  if (gate) label('개폐 다리', gate.position.x - 7, gate.position.y - 4,
-    [gate.position.x - 2.5, gate.position.y + 0.7], '#c8a4ff');
-  const chute = entities.find(e => e.shape.type === 'box' && e.shape.boostSpeed && e.shape.height > 1.5);
-  if (chute) label('낙하 지름길', chute.position.x + 6, chute.position.y - 1,
-    [chute.position.x + 0.5, chute.position.y], '#a6ff63');
-  const jump = entities.find(e => e.shape.type === 'box' && e.shape.boostSpeed && e.shape.rotation < 0);
-  if (jump) label('도약 패드', jump.position.x + 7, jump.position.y + 7,
-    [jump.position.x, jump.position.y + 0.8], '#ffc668');
-  const final = entities.find(e => e.type === 'kinematic' && e.shape.type === 'box' && e.position.y > 100);
-  if (final) label('결승 로터', final.position.x + 9, final.position.y - 4.5,
-    [final.position.x + 1.2, final.position.y], '#c8a4ff');
+  const accelerator = entities.find(
+    (e) => e.shape.type === 'box' && e.shape.boostSpeed && e.position.y < 45 && Math.abs(e.shape.rotation) < 0.5
+  );
+  if (accelerator)
+    label(
+      '가속 다리',
+      accelerator.position.x,
+      accelerator.position.y - 4.3,
+      [accelerator.position.x, accelerator.position.y - 0.7],
+      '#a6ff63'
+    );
+  const gate = entities.find((e) => e.props.timedGate);
+  if (gate)
+    label(
+      '개폐 다리',
+      gate.position.x - 7,
+      gate.position.y - 4,
+      [gate.position.x - 2.5, gate.position.y + 0.7],
+      '#c8a4ff'
+    );
+  const chute = entities.find((e) => e.shape.type === 'box' && e.shape.boostSpeed && e.shape.height > 1.5);
+  if (chute)
+    label(
+      '낙하 지름길',
+      chute.position.x + 6,
+      chute.position.y - 1,
+      [chute.position.x + 0.5, chute.position.y],
+      '#a6ff63'
+    );
+  const jump = entities.find((e) => e.shape.type === 'box' && e.shape.boostSpeed && e.shape.rotation < 0);
+  if (jump)
+    label('도약 패드', jump.position.x + 7, jump.position.y + 7, [jump.position.x, jump.position.y + 0.8], '#ffc668');
+  const final = entities.find((e) => e.type === 'kinematic' && e.shape.type === 'box' && e.position.y > 100);
+  if (final)
+    label(
+      '결승 로터',
+      final.position.x + 9,
+      final.position.y - 4.5,
+      [final.position.x + 1.2, final.position.y],
+      '#c8a4ff'
+    );
   // The painted finish has an open bottom, matching the real exit.
-  for (let row = 0; row < 2; row++) for (let col = 0; col < 12; col++) {
-    ctx.fillStyle = sceneColor((row + col) % 2 ? '#0a1210' : '#a9d6a9');
-    ctx.fillRect(29 + col * 0.5, stage.goalY - 1.1 + row * 0.5, 0.5, 0.5);
-  }
+  for (let row = 0; row < 2; row++)
+    for (let col = 0; col < 12; col++) {
+      ctx.fillStyle = sceneColor((row + col) % 2 ? '#0a1210' : '#a9d6a9');
+      ctx.fillRect(29 + col * 0.5, stage.goalY - 1.1 + row * 0.5, 0.5, 0.5);
+    }
   ctx.restore();
 }
 
 export function drawCanyonArt(ctx: Context, stage: StageDef, cacheBackground = true) {
-  const texture = typeof document === 'undefined' ? undefined
-    : document.getElementById('canyon-rock-texture') as HTMLImageElement | null;
+  const texture =
+    typeof document === 'undefined'
+      ? undefined
+      : (document.getElementById('canyon-rock-texture') as HTMLImageElement | null);
   const textured = !!texture?.complete && !!texture.naturalWidth;
-  if (!cacheBackground || typeof OffscreenCanvas === 'undefined') { paintCanyon(ctx, stage, textured ? texture! : undefined); return; }
-  backgroundCache.draw(ctx, stage, 'canyon/' + textured, { x: 0, y: -32, width: stage.width ?? 64, height: stage.goalY + 39, density: 20 }, target => paintCanyon(target, stage, textured ? texture! : undefined));
+  if (!cacheBackground || typeof OffscreenCanvas === 'undefined') {
+    paintCanyon(ctx, stage, textured ? texture! : undefined);
+    return;
+  }
+  backgroundCache.draw(
+    ctx,
+    stage,
+    'canyon/' + textured,
+    { x: 0, y: -32, width: stage.width ?? 64, height: stage.goalY + 39, density: 20 },
+    (target) => paintCanyon(target, stage, textured ? texture! : undefined)
+  );
 }
 
 function bridgeDeck(ctx: Context, a: Point, b: Point, color: string) {
-  const dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy);
-  ctx.save(); ctx.translate(...a); ctx.rotate(Math.atan2(dy, dx));
+  const dx = b[0] - a[0],
+    dy = b[1] - a[1],
+    length = Math.hypot(dx, dy);
+  ctx.save();
+  ctx.translate(...a);
+  ctx.rotate(Math.atan2(dy, dx));
   const side = dx > 0 ? 1 : -1;
   const metal = ctx.createLinearGradient(0, 0, 0, side * 0.8);
-  metal.addColorStop(0, sceneColor(color)); metal.addColorStop(0.16, sceneColor('#dae4d4')); metal.addColorStop(0.35, sceneColor('#334138')); metal.addColorStop(1, sceneColor('#0a1016'));
-  ctx.fillStyle = metal; ctx.fillRect(0, Math.min(0, side * 0.8), length, 0.8);
+  metal.addColorStop(0, sceneColor(color));
+  metal.addColorStop(0.16, sceneColor('#dae4d4'));
+  metal.addColorStop(0.35, sceneColor('#334138'));
+  metal.addColorStop(1, sceneColor('#0a1016'));
+  ctx.fillStyle = metal;
+  ctx.fillRect(0, Math.min(0, side * 0.8), length, 0.8);
   ctx.fillStyle = sceneColor('#04060c');
   for (let x = 0.65; x < length - 0.65; x += 1.25) {
-    ctx.beginPath(); ctx.ellipse(x, side * 0.44, 0.38, 0.11, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(x, side * 0.44, 0.38, 0.11, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
-  ctx.strokeStyle = sceneColor(color); ctx.lineWidth = 0.09; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(length, 0); ctx.stroke();
+  ctx.strokeStyle = sceneColor(color);
+  ctx.lineWidth = 0.09;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(length, 0);
+  ctx.stroke();
   ctx.restore();
 }
 
 export function drawCanyonDevices(ctx: Context, entities: MapEntityState[], scale: number, view?: ViewBounds) {
-  ctx.save(); ctx.shadowBlur = 0;
+  ctx.save();
+  ctx.shadowBlur = 0;
   for (const e of entities) {
     if (!visibleArt(e, view)) continue;
     const s = e.shape;
     if (s.hidden) continue;
-    ctx.save(); ctx.translate(e.x, e.y); ctx.rotate(e.angle);
+    ctx.save();
+    ctx.translate(e.x, e.y);
+    ctx.rotate(e.angle);
     if (s.type === 'polyline' && s.points.length === 2 && Math.abs(s.points[1][0] - s.points[0][0]) > 12) {
       bridgeDeck(ctx, s.points[0], s.points[1], s.points[0][0] < s.points[1][0] ? '#a6ff63' : '#b58aff');
     } else if (s.type === 'polyline' && s.solid) {
       const hinged = s.points[0][0] === 0 && s.points[0][1] === 0;
       bridgeDeck(ctx, s.points[0], s.points[1], hinged || s.points[0][0] > s.points[1][0] ? '#b58aff' : '#a6ff63');
       if (hinged) {
-        ctx.beginPath(); ctx.arc(0, 0, 0.38, 0, Math.PI * 2); ctx.fillStyle = sceneColor('#9b7fc5'); ctx.fill();
-        ctx.beginPath(); ctx.arc(0, 0, 0.17, 0, Math.PI * 2); ctx.fillStyle = sceneColor(Math.abs(e.angle) > 0.5 ? '#a6ff63' : '#b58aff'); ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, 0.38, 0, Math.PI * 2);
+        ctx.fillStyle = sceneColor('#9b7fc5');
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, 0.17, 0, Math.PI * 2);
+        ctx.fillStyle = sceneColor(Math.abs(e.angle) > 0.5 ? '#a6ff63' : '#b58aff');
+        ctx.fill();
       }
     } else if (s.type === 'box' && s.boostSpeed === undefined) {
       ctx.rotate(s.rotation);
       const material = ctx.createLinearGradient(0, -s.height, 0, s.height);
-      material.addColorStop(0, sceneColor('#f0fff1')); material.addColorStop(0.45, sceneColor(s.color ?? '#a6ff63')); material.addColorStop(1, sceneColor('#243228'));
-      ctx.fillStyle = material; ctx.fillRect(-s.width, -s.height, s.width * 2, s.height * 2);
-      ctx.fillStyle = sceneColor('#12191d'); ctx.beginPath(); ctx.arc(0, 0, 0.45, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = sceneColor('#caffe1'); ctx.lineWidth = 0.06 + 0.3 / scale; ctx.stroke();
+      material.addColorStop(0, sceneColor('#f0fff1'));
+      material.addColorStop(0.45, sceneColor(s.color ?? '#a6ff63'));
+      material.addColorStop(1, sceneColor('#243228'));
+      ctx.fillStyle = material;
+      ctx.fillRect(-s.width, -s.height, s.width * 2, s.height * 2);
+      ctx.fillStyle = sceneColor('#12191d');
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = sceneColor('#caffe1');
+      ctx.lineWidth = 0.06 + 0.3 / scale;
+      ctx.stroke();
     } else if (s.type === 'box' && s.boostSpeed !== undefined && s.rotation < 0) {
       // The spring is drawn behind the accelerating pad, along its actual impulse direction.
-      ctx.rotate(s.rotation); ctx.strokeStyle = sceneColor(s.color ?? '#c7ff94'); ctx.lineWidth = 0.13;
-      ctx.beginPath(); ctx.moveTo(-2.3, 0);
+      ctx.rotate(s.rotation);
+      ctx.strokeStyle = sceneColor(s.color ?? '#c7ff94');
+      ctx.lineWidth = 0.13;
+      ctx.beginPath();
+      ctx.moveTo(-2.3, 0);
       for (let i = 0; i < 13; i++) ctx.lineTo(-2.3 + i * 0.11, i % 2 ? 0.4 : -0.4);
-      ctx.lineTo(-0.9, 0); ctx.stroke();
-      ctx.fillStyle = sceneColor('#81aa6e'); ctx.fillRect(-2.5, -0.55, 0.2, 1.1);
+      ctx.lineTo(-0.9, 0);
+      ctx.stroke();
+      ctx.fillStyle = sceneColor('#81aa6e');
+      ctx.fillRect(-2.5, -0.55, 0.2, 1.1);
     }
     ctx.restore();
   }

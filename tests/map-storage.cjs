@@ -1,13 +1,18 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs'), ts = require('typescript');
-require.extensions['.ts'] = (m, f) => m._compile(ts.transpileModule(fs.readFileSync(f, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
-}).outputText, f);
+const fs = require('node:fs'),
+  ts = require('typescript');
+require.extensions['.ts'] = (m, f) =>
+  m._compile(
+    ts.transpileModule(fs.readFileSync(f, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+    }).outputText,
+    f
+  );
 const { blankStage, readSavedMaps, saveMaps, MAPS_KEY, MAPS_BACKUP_PREFIX } = require('../src/model.ts');
 const { stages, hiddenStages, DEFAULT_MAP_INDEX } = require('../src/data/maps.ts');
 const storageFor = (raw) => {
   const values = new Map(raw === undefined ? [] : [[MAPS_KEY, raw]]);
-  return { values, getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  return { values, getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
 };
 const good = { id: 'good', stage: blankStage() };
 const bad = { id: 'bad', stage: { ...blankStage(), goalY: -1 } };
@@ -15,13 +20,18 @@ const badArt = { id: 'bad-art', stage: { ...blankStage(), art: { style: 'twin-fu
 const raw = JSON.stringify([good, bad, badArt, null]);
 const storage = storageFor(raw);
 let invalid = 0;
-const recovered = readSavedMaps(storage, count => { invalid = count; });
+const recovered = readSavedMaps(storage, (count) => {
+  invalid = count;
+});
 assert.deepEqual(recovered, [good]);
 assert.equal(invalid, 3);
 assert.equal(storage.getItem(MAPS_KEY), raw, 'loading must not rewrite damaged data');
 const added = { id: 'new', stage: blankStage() };
 saveMaps(storage, [...recovered, added]);
-assert.deepEqual(readSavedMaps(storage).map(m => m.id), ['good', 'new']);
+assert.deepEqual(
+  readSavedMaps(storage).map((m) => m.id),
+  ['good', 'new']
+);
 const backups = () => [...storage.values].filter(([key]) => key.startsWith(MAPS_BACKUP_PREFIX));
 assert.equal(backups().length, 1);
 assert.equal(backups()[0][1], raw);
@@ -36,9 +46,14 @@ try {
     assert.throws(() => readSavedMaps(storage));
     saveMaps(storage, [good]);
   }
-} finally { Date.now = oldNow; }
+} finally {
+  Date.now = oldNow;
+}
 assert.ok(backups().some(([, value]) => value === 'broken JSON'));
-assert.ok(backups().some(([, value]) => value === '{}'), 'same-time backups must not replace one another');
+assert.ok(
+  backups().some(([, value]) => value === '{}'),
+  'same-time backups must not replace one another'
+);
 const denied = storageFor(raw);
 const write = denied.setItem;
 denied.setItem = (key, value) => {
@@ -57,28 +72,40 @@ const { MapLibrary } = require('../src/map-library.ts');
 const store = storageFor();
 const library = new MapLibrary(stages, hiddenStages);
 library.load(store);
-const pipeline = stages.findIndex(s => s.title === '네온 파이프라인');
+const pipeline = stages.findIndex((s) => s.title === '네온 파이프라인');
 let edited = { ...stages[pipeline], goalY: 220 };
 const savedId = library.save(store, edited, 'builtin-' + pipeline);
 assert.ok(!savedId.startsWith('builtin-'));
 edited = { ...edited, goalY: 210 };
 assert.equal(library.save(store, edited, savedId), savedId);
-assert.equal(library.list().filter(m => !m.id.startsWith('builtin-')).length, 1);
+assert.equal(library.list().filter((m) => !m.id.startsWith('builtin-')).length, 1);
 library.load(store);
-assert.equal(library.list().find(m => m.id === savedId).stage.goalY, 210);
-assert.equal(library.list().find(m => m.id === 'builtin-' + pipeline).stage.goalY, stages[pipeline].goalY);
+assert.equal(library.list().find((m) => m.id === savedId).stage.goalY, 210);
+assert.equal(library.list().find((m) => m.id === 'builtin-' + pipeline).stage.goalY, stages[pipeline].goalY);
 const duplicateId = library.save(store, { ...edited, goalY: 200 }, null);
 assert.notEqual(duplicateId, savedId, 'same-title maps keep separate identities');
-assert.equal(library.list().filter(m => !m.id.startsWith('builtin-')).length, 2);
+assert.equal(library.list().filter((m) => !m.id.startsWith('builtin-')).length, 2);
 assert.equal(library.list(edited).at(-1).id, 'preview');
-assert.ok(!library.list().some(m => m.id === 'preview'), 'preview never enters the saved list');
-const denyWrites = { getItem: store.getItem, setItem() { throw new Error('QuotaExceededError'); } };
+assert.ok(!library.list().some((m) => m.id === 'preview'), 'preview never enters the saved list');
+const denyWrites = {
+  getItem: store.getItem,
+  setItem() {
+    throw new Error('QuotaExceededError');
+  },
+};
 assert.throws(() => library.save(denyWrites, { ...edited, goalY: 190 }, savedId));
-assert.equal(library.list().find(m => m.id === savedId).stage.goalY, 210, 'failed save leaves in-memory state intact');
+assert.equal(
+  library.list().find((m) => m.id === savedId).stage.goalY,
+  210,
+  'failed save leaves in-memory state intact'
+);
 assert.throws(() => library.remove(denyWrites, savedId));
-assert.ok(library.list().some(m => m.id === savedId));
+assert.ok(library.list().some((m) => m.id === savedId));
 library.remove(store, duplicateId);
-assert.ok(library.list().some(m => m.id === savedId), 'removing another map preserves the selected map');
+assert.ok(
+  library.list().some((m) => m.id === savedId),
+  'removing another map preserves the selected map'
+);
 library.remove(store, savedId);
 assert.equal(library.list().length, stages.length - hiddenStages.length);
 console.log('PASS shared library save/re-edit/reload/duplicate titles/preview/removal and failed writes');
@@ -86,23 +113,42 @@ assert.equal(stages[DEFAULT_MAP_INDEX].title, '네온 분기점');
 console.log('PASS shared initial map is neon junction');
 assert.equal(stages.length, 19, 'the registered maps include orbiting gate and exclude neon hourglass');
 assert.equal(library.list().length, 17, 'both pickers offer seventeen built-in maps');
-assert.equal(library.list().find(map => map.stage.title === '떠도는 입구').id, 'builtin-18',
-  'append the new map without renumbering existing selections');
-assert.deepEqual(hiddenStages.map(stage => stage.title), ['스프링 놀이터', '역전 사다리']);
-assert.ok(hiddenStages.every(stage => stages.includes(stage)), 'hidden map data remains registered');
-assert.ok(!library.list().some(map => ['네온 모래시계', '스프링 놀이터', '역전 사다리'].includes(map.stage.title)));
-for (const stage of stages.filter(stage => !hiddenStages.includes(stage)))
-  assert.equal(library.list().find(map => map.stage === stage).id, 'builtin-' + stages.indexOf(stage),
-    'hiding maps must preserve the remaining built-in ids');
-assert.ok(!stages.some(stage => stage.title === '네온 모래시계'));
+assert.equal(
+  library.list().find((map) => map.stage.title === '떠도는 입구').id,
+  'builtin-18',
+  'append the new map without renumbering existing selections'
+);
+assert.deepEqual(
+  hiddenStages.map((stage) => stage.title),
+  ['스프링 놀이터', '역전 사다리']
+);
+assert.ok(
+  hiddenStages.every((stage) => stages.includes(stage)),
+  'hidden map data remains registered'
+);
+assert.ok(!library.list().some((map) => ['네온 모래시계', '스프링 놀이터', '역전 사다리'].includes(map.stage.title)));
+for (const stage of stages.filter((stage) => !hiddenStages.includes(stage)))
+  assert.equal(
+    library.list().find((map) => map.stage === stage).id,
+    'builtin-' + stages.indexOf(stage),
+    'hiding maps must preserve the remaining built-in ids'
+  );
+assert.ok(!stages.some((stage) => stage.title === '네온 모래시계'));
 const hiddenCopyId = library.save(store, { ...hiddenStages[0] }, null);
-assert.ok(library.list().some(map => map.id === hiddenCopyId), 'hiding a builtin does not hide a saved copy');
+assert.ok(
+  library.list().some((map) => map.id === hiddenCopyId),
+  'hiding a builtin does not hide a saved copy'
+);
 library.remove(store, hiddenCopyId);
-assert.ok(stages.some(stage => stage.title === '끝없는 나선'));
-assert.ok(stages.some(stage => stage.title === '네온 크로스웨이'));
-assert.ok(stages.some(stage => stage.title === '회전 차고지'));
-assert.ok(!stages.some(stage => ['역풍 엘리베이터', '돌풍 갈림길'].includes(stage.title)),
-  'removed maps must be absent from both built-in pickers');
-assert.ok(!stages.some(stage => ['네온 오비트', '네온 믹서'].includes(stage.title)),
-  'retired orbit and mixer maps are absent from every built-in picker');
+assert.ok(stages.some((stage) => stage.title === '끝없는 나선'));
+assert.ok(stages.some((stage) => stage.title === '네온 크로스웨이'));
+assert.ok(stages.some((stage) => stage.title === '회전 차고지'));
+assert.ok(
+  !stages.some((stage) => ['역풍 엘리베이터', '돌풍 갈림길'].includes(stage.title)),
+  'removed maps must be absent from both built-in pickers'
+);
+assert.ok(
+  !stages.some((stage) => ['네온 오비트', '네온 믹서'].includes(stage.title)),
+  'retired orbit and mixer maps are absent from every built-in picker'
+);
 console.log('PASS retired neon orbit and mixer maps are removed');

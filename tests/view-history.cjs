@@ -1,16 +1,29 @@
 const assert = require('node:assert/strict');
-const fs = require('node:fs'), ts = require('typescript');
-require.extensions['.ts'] = (module, file) => module._compile(ts.transpileModule(fs.readFileSync(file, 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-}).outputText, file);
+const fs = require('node:fs'),
+  ts = require('typescript');
+require.extensions['.ts'] = (module, file) =>
+  module._compile(
+    ts.transpileModule(fs.readFileSync(file, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText,
+    file
+  );
 const { ViewHistory } = require('../src/view-history.ts');
 
 const entries = [{ state: null }, { state: { existing: 'kept' } }];
-let position = 1, exits = 0, popstate;
+let position = 1,
+  exits = 0,
+  popstate;
 const history = {
-  get state() { return entries[position].state; },
-  replaceState(state) { entries[position] = { state }; },
-  pushState(state) { entries.splice(++position, entries.length - position, { state }); },
+  get state() {
+    return entries[position].state;
+  },
+  replaceState(state) {
+    entries[position] = { state };
+  },
+  pushState(state) {
+    entries.splice(++position, entries.length - position, { state });
+  },
   back() {
     if (!position) return;
     position--;
@@ -24,9 +37,14 @@ const history = {
     }
   },
 };
-global.window = { history, addEventListener(type, listener) { if (type === 'popstate') popstate = listener; } };
+global.window = {
+  history,
+  addEventListener(type, listener) {
+    if (type === 'popstate') popstate = listener;
+  },
+};
 const views = [];
-const navigation = new ViewHistory(view => views.push(view));
+const navigation = new ViewHistory((view) => views.push(view));
 assert.deepEqual(history.state, { existing: 'kept', marblePinballView: 'gallery' });
 
 navigation.enterGame();

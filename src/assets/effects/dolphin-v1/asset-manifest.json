@@ -10,20 +10,9 @@
       "file": "dolphin-tail-fixed.png",
       "editSource": "dolphin.png",
       "editPrompt": "Use case: precise-object-edit.\nAsset type: transparent 2D dolphin game sprite, correction of the tail anatomy only.\nInput image 1: EDIT TARGET, the existing right-facing blue-grey dolphin PNG. Retain its existing sprite design.\nPrimary request: fix the LEFTMOST tail and its narrow connection to the body. The existing tail reads like an upright fish caudal fin with tall upper and lower lobes. Replace it with a believable dolphin's HORIZONTAL tail flukes: a flattened, gently swept-back transverse pair of flukes lying in the horizontal plane, like a small flat wing, with a shallow central trailing-edge notch. Show the tail slightly from above/three-quarter so the flattened top surface and foreshortened far fluke are readable, while the rest of the dolphin remains in its current side view. Make the tail compact, elegant and low in vertical profile. The tail should NOT be a tall vertical V, should NOT have one large fin pointing straight up and another straight down, and should NOT resemble a shark/fish tail. Connect it smoothly through a tapered, muscular tail stock with continuous blue shading; no abrupt pasted-on joint. Keep the tail comfortably inside the original padding.\nInvariants: change only the tail flukes and immediate narrow tail stock in the leftmost quarter. Preserve the head, face, eye, beak, smile, dorsal fin, visible front flipper, entire main body silhouette, ivory belly, exact sea-blue/teal and ivory color scheme, soft glossy cel shading, thin dark edge and lighting direction. Preserve the right-facing horizontal orientation and original body size and placement. Exactly one complete dolphin, entire body visible, same landscape 2:1 framing.\nBackground: real transparent alpha, preserve transparency. No water or splash, no ground or shadow outside the animal, no additional fins or limbs, no text, labels, arrows, checkerboard, border or watermark. The resulting tail must be anatomically readable even when the whole sprite is rendered only 120 to 144 pixels wide.",
-      "size": [
-        1774,
-        887
-      ],
-      "sourceRect": [
-        53,
-        102,
-        1675,
-        626
-      ],
-      "pivot": [
-        0.5,
-        0.5
-      ],
+      "size": [1774, 887],
+      "sourceRect": [53, 102, 1675, 626],
+      "pivot": [0.5, 0.5],
       "facing": "right",
       "leftDirection": "mirror horizontally at render time",
       "proposedWorldWidth": 4,
@@ -31,20 +20,9 @@
     },
     "splash": {
       "file": "splash.png",
-      "size": [
-        1774,
-        887
-      ],
-      "sourceRect": [
-        69,
-        133,
-        1651,
-        671
-      ],
-      "pivot": [
-        0.5,
-        0.96
-      ],
+      "size": [1774, 887],
+      "sourceRect": [69, 133, 1651, 671],
+      "pivot": [0.5, 0.96],
       "proposedDurationMs": 550,
       "prompt": "Use case: stylized-concept.\nAsset type: isolated water splash effect sprite for a polished 2D browser pinball game, transparent PNG.\nPrimary request: ONE compact splash burst that appears for half a second when a dolphin leaps into or out of an imaginary water surface. Only water, no dolphin.\nComposition: a low wide symmetrical semicircular crown of water, viewed from the side, with five to seven rounded upward/outward jets and a small handful of clearly separated large droplets. A thin shallow oval ripple at the bottom anchors the splash, without a solid pool. The center stays low and open so a moving dolphin remains readable above it. All parts fit in one compact cluster; landscape 2:1 composition.\nStyle: clean stylized game illustration, smooth cel-shaded translucent water, simple broad readable shapes, restrained glossy highlights and deep teal-blue edge accents. Match a soft blue-grey/sea-teal dolphin with an ivory belly. Readable at 90 to 140 pixels wide on both blue-black and warm beige backgrounds. Edges should be clearly defined rather than a huge glow or fine spray.\nPalette: muted turquoise-blue water, pale icy ivory-white highlights, subtle darker blue-teal contour accents. Moderate internal transparency; bright highlights can be opaque.\nFraming: centered, full splash and every droplet inside the frame, 10 percent clear padding.\nConstraints: actual transparent alpha background. No dolphin, no other animal, no marbles, no sea or large water surface, no ground plane, no text, no letters, no arrows, no interface, no checkerboard painted in, no shadow rectangle, no border, no watermark. Only one splash state, not a sprite sheet."
     }

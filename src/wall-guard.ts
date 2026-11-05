@@ -11,17 +11,27 @@ function forEachWall(stage: StageDef, visit: (ax: number, ay: number, bx: number
   for (const entity of stage.entities ?? []) {
     const s = entity.shape;
     if (entity.type !== 'static' || s.sensor || (entity.props.life ?? -1) > 0 || s.type === 'circle') continue;
-    const { x, y } = entity.position, layer = s.collisionLayer ?? 1;
+    const { x, y } = entity.position,
+      layer = s.collisionLayer ?? 1;
     if (s.type === 'polyline') {
       for (let i = 1; i < s.points.length; i++) {
-        const a = s.points[i - 1], b = s.points[i];
+        const a = s.points[i - 1],
+          b = s.points[i];
         visit(x + a[0], y + a[1], x + b[0], y + b[1], layer);
       }
     } else if (s.boostSpeed === undefined) {
-      const cos = Math.cos(s.rotation), sin = Math.sin(s.rotation);
-      const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) =>
-        [x + u * s.width * cos - v * s.height * sin, y + u * s.width * sin + v * s.height * cos]);
-      corners.forEach((a, i) => { const b = corners[(i + 1) % 4]; visit(a[0], a[1], b[0], b[1], layer); });
+      const cos = Math.cos(s.rotation),
+        sin = Math.sin(s.rotation);
+      const corners = [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ].map(([u, v]) => [x + u * s.width * cos - v * s.height * sin, y + u * s.width * sin + v * s.height * cos]);
+      corners.forEach((a, i) => {
+        const b = corners[(i + 1) % 4];
+        visit(a[0], a[1], b[0], b[1], layer);
+      });
     }
   }
 }
@@ -30,7 +40,8 @@ function forEachWall(stage: StageDef, visit: (ax: number, ay: number, bx: number
 export function wallGridCost(stage: StageDef) {
   let entries = 0;
   forEachWall(stage, (ax, ay, bx, by) => {
-    if (ax !== bx || ay !== by) entries += 4 * (Math.ceil(Math.abs(bx - ax) / CELL) + Math.ceil(Math.abs(by - ay) / CELL) + 2);
+    if (ax !== bx || ay !== by)
+      entries += 4 * (Math.ceil(Math.abs(bx - ax) / CELL) + Math.ceil(Math.abs(by - ay) / CELL) + 2);
   });
   return entries;
 }
@@ -42,7 +53,8 @@ export class WallGuard {
   private cells = new Map<number, number[]>();
 
   constructor(stage: StageDef) {
-    if (wallGridCost(stage) > MAX_WALL_GRID_ENTRIES) throw new Error('벽 검사 범위가 너무 커요. 긴 벽이나 장애물 수를 줄여 주세요.');
+    if (wallGridCost(stage) > MAX_WALL_GRID_ENTRIES)
+      throw new Error('벽 검사 범위가 너무 커요. 긴 벽이나 장애물 수를 줄여 주세요.');
     forEachWall(stage, (ax, ay, bx, by, layer) => this.add(ax, ay, bx, by, layer));
   }
 
@@ -50,13 +62,26 @@ export class WallGuard {
     if (ax === bx && ay === by) return;
     const index = this.segments.length;
     this.segments.push(ax, ay, bx, by, layer);
-    const dx = bx - ax, dy = by - ay, epsilon = 1e-9;
+    const dx = bx - ax,
+      dy = by - ay,
+      epsilon = 1e-9;
     // Clip the line to each column, visiting only its covered rows instead of the entire AABB.
-    for (let cx = Math.floor((Math.min(ax, bx) - epsilon) / CELL); cx <= Math.floor((Math.max(ax, bx) + epsilon) / CELL); cx++) {
-      const t0 = dx ? (cx * CELL - ax) / dx : 0, t1 = dx ? ((cx + 1) * CELL - ax) / dx : 1;
-      const lo = Math.max(0, Math.min(1, Math.min(t0, t1))), hi = Math.max(0, Math.min(1, Math.max(t0, t1)));
-      const y0 = ay + dy * lo, y1 = ay + dy * hi;
-      for (let cy = Math.floor((Math.min(y0, y1) - epsilon) / CELL); cy <= Math.floor((Math.max(y0, y1) + epsilon) / CELL); cy++) {
+    for (
+      let cx = Math.floor((Math.min(ax, bx) - epsilon) / CELL);
+      cx <= Math.floor((Math.max(ax, bx) + epsilon) / CELL);
+      cx++
+    ) {
+      const t0 = dx ? (cx * CELL - ax) / dx : 0,
+        t1 = dx ? ((cx + 1) * CELL - ax) / dx : 1;
+      const lo = Math.max(0, Math.min(1, Math.min(t0, t1))),
+        hi = Math.max(0, Math.min(1, Math.max(t0, t1)));
+      const y0 = ay + dy * lo,
+        y1 = ay + dy * hi;
+      for (
+        let cy = Math.floor((Math.min(y0, y1) - epsilon) / CELL);
+        cy <= Math.floor((Math.max(y0, y1) + epsilon) / CELL);
+        cy++
+      ) {
         const k = key(cx, cy);
         const list = this.cells.get(k);
         if (list) list.push(index);
@@ -73,7 +98,10 @@ export class WallGuard {
       for (let cy = Math.floor(Math.min(ay, by) / CELL); cy <= Math.floor(Math.max(ay, by) / CELL); cy++) {
         for (const i of this.cells.get(key(cx, cy)) ?? []) {
           if (s[i + 4] !== layer) continue;
-          const px = s[i], py = s[i + 1], qx = s[i + 2], qy = s[i + 3];
+          const px = s[i],
+            py = s[i + 1],
+            qx = s[i + 2],
+            qy = s[i + 3];
           // Strict orientation tests: grazing an endpoint or running along a wall is not a crossing.
           const d1 = (qx - px) * (ay - py) - (qy - py) * (ax - px);
           const d2 = (qx - px) * (by - py) - (qy - py) * (bx - px);

@@ -22,7 +22,9 @@ function draw(age, order = 'asc', reduced = false, width = 1200, entries = winne
     clips = [];
   let fillStyle;
   const ctx = {
-    set fillStyle(value) { fillStyle = value; },
+    set fillStyle(value) {
+      fillStyle = value;
+    },
     beginPath() {},
     rect: (...args) => clips.push(args),
     clip() {},
@@ -122,18 +124,35 @@ assert.deepEqual(
 );
 assert.ok(pending.text.every((t) => !t.value.includes('undefined') && !t.value.includes('등 ·')));
 
-const luminance = color => [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16) / 255)
-  .map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
-  .reduce((sum, value, i) => sum + value * [.2126, .7152, .0722][i], 0);
-const contrast = (a, b) => (Math.max(luminance(a), luminance(b)) + .05) / (Math.min(luminance(a), luminance(b)) + .05);
-assert.equal(opening.text.find(t => t.value === '축하합니다!').color, '#65efda', 'dark celebration keeps its original palette');
+const luminance = (color) =>
+  [1, 3, 5]
+    .map((i) => parseInt(color.slice(i, i + 2), 16) / 255)
+    .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4))
+    .reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a, b) =>
+  (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
+assert.equal(
+  opening.text.find((t) => t.value === '축하합니다!').color,
+  '#65efda',
+  'dark celebration keeps its original palette'
+);
 setSceneTheme('beige');
 try {
-  const beige = draw(.4);
-  assert.ok(beige.confetti.every(piece => contrast(piece.color, '#f4ede1') >= 3), 'beige confetti stays visible');
-  assert.ok(beige.text.every(label => contrast(label.color, '#f4ede1') >= 4.5), 'beige result text stays legible');
-  const generatedColor = draw(.4, 'asc', false, 1200, [{ ...winners[0], color: 'hsl(0 85% 72%)' }]);
-  assert.ok(generatedColor.text.every(label => contrast(label.color, '#f4ede1') >= 4.5),
-    'generated HSL marble colors cannot wash out beige result names');
-} finally { setSceneTheme('dark'); }
+  const beige = draw(0.4);
+  assert.ok(
+    beige.confetti.every((piece) => contrast(piece.color, '#f4ede1') >= 3),
+    'beige confetti stays visible'
+  );
+  assert.ok(
+    beige.text.every((label) => contrast(label.color, '#f4ede1') >= 4.5),
+    'beige result text stays legible'
+  );
+  const generatedColor = draw(0.4, 'asc', false, 1200, [{ ...winners[0], color: 'hsl(0 85% 72%)' }]);
+  assert.ok(
+    generatedColor.text.every((label) => contrast(label.color, '#f4ede1') >= 4.5),
+    'generated HSL marble colors cannot wash out beige result names'
+  );
+} finally {
+  setSceneTheme('dark');
+}
 console.log('PASS beige celebration colors and unchanged dark palette');

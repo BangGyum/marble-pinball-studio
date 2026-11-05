@@ -17,7 +17,9 @@ initTheme();
 initMarbleDesign();
 const library = new MapLibrary(stages, hiddenStages);
 try {
-  library.load(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));
+  library.load(localStorage, (count) =>
+    toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`)
+  );
 } catch {
   toast('저장된 맵을 읽지 못했어요. 브라우저의 저장소 설정을 확인해 주세요.');
 }
@@ -60,17 +62,23 @@ winnerCount.addEventListener('change', () => (preferredWinnerCount = Number(winn
 const initialMapIndex = DEFAULT_MAP_INDEX;
 let currentStage: StageDef = stages[initialMapIndex];
 let initialized = false;
-const dolphinPanel = new DolphinSettingsPanel(el('dolphin-settings'), settings => {
-  if (!initialized) return;
-  if (game.state === 'finished') prepare();
-  game.setDolphins(settings);
-}, show => game.setDolphinPreview(show), () => game.showDolphinLayout());
-game.onDolphinChange = settings => dolphinPanel.moved(settings);
+const dolphinPanel = new DolphinSettingsPanel(
+  el('dolphin-settings'),
+  (settings) => {
+    if (!initialized) return;
+    if (game.state === 'finished') prepare();
+    game.setDolphins(settings);
+  },
+  (show) => game.setDolphinPreview(show),
+  () => game.showDolphinLayout()
+);
+game.onDolphinChange = (settings) => dolphinPanel.moved(settings);
 const gameView = el('game-view'),
   panel = el('control-panel'),
   panelToggle = el<HTMLButtonElement>('panel-toggle');
 const galleryView = el('map-gallery');
-let galleryScroll = 0, resumeAfterGallery = false;
+let galleryScroll = 0,
+  resumeAfterGallery = false;
 const gallery = new MapGallery((id) => {
   const selected = allMaps().find((map) => map.id === id);
   if (!selected) return;

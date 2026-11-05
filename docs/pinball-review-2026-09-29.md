@@ -107,7 +107,7 @@ JS wrapper 잔존과 이 실행에서의 증가는 확인했습니다. 주소 �
 
 [pages.yml](C:/Users/user/Documents/bangGame/.github/workflows/pages.yml:2)은 `main` push와 수동 실행만 검사합니다. PR 단계의 검증을 배포 작업과 분리하고, 현재 배포 작업에서 빠진 `build:lan`도 포함하면 좋습니다. 테스트도 빠른 계약/단위 검사와 오래 걸리는 맵 완주 검사로 명령을 나누되, 전체 검증은 유지하는 방식이 적절합니다.
 
-[server/lan.cjs](C:/Users/user/Documents/bangGame/server/lan.cjs:1)는 TypeScript 검사 범위 밖에서 메시지 객체와 명령 키를 수동 작성합니다. 공유 `Scene`, `Frame`, `Command`와 실제 서버 반환값을 TypeScript 또는 checkJs로 연결하면 필드 변경 누락을 줄일 수 있습니다. [IPhysics](C:/Users/user/Documents/bangGame/src/IPhysics.ts:4)에도 Race가 실제 사용하는 `isSpringBusy`, `isMarbleOnBridge`가 빠져 있으므로 현재 계약부터 정렬하는 편이 좋습니다.
+[server/lan.cjs](C:/Users/user/Documents/bangGame/server/lan.cjs:1)는 TypeScript 검사 범위 밖에서 메시지 객체와 명령 키를 수동 작성합니다. 공유 `Scene`, `Frame`, `Command`와 실제 서버 반환값을 TypeScript 또는 checkJs로 연결하면 필드 변경 누락을 줄일 수 있습니다. [IPhysics](C:/Users/user/Documents/bangGame/src/i-physics.ts:4)에도 Race가 실제 사용하는 `isSpringBusy`, `isMarbleOnBridge`가 빠져 있으므로 현재 계약부터 정렬하는 편이 좋습니다.
 
 `StageDef`, `WindZone`, `ART_STYLES` 정의를 기본 맵 레지스트리에서 분리하고, 다음 저장 기능 수정 시 정적/LAN 중복 저장·선택 로직만 작은 모듈로 추출하는 것은 후순위입니다. 파일 이름이나 폴더 수를 늘리는 목적의 전면 재구성은 필요하지 않습니다.
 

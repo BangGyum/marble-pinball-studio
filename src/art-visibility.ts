@@ -1,4 +1,4 @@
-import type { MapEntityState } from './types/MapEntity.type';
+import type { MapEntityState } from './types/map-entity';
 
 export type ViewBounds = { left: number; right: number; top: number; bottom: number };
 const radii = new WeakMap<MapEntityState['shape'], number>();
@@ -9,11 +9,19 @@ export function visibleArt(entity: MapEntityState, view?: ViewBounds, margin = 3
   const shape = entity.shape;
   let radius = radii.get(shape);
   if (radius === undefined) {
-    radius = shape.type === 'circle' ? shape.radius : shape.type === 'box' ? Math.hypot(shape.width, shape.height)
-      : shape.points.reduce((largest, [x, y]) => Math.max(largest, Math.hypot(x, y)), 0);
+    radius =
+      shape.type === 'circle'
+        ? shape.radius
+        : shape.type === 'box'
+          ? Math.hypot(shape.width, shape.height)
+          : shape.points.reduce((largest, [x, y]) => Math.max(largest, Math.hypot(x, y)), 0);
     radii.set(shape, radius);
   }
   radius += margin;
-  return entity.x + radius >= view.left && entity.x - radius <= view.right &&
-    entity.y + radius >= view.top && entity.y - radius <= view.bottom;
+  return (
+    entity.x + radius >= view.left &&
+    entity.x - radius <= view.right &&
+    entity.y + radius >= view.top &&
+    entity.y - radius <= view.bottom
+  );
 }

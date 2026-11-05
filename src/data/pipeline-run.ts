@@ -1,4 +1,4 @@
-import type { MapEntity } from '../types/MapEntity.type';
+import type { MapEntity } from '../types/map-entity';
 import type { StageDef } from './maps';
 
 const cyan = '#64f4e0';

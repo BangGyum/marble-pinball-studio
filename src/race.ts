@@ -1,11 +1,21 @@
 import { SpringCooldowns } from './spring-cooldowns';
 import { Box2dPhysics } from './physics-box2d';
-import type { IPhysics } from './IPhysics';
+import type { IPhysics } from './i-physics';
 import type { StageDef } from './data/maps';
 import { shuffled, type WinnerOrder } from './model';
 import { WallGuard, WALL_GUARD_MAX_SPEED } from './wall-guard';
 import { finishFraction, raceProgress } from './finish';
-import { dolphinBounce, dolphinContact, dolphinPose, dolphinScale, dolphinWaves, DOLPHIN_DURATION, DOLPHIN_WIDTH, validateDolphins, type DolphinSettings } from './dolphin';
+import {
+  dolphinBounce,
+  dolphinContact,
+  dolphinPose,
+  dolphinScale,
+  dolphinWaves,
+  DOLPHIN_DURATION,
+  DOLPHIN_WIDTH,
+  validateDolphins,
+  type DolphinSettings,
+} from './dolphin';
 import { DOLPHIN_HEIGHT } from './dolphin-hitbox';
 
 export type Ball = {
@@ -47,14 +57,31 @@ export class Race {
   activateSpring(index: number, player: object = this.springPlayer) {
     if (this.state !== 'running' || !Number.isInteger(index)) return false;
     const shape = this.physics.getEntities()[index]?.shape;
-    if (shape?.type !== 'box' || !shape.spring || this.springCooldowns.remaining(shape, player) > 0 ||
-      !this.physics.activateSpring(index)) return false;
+    if (
+      shape?.type !== 'box' ||
+      !shape.spring ||
+      this.springCooldowns.remaining(shape, player) > 0 ||
+      !this.physics.activateSpring(index)
+    )
+      return false;
     this.springCooldowns.consume(shape, player);
     return true;
   }
-  springStatuses(player: object = this.springPlayer, entities = this.physics.getEntities()): [number, number, boolean][] {
-    return entities.flatMap((e, i) => e.shape.type === 'box' && e.shape.spring
-      ? [[i, Math.ceil(this.springCooldowns.remaining(e.shape, player)), this.physics.isSpringBusy(i)] as [number, number, boolean]] : []);
+  springStatuses(
+    player: object = this.springPlayer,
+    entities = this.physics.getEntities()
+  ): [number, number, boolean][] {
+    return entities.flatMap((e, i) =>
+      e.shape.type === 'box' && e.shape.spring
+        ? [
+            [i, Math.ceil(this.springCooldowns.remaining(e.shape, player)), this.physics.isSpringBusy(i)] as [
+              number,
+              number,
+              boolean,
+            ],
+          ]
+        : []
+    );
   }
   state: 'ready' | 'running' | 'paused' | 'finished' = 'ready';
   stage!: StageDef;
@@ -97,9 +124,20 @@ export class Race {
     this.progressAt = 0;
     const props = (stage.entities ?? []).map((e) => e.props);
     this.holdUntil = Math.max(0, ...props.map((p) => p.timedGate?.releaseAfter ?? 0));
-    this.trapSeconds = 2 * Math.max(30, ...(stage.windZones ?? []).map((w) => w.period ?? 0),
-      ...props.map((p) => Math.max(p.timedGate?.period ?? 0, p.spinCycle?.period ?? 0,
-        p.oscillation?.period ?? 0, p.sliding?.period ?? 0)));
+    this.trapSeconds =
+      2 *
+      Math.max(
+        30,
+        ...(stage.windZones ?? []).map((w) => w.period ?? 0),
+        ...props.map((p) =>
+          Math.max(
+            p.timedGate?.period ?? 0,
+            p.spinCycle?.period ?? 0,
+            p.oscillation?.period ?? 0,
+            p.sliding?.period ?? 0
+          )
+        )
+      );
     this.walls = new WallGuard(stage);
     this.physics.clearMarbles();
     this.physics.clear();
@@ -110,8 +148,7 @@ export class Race {
       const x = 10.1 + spawnOffset + (id % 10) * 0.61 + (stage.randomizeStart ? (Math.random() - 0.5) * 0.08 : 0),
         y = 5 - Math.floor(id / 10) * 0.62 + (stage.randomizeStart ? (Math.random() - 0.5) * 0.08 : 0);
       this.physics.createMarble(id, x, y);
-      return { id, name,
-        color: `hsl(${(id * 137.508) % 360} 85% 72%)`, x, y, angle: 0, stuck: 0 };
+      return { id, name, color: `hsl(${(id * 137.508) % 360} 85% 72%)`, x, y, angle: 0, stuck: 0 };
     });
   }
 
@@ -143,12 +180,18 @@ export class Race {
   finishSlowdown() {
     const target = this.focusBall();
     const goal = this.stage.goalArea;
-    return !this.winners.length && target && (goal
-      ? raceProgress(this.stage, target) > -goal.radius - 2 : target.y > this.stage.goalY - 4) ? 0.45 : 1;
+    return !this.winners.length &&
+      target &&
+      (goal ? raceProgress(this.stage, target) > -goal.radius - 2 : target.y > this.stage.goalY - 4)
+      ? 0.45
+      : 1;
   }
 
   advance() {
-    this.physics.step(STEP, this.dolphins.enabled ? (dt, offset) => this.stepDolphins(dt, this.elapsed + offset) : undefined);
+    this.physics.step(
+      STEP,
+      this.dolphins.enabled ? (dt, offset) => this.stepDolphins(dt, this.elapsed + offset) : undefined
+    );
     this.elapsed += STEP;
     const crossing: { ball: Ball; fraction: number }[] = [];
     let trapped = true;
@@ -157,8 +200,12 @@ export class Race {
       let p = this.physics.getMarblePosition(ball.id);
       const onBridge = this.stage.exitBridge ? this.physics.isMarbleOnBridge(ball.id) : undefined;
       // Changing layers mid-step legitimately passes walls of the other layer.
-      if (this.walls && onBridge === ball.onBridge && this.walls.crosses(ball.x, ball.y, p.x, p.y, onBridge ? 2 : 1) &&
-        this.physics.getMarbleSpeed(ball.id) < WALL_GUARD_MAX_SPEED) {
+      if (
+        this.walls &&
+        onBridge === ball.onBridge &&
+        this.walls.crosses(ball.x, ball.y, p.x, p.y, onBridge ? 2 : 1) &&
+        this.physics.getMarbleSpeed(ball.id) < WALL_GUARD_MAX_SPEED
+      ) {
         this.physics.placeMarble(ball.id, ball.x, ball.y);
         p = { x: ball.x, y: ball.y, angle: ball.angle };
         this.rescues++;
@@ -186,7 +233,9 @@ export class Race {
       }
       // A bounce after a nudge is short; rolling on for 2s means the marble got free. Checking for
       // stillness right now instead would need every wedged marble between bounces at once.
-      trapped &&= (ball.movingFor ?? 0) < 2 && (ball.shakes ?? 0) >= TRAPPED_SHAKES &&
+      trapped &&=
+        (ball.movingFor ?? 0) < 2 &&
+        (ball.shakes ?? 0) >= TRAPPED_SHAKES &&
         this.elapsed - Math.max(ball.progressAt ?? 0, ball.motionAt ?? 0, this.holdUntil) > this.trapSeconds;
       ball.px = ball.x;
       ball.py = ball.y;
@@ -199,8 +248,10 @@ export class Race {
     crossing.sort((a, b) => a.fraction - b.fraction || a.ball.id - b.ball.id);
     for (const { ball } of crossing) this.arrive(ball);
     if (crossing.length) this.progressAt = this.elapsed;
-    if (this.arrivals.length < this.balls.length &&
-      (trapped || this.elapsed - Math.max(this.progressAt, this.holdUntil) > STALL_LIMIT_SECONDS)) {
+    if (
+      this.arrivals.length < this.balls.length &&
+      (trapped || this.elapsed - Math.max(this.progressAt, this.holdUntil) > STALL_LIMIT_SECONDS)
+    ) {
       // The rest can no longer finish: rank them by depth instead of running forever.
       for (const ball of this.racing()) this.arrive(ball);
       this.finishReason = 'stalled';
@@ -229,31 +280,55 @@ export class Race {
     this.physics.removeMarble(ball.id);
   }
   private stepDolphins(dt: number, elapsed: number) {
-    const scale = dolphinScale(this.dolphins), speed = this.dolphins.speed ?? 1;
-    const touching = this.dolphinNextContacts; touching.clear();
+    const scale = dolphinScale(this.dolphins),
+      speed = this.dolphins.speed ?? 1;
+    const touching = this.dolphinNextContacts;
+    touching.clear();
     const poses = dolphinWaves(this.dolphins, elapsed).flatMap(({ wave, time }) => {
       if (time + dt * speed > DOLPHIN_DURATION) return [];
       return this.dolphins.rows.map((row, index) => {
         const direction = (wave + index) % 2 ? -1 : 1;
-        const before = dolphinPose(this.stage, row, time, direction, scale), p = dolphinPose(this.stage, row, time + dt * speed, direction, scale);
-        const motion = { vx: (p.x - before.x) / dt, vy: (p.y - before.y) / dt,
-          omega: direction * Math.atan2(Math.sin(p.angle - before.angle), Math.cos(p.angle - before.angle)) / dt };
-        const c = Math.abs(Math.cos(p.angle)), s = Math.abs(Math.sin(p.angle));
-        return { p, motion, wave, index, halfWidth: (DOLPHIN_WIDTH * c + DOLPHIN_HEIGHT * s) * scale / 2 + .25,
-          halfHeight: (DOLPHIN_WIDTH * s + DOLPHIN_HEIGHT * c) * scale / 2 + .25 };
+        const before = dolphinPose(this.stage, row, time, direction, scale),
+          p = dolphinPose(this.stage, row, time + dt * speed, direction, scale);
+        const motion = {
+          vx: (p.x - before.x) / dt,
+          vy: (p.y - before.y) / dt,
+          omega: (direction * Math.atan2(Math.sin(p.angle - before.angle), Math.cos(p.angle - before.angle))) / dt,
+        };
+        const c = Math.abs(Math.cos(p.angle)),
+          s = Math.abs(Math.sin(p.angle));
+        return {
+          p,
+          motion,
+          wave,
+          index,
+          halfWidth: ((DOLPHIN_WIDTH * c + DOLPHIN_HEIGHT * s) * scale) / 2 + 0.25,
+          halfHeight: ((DOLPHIN_WIDTH * s + DOLPHIN_HEIGHT * c) * scale) / 2 + 0.25,
+        };
       });
     });
-    if (!poses.length) { this.dolphinContacts.clear(); return; }
+    if (!poses.length) {
+      this.dolphinContacts.clear();
+      return;
+    }
     for (const ball of this.balls) {
       if (ball.rank) continue;
       const pos = this.physics.getMarblePosition(ball.id);
       for (const { p, motion, wave, index, halfWidth, halfHeight } of poses) {
-        if (Math.abs(pos.x - p.x) > halfWidth || Math.abs(pos.y - p.y) > halfHeight || pos.y > p.waterY + .25) continue;
+        if (Math.abs(pos.x - p.x) > halfWidth || Math.abs(pos.y - p.y) > halfHeight || pos.y > p.waterY + 0.25)
+          continue;
         // Only real outline contacts need WASM velocities and restitution tracking.
         const surface = dolphinContact(pos, p);
         if (!surface) continue;
-        const key = `${wave}:${index}:${ball.id}`, alreadyHit = this.dolphinContacts.has(key);
-        const contact = dolphinBounce({ ...pos, ...this.physics.getMarbleVelocity(ball.id) }, p, motion, !alreadyHit, surface);
+        const key = `${wave}:${index}:${ball.id}`,
+          alreadyHit = this.dolphinContacts.has(key);
+        const contact = dolphinBounce(
+          { ...pos, ...this.physics.getMarbleVelocity(ball.id) },
+          p,
+          motion,
+          !alreadyHit,
+          surface
+        );
         if (!contact) continue;
         // Restitution happens once; inward motion is constrained throughout contact.
         if (contact.hit || alreadyHit) touching.add(key);

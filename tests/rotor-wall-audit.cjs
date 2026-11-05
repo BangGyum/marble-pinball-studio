@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const fs = require('fs'),
+const fs = require('node:fs'),
   ts = require('typescript');
 require.extensions['.ts'] = (m, f) =>
   m._compile(
@@ -44,7 +44,7 @@ function inside(x, y) {
 (async () => {
   const p = new Box2dPhysics();
   await p.init();
-  let escapes = [];
+  const escapes = [];
   for (let phase = 0; phase < 72; phase++) {
     p.clearMarbles();
     p.clear();
@@ -63,7 +63,9 @@ function inside(x, y) {
       [25.6, 167.6],
       [40.4, 167.6],
     ];
-    points.forEach(([x, y], i) => p.createMarble(i, x, y));
+    points.forEach(([x, y], i) => {
+      p.createMarble(i, x, y);
+    });
     p.start();
     const done = new Set();
     for (let t = 0; t < 3600 && done.size < points.length; t++) {

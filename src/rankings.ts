@@ -29,15 +29,20 @@ export class Rankings {
         name.title = ball.name;
         item.append(color, name);
         if (this.select) {
-          item.tabIndex = 0; item.setAttribute('role', 'button');
+          item.tabIndex = 0;
+          item.setAttribute('role', 'button');
           item.addEventListener('click', () => this.select!(ball.id));
           item.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.select!(ball.id); }
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              this.select!(ball.id);
+            }
           });
         }
         this.rows.set(ball, item);
       }
-      const rank = ready ? 0 : ball.rank ?? i + 1, finished = String(!!ball.rank);
+      const rank = ready ? 0 : (ball.rank ?? i + 1),
+        finished = String(!!ball.rank);
       if (item.value !== rank || item.dataset.finished !== finished) {
         if (item.value !== rank) item.value = rank;
         if (item.dataset.finished !== finished) item.dataset.finished = finished;

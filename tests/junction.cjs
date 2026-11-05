@@ -16,7 +16,10 @@ const { Game } = require('../src/game.ts');
 const { validateStage } = require('../src/model.ts');
 global.fetch = undefined;
 let seed = 123456;
-Math.random = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296;
+Math.random = () => {
+  seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+  return seed / 4294967296;
+};
 async function run() {
   validateStage(neonJunction);
   const physics = new Box2dPhysics();
@@ -75,7 +78,14 @@ async function run() {
     shake(id);
   };
   const game = Object.create(Game.prototype);
-  Object.assign(game, { physics, springControls: { reset() {} }, springCooldowns: { reset() {} }, recorder: { stop() {} }, render() {}, onFinish() {} });
+  Object.assign(game, {
+    physics,
+    springControls: { reset() {} },
+    springCooldowns: { reset() {} },
+    recorder: { stop() {} },
+    render() {},
+    onFinish() {},
+  });
   const usedPipes = new Set();
   for (const count of [1, 4, 8, 12, 30, 49]) {
     shakes = 0;
@@ -118,7 +128,9 @@ async function run() {
         [...upper].some(([id, route]) => route !== directRoutes.get(id)),
         'mixing must change routes from initial alignment'
       );
-      upper.forEach((route) => usedPipes.add(route));
+      upper.forEach((route) => {
+        usedPipes.add(route);
+      });
       assert.ok(new Set(upper.values()).size >= 3, 'the mixer must distribute large groups across pipes');
     }
     console.log(

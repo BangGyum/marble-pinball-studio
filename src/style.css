@@ -106,6 +106,7 @@ a:hover {
   color: var(--accent);
 }
 [hidden] {
+  /* biome-ignore lint/complexity/noImportantStyles: The hidden attribute must override component display styles. */
   display: none !important;
 }
 .muted {

@@ -17,9 +17,13 @@ export function initTheme() {
   };
   // The head script restores the saved theme before the first paint.
   apply(root.dataset.theme === 'beige');
-  for (const toggle of toggles) toggle.addEventListener('click', () => {
-    apply(root.dataset.theme !== 'beige');
-    try { localStorage.setItem('marble-pinball.theme', root.dataset.theme!); }
-    catch { toast('테마는 변경했지만 저장하지 못했어요. 브라우저의 저장소 설정을 확인해 주세요.'); }
-  });
+  for (const toggle of toggles)
+    toggle.addEventListener('click', () => {
+      apply(root.dataset.theme !== 'beige');
+      try {
+        localStorage.setItem('marble-pinball.theme', root.dataset.theme!);
+      } catch {
+        toast('테마는 변경했지만 저장하지 못했어요. 브라우저의 저장소 설정을 확인해 주세요.');
+      }
+    });
 }

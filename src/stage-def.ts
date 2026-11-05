@@ -1,6 +1,22 @@
-import type { MapEntity } from './types/MapEntity.type';
+import type { MapEntity } from './types/map-entity';
 
-export const ART_STYLES = ['reversal-ladder', 'roundhouse', 'rapids', 'jackpot', 'pinball-cascade', 'clocktower', 'orbital-lock', 'hourglass', 'fracture-canyon', 'crossway', 'switchback-express', 'infinite-funnel', 'twin-funnel', 'bounce-stairs', 'orbiting-gate'] as const;
+export const ART_STYLES = [
+  'reversal-ladder',
+  'roundhouse',
+  'rapids',
+  'jackpot',
+  'pinball-cascade',
+  'clocktower',
+  'orbital-lock',
+  'hourglass',
+  'fracture-canyon',
+  'crossway',
+  'switchback-express',
+  'infinite-funnel',
+  'twin-funnel',
+  'bounce-stairs',
+  'orbiting-gate',
+] as const;
 
 type BridgeArea = { x: number; y: number; width: number; height: number };
 type Bridge = { entry: BridgeArea; deck: [number, number][] };
@@ -32,7 +48,8 @@ export type WindZone = {
       speed: number;
       radial?: number;
       gust?: number;
-    });
+    }
+);
 
 export type StageDef = {
   title: string;

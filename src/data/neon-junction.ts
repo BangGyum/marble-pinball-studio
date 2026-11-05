@@ -1,5 +1,5 @@
 import type { StageDef } from './maps';
-import type { MapEntity } from '../types/MapEntity.type';
+import type { MapEntity } from '../types/map-entity';
 
 const mint = '#65efda',
   violet = '#ba9cff',

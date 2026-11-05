@@ -6,7 +6,7 @@ import { drawOrbitingGateArt } from './orbiting-gate-art';
 import { drawGoalArea } from './finish';
 import type { Ball } from './game';
 import type { StageDef } from './data/maps';
-import type { MapEntityState } from './types/MapEntity.type';
+import type { MapEntityState } from './types/map-entity';
 import { drawEntities } from './draw';
 import { drawMarble } from './marble-art';
 import { getMarbleDesign } from './marble-design';
@@ -15,7 +15,11 @@ import { getSceneTheme, type SceneTheme } from './scene-theme';
 
 type Sprite = { canvas: OffscreenCanvas; width: number; height: number; left: number; top: number };
 
-function drawMinimapArt(ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, stage: StageDef, scale: number) {
+function drawMinimapArt(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  stage: StageDef,
+  scale: number
+) {
   // These maps use scenery in place of hidden collision rails. The minimap caches it once.
   if (stage.art?.style === 'reversal-ladder') drawLadderArt(ctx, stage, false);
   if (stage.art?.style === 'infinite-funnel') drawFunnelArt(ctx, stage, 1, false);
@@ -28,7 +32,14 @@ function drawMinimapArt(ctx: CanvasRenderingContext2D | OffscreenCanvasRendering
 export class RenderCache {
   private balls = new WeakMap<Ball, { key: string; sprite: Sprite }>();
   private labels = new WeakMap<Ball, { key: string; sprite: Sprite }>();
-  private minimap?: { stage: StageDef; scale: number; dpr: number; theme: SceneTheme; canvas: OffscreenCanvas; fixed: Set<MapEntityState['shape']> };
+  private minimap?: {
+    stage: StageDef;
+    scale: number;
+    dpr: number;
+    theme: SceneTheme;
+    canvas: OffscreenCanvas;
+    fixed: Set<MapEntityState['shape']>;
+  };
   private deadline = Infinity;
   warming = false;
 
@@ -37,14 +48,23 @@ export class RenderCache {
     this.warming = false;
   }
 
-  drawBall(ctx: CanvasRenderingContext2D, ball: Ball, scale: number, dpr: number, x = ball.x, y = ball.y, squash?: MarbleSquash) {
+  drawBall(
+    ctx: CanvasRenderingContext2D,
+    ball: Ball,
+    scale: number,
+    dpr: number,
+    x = ball.x,
+    y = ball.y,
+    squash?: MarbleSquash
+  ) {
     // Older browsers can keep using the vector renderer.
     if (typeof OffscreenCanvas === 'undefined') return false;
     // Rasterize in small resolution buckets; continuous zoom reuses these bitmaps.
     const resolution = Math.ceil(scale / 8) * 8;
     const key = `${getMarbleDesign()}/${getSceneTheme()}/${resolution}/${dpr}/${ball.color}`;
     let cached = this.balls.get(ball);
-    const font = Math.min(17, Math.max(12, scale * 0.24)), rasterFont = Math.ceil(font);
+    const font = Math.min(17, Math.max(12, scale * 0.24)),
+      rasterFont = Math.ceil(font);
     const labelKey = `${getSceneTheme()}/${rasterFont}/${dpr}/${ball.color}/${ball.name}`;
     let label = this.labels.get(ball);
     if ((!cached || cached.key !== key || !label || label.key !== labelKey) && performance.now() >= this.deadline) {
@@ -53,58 +73,93 @@ export class RenderCache {
       return false;
     }
     if (!cached || cached.key !== key) {
-      const radius = resolution * 0.25, edge = Math.ceil(radius + 14);
+      const radius = resolution * 0.25,
+        edge = Math.ceil(radius + 14);
       const canvas = new OffscreenCanvas(Math.ceil(edge * 2 * dpr), Math.ceil(edge * 2 * dpr));
       const spriteCtx = canvas.getContext('2d')!;
       spriteCtx.setTransform(dpr, 0, 0, dpr, edge * dpr, edge * dpr);
       drawMarble(spriteCtx, 0, 0, radius, ball.color);
-      cached = { key, sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left: edge, top: edge } };
+      cached = {
+        key,
+        sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left: edge, top: edge },
+      };
       this.balls.set(ball, cached);
     }
     const marble = cached.sprite;
     if (squash) {
-      ctx.save(); ctx.translate(x, y); ctx.rotate(squash.angle);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(squash.angle);
       ctx.scale(1 - squash.amount, 1 + squash.amount * 0.7);
       ctx.rotate(-squash.angle);
-      ctx.drawImage(marble.canvas, -marble.left / resolution, -marble.top / resolution, marble.width / resolution, marble.height / resolution);
+      ctx.drawImage(
+        marble.canvas,
+        -marble.left / resolution,
+        -marble.top / resolution,
+        marble.width / resolution,
+        marble.height / resolution
+      );
       ctx.restore();
     } else {
-      ctx.drawImage(marble.canvas, x - marble.left / resolution, y - marble.top / resolution, marble.width / resolution, marble.height / resolution);
+      ctx.drawImage(
+        marble.canvas,
+        x - marble.left / resolution,
+        y - marble.top / resolution,
+        marble.width / resolution,
+        marble.height / resolution
+      );
     }
     // Labels keep the original 12–17 CSS pixel policy, independently of marble zoom.
     if (!label || label.key !== labelKey) {
-      const canvas = new OffscreenCanvas(1, 1), spriteCtx = canvas.getContext('2d')!;
+      const canvas = new OffscreenCanvas(1, 1),
+        spriteCtx = canvas.getContext('2d')!;
       spriteCtx.font = `${rasterFont}px sans-serif`;
-      const left = Math.ceil(spriteCtx.measureText(ball.name).width / 2 + 4), top = rasterFont + 4;
-      canvas.width = Math.ceil(left * 2 * dpr); canvas.height = Math.ceil((top + 8) * dpr);
+      const left = Math.ceil(spriteCtx.measureText(ball.name).width / 2 + 4),
+        top = rasterFont + 4;
+      canvas.width = Math.ceil(left * 2 * dpr);
+      canvas.height = Math.ceil((top + 8) * dpr);
       spriteCtx.setTransform(dpr, 0, 0, dpr, left * dpr, top * dpr);
       spriteCtx.fillStyle = getSceneTheme() === 'beige' ? '#44382d' : ball.color;
       spriteCtx.font = `${rasterFont}px sans-serif`;
       spriteCtx.textAlign = 'center';
       spriteCtx.strokeStyle = getSceneTheme() === 'beige' ? '#fff8eb' : '#050a10';
       spriteCtx.lineWidth = 3;
-      spriteCtx.strokeText(ball.name, 0, 0); spriteCtx.fillText(ball.name, 0, 0);
+      spriteCtx.strokeText(ball.name, 0, 0);
+      spriteCtx.fillText(ball.name, 0, 0);
       label = { key: labelKey, sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left, top } };
       this.labels.set(ball, label);
     }
-    const s = label.sprite, labelScale = font / rasterFont / scale;
-    ctx.drawImage(s.canvas, x - s.left * labelScale, y + 0.55 - s.top * labelScale, s.width * labelScale, s.height * labelScale);
+    const s = label.sprite,
+      labelScale = font / rasterFont / scale;
+    ctx.drawImage(
+      s.canvas,
+      x - s.left * labelScale,
+      y + 0.55 - s.top * labelScale,
+      s.width * labelScale,
+      s.height * labelScale
+    );
     return true;
   }
 
   drawMinimap(ctx: CanvasRenderingContext2D, stage: StageDef, entities: MapEntityState[], scale: number, dpr: number) {
     // Elevated geometry is drawn by the overlay, with the same mouth clipping as the main view.
-    if (stage.exitBridge) entities = entities.filter(e => e.shape.collisionLayer !== 2);
+    if (stage.exitBridge) entities = entities.filter((e) => e.shape.collisionLayer !== 2);
     if (typeof OffscreenCanvas === 'undefined' || scale <= 0) {
       drawMinimapArt(ctx, stage, scale);
       drawEntities(ctx, entities, scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
       return;
     }
     let cached = this.minimap;
-    if (!cached || cached.stage !== stage || cached.scale !== scale || cached.dpr !== dpr || cached.theme !== getSceneTheme()) {
-      const fixed = new Set((stage.entities ?? [])
-        .filter((e) => e.type === 'static' && (e.props.life ?? -1) <= 0)
-        .map((e) => e.shape));
+    if (
+      !cached ||
+      cached.stage !== stage ||
+      cached.scale !== scale ||
+      cached.dpr !== dpr ||
+      cached.theme !== getSceneTheme()
+    ) {
+      const fixed = new Set(
+        (stage.entities ?? []).filter((e) => e.type === 'static' && (e.props.life ?? -1) <= 0).map((e) => e.shape)
+      );
       const canvas = new OffscreenCanvas(
         Math.max(1, Math.ceil((stage.width ?? 26) * scale * dpr)),
         Math.max(1, Math.ceil(stage.goalY * scale * dpr))
@@ -112,11 +167,29 @@ export class RenderCache {
       const mapCtx = canvas.getContext('2d')!;
       mapCtx.scale(scale * dpr, scale * dpr);
       drawMinimapArt(mapCtx, stage, scale);
-      drawEntities(mapCtx, entities.filter((e) => fixed.has(e.shape)), scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
+      drawEntities(
+        mapCtx,
+        entities.filter((e) => fixed.has(e.shape)),
+        scale,
+        -1,
+        false,
+        undefined,
+        false,
+        stage.art?.style === 'reversal-ladder'
+      );
       cached = this.minimap = { stage, scale, dpr, theme: getSceneTheme(), canvas, fixed };
     }
     ctx.drawImage(cached.canvas, 0, 0, cached.canvas.width / (scale * dpr), cached.canvas.height / (scale * dpr));
     // Rotors and breakable obstacles stay live, above the fixed map layer.
-    drawEntities(ctx, entities.filter((e) => !cached.fixed.has(e.shape)), scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
+    drawEntities(
+      ctx,
+      entities.filter((e) => !cached.fixed.has(e.shape)),
+      scale,
+      -1,
+      false,
+      undefined,
+      false,
+      stage.art?.style === 'reversal-ladder'
+    );
   }
 }

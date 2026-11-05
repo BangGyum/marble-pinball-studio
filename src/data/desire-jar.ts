@@ -322,7 +322,10 @@ export const desireJar: StageDef = {
       shape: {
         type: 'polyline',
         rotation: 0,
-        points: [[12, 85.8], [11, 86.4]],
+        points: [
+          [12, 85.8],
+          [11, 86.4],
+        ],
       },
     },
     {
@@ -332,7 +335,10 @@ export const desireJar: StageDef = {
       shape: {
         type: 'polyline',
         rotation: 0,
-        points: [[14, 85.8], [15, 86.4]],
+        points: [
+          [14, 85.8],
+          [15, 86.4],
+        ],
       },
     },
   ],

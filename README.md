@@ -132,9 +132,14 @@ yarn test
 녹화 파일은 기존 30FPS이며 대기·일시정지 화면은 필요할 때와 약 10Hz로 갱신합니다.
 
 `npm run check`는 브라우저·공유 코드와 LAN 서버 메시지 타입을 함께 검사합니다.
+`npm run lint`는 소스·LAN 서버·테스트·프로젝트의 JavaScript 스크립트와 두 게임 HTML의 린트 오류와 경고를 검사합니다.
+`npm run format:check`는 Biome이 지원하는 해당 파일의 포맷을 검사하며, `npm run format`으로 수정할 수 있습니다.
+현재 Biome은 HTML을 린트하지만 포맷하지 않습니다. 생성되는 `licenses.html`과 Python 스크립트는 검사 대상에서 제외합니다.
+들여쓰기 2칸, 작은따옴표, 줄 길이 120자와 JavaScript·TypeScript 파일의 kebab-case 이름을 기본으로 합니다. 문자열 연결과 템플릿 리터럴은 상황에 맞게 선택합니다.
+TypeScript의 non-null 단언은 내부 불변조건이 확실한 경우에만 허용합니다. 저장 데이터나 네트워크 입력 등 외부 값은 단언 대신 검증해야 합니다.
 `npm run test:unit`은 입력·저장·물리 결함·캐시·렌더링 회귀를, `npm run test:maps`는 맵 완주와 충돌 경로를,
 `npm run test:lan`은 재생 및 실제 HTTP/WebSocket 연결을 검사합니다. `npm test`는 세 그룹을 모두 실행합니다.
-PR과 main에서 전체 테스트, 정적 빌드, LAN 빌드를 검사하며 GitHub Pages 배포는 main 검증 성공 후 실행합니다.
+PR과 main에서 린트·포맷·전체 테스트·정적 빌드·LAN 빌드를 검사하며 GitHub Pages 배포는 main 검증 성공 후 실행합니다.
 
 프레임 비교는 `npm run dev:performance`로 진단 화면을 열어 맵·구슬 수·배속과 경기/확대/대기 상태를 선택합니다.
 같은 창 크기와 DPR에서 첫 2초를 제외한 12초 동안 RAF 간격, 렌더·물리 처리 시간, 캐시 생성 및 상태 조회 횟수를 기록합니다.

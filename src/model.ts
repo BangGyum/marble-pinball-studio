@@ -1,5 +1,5 @@
 import { ART_STYLES, type StageDef } from './stage-def';
-import type { MapEntity } from './types/MapEntity.type';
+import type { MapEntity } from './types/map-entity';
 import { MAX_WALL_GRID_ENTRIES, wallGridCost } from './wall-guard';
 
 export type WinnerOrder = 'asc' | 'desc';
@@ -95,71 +95,130 @@ export function validateStage(value: unknown): StageDef {
     throw new Error('올바른 맵 파일이 아니에요. 맵 이름, 결승선, 장애물을 확인해 주세요.');
   if (s.goalArea !== undefined) {
     const goal = s.goalArea;
-    if (!goal || !finite(goal.radius, .5, 30) ||
+    if (
+      !goal ||
+      !finite(goal.radius, 0.5, 30) ||
       !finite(goal.x, goal.radius, (s.width ?? 26) - goal.radius) ||
-      !finite(goal.y, goal.radius, s.goalY - goal.radius))
+      !finite(goal.y, goal.radius, s.goalY - goal.radius)
+    )
       throw new Error('원형 결승 영역은 맵 안에 있어야 하며 반지름은 0.5~30이어야 해요.');
   }
   if (s.art?.style === 'orbiting-gate' && !s.goalArea)
     throw new Error('떠도는 입구 배경에는 원형 결승 영역이 필요해요.');
-  if (s.art !== undefined && (!s.art || !(ART_STYLES as readonly string[]).includes(s.art.style) || !Array.isArray(s.art.contours) ||
-    (s.art.contours.length === 0 && ['crossway', 'fracture-canyon', 'bounce-stairs', 'orbiting-gate'].includes(s.art.style)) ||
-    s.art.contours.length > 20 || s.art.contours.some((points) => !Array.isArray(points) ||
-      points.length < 3 || points.length > 1000 || points.some((p) => !Array.isArray(p) || p.length !== 2 ||
-        !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))))
+  if (
+    s.art !== undefined &&
+    (!s.art ||
+      !(ART_STYLES as readonly string[]).includes(s.art.style) ||
+      !Array.isArray(s.art.contours) ||
+      (s.art.contours.length === 0 &&
+        ['crossway', 'fracture-canyon', 'bounce-stairs', 'orbiting-gate'].includes(s.art.style)) ||
+      s.art.contours.length > 20 ||
+      s.art.contours.some(
+        (points) =>
+          !Array.isArray(points) ||
+          points.length < 3 ||
+          points.length > 1000 ||
+          points.some(
+            (p) => !Array.isArray(p) || p.length !== 2 || !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)
+          )
+      ))
+  )
     throw new Error('맵 배경 장식 좌표가 올바르지 않아요.');
-  if (s.art?.arrows !== undefined && (!Array.isArray(s.art.arrows) || s.art.arrows.length > 100 ||
-    s.art.arrows.some((a) => !Array.isArray(a) || a.length !== 3 ||
-      !finite(a[0], -1000, 1000) || !finite(a[1], -1000, 1000) || !finite(a[2], -100, 100))))
+  if (
+    s.art?.arrows !== undefined &&
+    (!Array.isArray(s.art.arrows) ||
+      s.art.arrows.length > 100 ||
+      s.art.arrows.some(
+        (a) =>
+          !Array.isArray(a) ||
+          a.length !== 3 ||
+          !finite(a[0], -1000, 1000) ||
+          !finite(a[1], -1000, 1000) ||
+          !finite(a[2], -100, 100)
+      ))
+  )
     throw new Error('맵 방향 표시가 올바르지 않아요.');
-  if (s.art?.style === 'twin-funnel' && !s.exitBridge)
-    throw new Error('쌍둥이 와류 배경에는 입체 출구가 필요해요.');
+  if (s.art?.style === 'twin-funnel' && !s.exitBridge) throw new Error('쌍둥이 와류 배경에는 입체 출구가 필요해요.');
   if (s.exitBridge !== undefined) {
     const transfers = s.exitBridge?.transfers;
     if (transfers !== undefined && (!Array.isArray(transfers) || transfers.length > 10))
       throw new Error('연결 통로는 최대 10개까지 사용할 수 있어요.');
     for (const bridge of [s.exitBridge, ...(transfers ?? [])]) {
       const entry = bridge?.entry;
-      if (!entry || !finite(entry.x, -1000, 1000) || !finite(entry.y, -1000, 1000) ||
-        !finite(entry.width, 0.5, 200) || !finite(entry.height, 0.5, 300) ||
-        !Array.isArray(bridge.deck) || bridge.deck.length < 3 || bridge.deck.length > 1000 ||
-        bridge.deck.some(p => !Array.isArray(p) || p.length !== 2 || !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)))
+      if (
+        !entry ||
+        !finite(entry.x, -1000, 1000) ||
+        !finite(entry.y, -1000, 1000) ||
+        !finite(entry.width, 0.5, 200) ||
+        !finite(entry.height, 0.5, 300) ||
+        !Array.isArray(bridge.deck) ||
+        bridge.deck.length < 3 ||
+        bridge.deck.length > 1000 ||
+        bridge.deck.some(
+          (p) => !Array.isArray(p) || p.length !== 2 || !finite(p[0], -1000, 1000) || !finite(p[1], -1000, 1000)
+        )
+      )
         throw new Error('입체 출구의 진입 영역과 바닥 좌표를 확인해 주세요.');
     }
     for (const transfer of transfers ?? []) {
       const exit = transfer.exit;
-      if (!exit || !finite(exit.x, -1000, 1000) || !finite(exit.y, -1000, 1000) ||
-        !finite(exit.width, 0.5, 200) || !finite(exit.height, 0.5, 300))
+      if (
+        !exit ||
+        !finite(exit.x, -1000, 1000) ||
+        !finite(exit.y, -1000, 1000) ||
+        !finite(exit.width, 0.5, 200) ||
+        !finite(exit.height, 0.5, 300)
+      )
         throw new Error('연결 통로의 복귀 영역을 확인해 주세요.');
     }
   }
-  if (s.vortex && (!finite(s.vortex.x, -1000, 1000) || !finite(s.vortex.y, -1000, 1000) ||
-    !finite(s.vortex.radius, 1, 100) || !finite(s.vortex.speed, -30, 30) ||
-    (s.vortex.gust !== undefined && !finite(s.vortex.gust, 0, 1))))
+  if (
+    s.vortex &&
+    (!finite(s.vortex.x, -1000, 1000) ||
+      !finite(s.vortex.y, -1000, 1000) ||
+      !finite(s.vortex.radius, 1, 100) ||
+      !finite(s.vortex.speed, -30, 30) ||
+      (s.vortex.gust !== undefined && !finite(s.vortex.gust, 0, 1)))
+  )
     throw new Error('회전 바람 설정이 올바르지 않아요.');
   if (s.windZones !== undefined && (!Array.isArray(s.windZones) || s.windZones.length > 30))
     throw new Error('바람 영역 설정이 올바르지 않아요.');
   for (const wind of s.windZones ?? []) {
-    if (!wind || !finite(wind.x, -1000, 1000) || !finite(wind.y, -1000, 1000) ||
+    if (
+      !wind ||
+      !finite(wind.x, -1000, 1000) ||
+      !finite(wind.y, -1000, 1000) ||
       (wind.phase !== undefined && !finite(wind.phase, -100, 100)) ||
       (wind.pulse !== undefined && !finite(wind.pulse, 0, 1)) ||
       (wind.dutyCycle !== undefined && !finite(wind.dutyCycle, 0.1, 1)) ||
       (wind.period !== undefined && !finite(wind.period, 1, 60)) ||
-      (wind.fan !== undefined && (!wind.fan || !finite(wind.fan.x, -1000, 1000) ||
-        !finite(wind.fan.y, -1000, 1000) || !finite(wind.fan.radius, 0.3, 15) ||
-        (wind.fan.front !== undefined && typeof wind.fan.front !== 'boolean'))))
+      (wind.fan !== undefined &&
+        (!wind.fan ||
+          !finite(wind.fan.x, -1000, 1000) ||
+          !finite(wind.fan.y, -1000, 1000) ||
+          !finite(wind.fan.radius, 0.3, 15) ||
+          (wind.fan.front !== undefined && typeof wind.fan.front !== 'boolean')))
+    )
       throw new Error('바람 영역 설정이 올바르지 않아요.');
     if (wind.type === 'directional') {
-      if (!finite(wind.width, 0.5, 200) || !finite(wind.height, 0.5, 300) ||
-        !finite(wind.velocityX, -50, 50) || !finite(wind.velocityY, -50, 50) ||
+      if (
+        !finite(wind.width, 0.5, 200) ||
+        !finite(wind.height, 0.5, 300) ||
+        !finite(wind.velocityX, -50, 50) ||
+        !finite(wind.velocityY, -50, 50) ||
         (wind.strength !== undefined && !finite(wind.strength, 0.1, 20)) ||
-        (wind.turbulence !== undefined && !finite(wind.turbulence, 0, 20)))
+        (wind.turbulence !== undefined && !finite(wind.turbulence, 0, 20))
+      )
         throw new Error('직선 바람 설정이 올바르지 않아요.');
     } else if (wind.type === 'vortex') {
-      if (!finite(wind.radius, 1, 100) || !finite(wind.speed, -30, 30) ||
-        (wind.innerRadius !== undefined && (!finite(wind.innerRadius, 0, wind.radius) || wind.innerRadius >= wind.radius)) ||
+      if (
+        !finite(wind.radius, 1, 100) ||
+        !finite(wind.speed, -30, 30) ||
+        (wind.innerRadius !== undefined &&
+          (!finite(wind.innerRadius, 0, wind.radius) || wind.innerRadius >= wind.radius)) ||
         (wind.radial !== undefined && !finite(wind.radial, -30, 30)) ||
-        (wind.gust !== undefined && !finite(wind.gust, 0, 1)))
+        (wind.gust !== undefined && !finite(wind.gust, 0, 1))
+      )
         throw new Error('회전 바람 설정이 올바르지 않아요.');
     } else throw new Error('알 수 없는 바람 종류예요.');
   }
@@ -179,46 +238,111 @@ export function validateStage(value: unknown): StageDef {
     )
       throw new Error('장애물 위치 또는 물리 설정이 올바르지 않아요.');
     const sh = e.shape;
-    if (sh?.collisionLayer !== undefined && (sh.collisionLayer !== 1 && sh.collisionLayer !== 2 ||
-      sh.collisionLayer === 2 && !s.exitBridge))
+    if (
+      sh?.collisionLayer !== undefined &&
+      ((sh.collisionLayer !== 1 && sh.collisionLayer !== 2) || (sh.collisionLayer === 2 && !s.exitBridge))
+    )
       throw new Error('입체 출구가 있는 맵에서만 두 번째 충돌 층을 사용할 수 있어요.');
-    if (sh && 'boostSpeed' in sh && (sh.type !== 'box' || !finite(sh.boostSpeed, 5, 60) ||
-      e.type !== 'static' || e.props.angularVelocity !== 0 || e.props.oscillation || e.props.timedGate || e.props.spinCycle || e.props.sliding ||
-      (e.props.life !== undefined && e.props.life !== -1)))
+    if (
+      sh &&
+      'boostSpeed' in sh &&
+      (sh.type !== 'box' ||
+        !finite(sh.boostSpeed, 5, 60) ||
+        e.type !== 'static' ||
+        e.props.angularVelocity !== 0 ||
+        e.props.oscillation ||
+        e.props.timedGate ||
+        e.props.spinCycle ||
+        e.props.sliding ||
+        (e.props.life !== undefined && e.props.life !== -1))
+    )
       throw new Error('부스터는 고정된 네모 발판이며 속도는 5~60 사이여야 해요.');
-    if (e.props.oscillation !== undefined && (!e.props.oscillation || e.type !== 'kinematic' ||
-      !finite(e.props.oscillation.amplitude, 0.01, 1.5) || !finite(e.props.oscillation.period, 1, 30)))
+    if (
+      e.props.oscillation !== undefined &&
+      (!e.props.oscillation ||
+        e.type !== 'kinematic' ||
+        !finite(e.props.oscillation.amplitude, 0.01, 1.5) ||
+        !finite(e.props.oscillation.period, 1, 30))
+    )
       throw new Error('왕복 장치의 각도 또는 주기가 올바르지 않아요.');
-    if (sh && 'spring' in sh && (sh.type !== 'box' || !sh.spring || e.type !== 'kinematic' ||
-      sh.sensor || sh.hidden || sh.boostSpeed !== undefined || e.props.angularVelocity !== 0 ||
-      e.props.oscillation || e.props.sliding || e.props.timedGate || e.props.spinCycle ||
-      (e.props.life !== undefined && e.props.life !== -1) ||
-      !finite(sh.spring.distance, 0.2, 5) || !finite(sh.spring.direction, -Math.PI * 2, Math.PI * 2)))
+    if (
+      sh &&
+      'spring' in sh &&
+      (sh.type !== 'box' ||
+        !sh.spring ||
+        e.type !== 'kinematic' ||
+        sh.sensor ||
+        sh.hidden ||
+        sh.boostSpeed !== undefined ||
+        e.props.angularVelocity !== 0 ||
+        e.props.oscillation ||
+        e.props.sliding ||
+        e.props.timedGate ||
+        e.props.spinCycle ||
+        (e.props.life !== undefined && e.props.life !== -1) ||
+        !finite(sh.spring.distance, 0.2, 5) ||
+        !finite(sh.spring.direction, -Math.PI * 2, Math.PI * 2))
+    )
       throw new Error('스프링은 이동 거리 0.2~5의 조작 가능한 네모 장치여야 해요.');
-    if (sh?.type === 'box' && sh.spring?.cooldown !== undefined &&
-      (!sh.spring.cooldown || !['shared','personal'].includes(sh.spring.cooldown.scope) || !finite(sh.spring.cooldown.seconds, 1, 120)))
+    if (
+      sh?.type === 'box' &&
+      sh.spring?.cooldown !== undefined &&
+      (!sh.spring.cooldown ||
+        !['shared', 'personal'].includes(sh.spring.cooldown.scope) ||
+        !finite(sh.spring.cooldown.seconds, 1, 120))
+    )
       throw new Error('스프링 쿨타임은 공통 또는 개인별이며 1~120초 사이여야 해요.');
     const gate = e.props.timedGate;
     const slide = e.props.sliding;
-    if (slide !== undefined && (!slide || e.type !== 'kinematic' || e.props.angularVelocity !== 0 ||
-      e.props.oscillation || gate || e.props.spinCycle || (e.props.life !== undefined && e.props.life !== -1) ||
-      !finite(slide.amplitude, 0.1, 20) || !finite(slide.period, 1, 30) || !finite(slide.phase, -60, 60) ||
-      (slide.direction !== undefined && !finite(slide.direction, -Math.PI * 2, Math.PI * 2))))
+    if (
+      slide !== undefined &&
+      (!slide ||
+        e.type !== 'kinematic' ||
+        e.props.angularVelocity !== 0 ||
+        e.props.oscillation ||
+        gate ||
+        e.props.spinCycle ||
+        (e.props.life !== undefined && e.props.life !== -1) ||
+        !finite(slide.amplitude, 0.1, 20) ||
+        !finite(slide.period, 1, 30) ||
+        !finite(slide.phase, -60, 60) ||
+        (slide.direction !== undefined && !finite(slide.direction, -Math.PI * 2, Math.PI * 2)))
+    )
       throw new Error('이동 발판의 거리와 주기를 확인해 주세요.');
-    if (gate !== undefined && (!gate || e.type !== 'kinematic' || e.props.oscillation ||
-      e.props.angularVelocity !== 0 || (e.props.life !== undefined && e.props.life !== -1) ||
-      !finite(gate.period, 2, 30) || !finite(gate.openFor, 0.5, gate.period - 0.5) ||
-      (gate.releaseAfter !== undefined && !finite(gate.releaseAfter, 5, 180)) ||
-      !finite(gate.phase, -60, 60) || !finite(gate.angle, -1.5, 1.5) || Math.abs(gate.angle) < 0.1))
+    if (
+      gate !== undefined &&
+      (!gate ||
+        e.type !== 'kinematic' ||
+        e.props.oscillation ||
+        e.props.angularVelocity !== 0 ||
+        (e.props.life !== undefined && e.props.life !== -1) ||
+        !finite(gate.period, 2, 30) ||
+        !finite(gate.openFor, 0.5, gate.period - 0.5) ||
+        (gate.releaseAfter !== undefined && !finite(gate.releaseAfter, 5, 180)) ||
+        !finite(gate.phase, -60, 60) ||
+        !finite(gate.angle, -1.5, 1.5) ||
+        Math.abs(gate.angle) < 0.1)
+    )
       throw new Error('타이밍 게이트의 열림 각도와 주기를 확인해 주세요.');
     const spin = e.props.spinCycle;
-    if (spin !== undefined && (!spin || e.type !== 'kinematic' || e.props.oscillation || gate ||
-      !finite(spin.period, 2, 30) || !finite(spin.runFor, 0.5, spin.period - 0.5) ||
-      !finite(spin.phase, -60, 60) || !finite(spin.idleSpeed, -5, 5)))
+    if (
+      spin !== undefined &&
+      (!spin ||
+        e.type !== 'kinematic' ||
+        e.props.oscillation ||
+        gate ||
+        !finite(spin.period, 2, 30) ||
+        !finite(spin.runFor, 0.5, spin.period - 0.5) ||
+        !finite(spin.phase, -60, 60) ||
+        !finite(spin.idleSpeed, -5, 5))
+    )
       throw new Error('주기형 회전판의 회전 시간과 주기를 확인해 주세요.');
-    if (!sh || (sh.sensor !== undefined && typeof sh.sensor !== 'boolean') ||
+    if (
+      !sh ||
+      (sh.sensor !== undefined && typeof sh.sensor !== 'boolean') ||
       (sh.hidden !== undefined && typeof sh.hidden !== 'boolean') ||
-      (sh.color !== undefined && !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(sh.color)))
+      (sh.color !== undefined && !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(sh.color))
+    )
       throw new Error('장애물 색상이 올바르지 않아요.');
     if (sh.type === 'circle') {
       if (!finite(sh.radius, 0.05, 30)) throw new Error('핀 크기가 올바르지 않아요.');
@@ -260,9 +384,11 @@ export function validateStage(value: unknown): StageDef {
       }
     } else throw new Error('지원하지 않는 장애물이에요.');
     fixtures += sh.type === 'polyline' && !sh.solid ? (sh.points.length - 1) * (sh.backing ? 2 : 1) : 1;
-    if (fixtures > MAX_MAP_FIXTURES) throw new Error('맵의 충돌 형상이 너무 많아요. 벽의 점이나 장애물 수를 줄여 주세요.');
+    if (fixtures > MAX_MAP_FIXTURES)
+      throw new Error('맵의 충돌 형상이 너무 많아요. 벽의 점이나 장애물 수를 줄여 주세요.');
   }
-  if (wallGridCost(s) > MAX_WALL_GRID_ENTRIES) throw new Error('벽 검사 범위가 너무 커요. 긴 벽이나 장애물 수를 줄여 주세요.');
+  if (wallGridCost(s) > MAX_WALL_GRID_ENTRIES)
+    throw new Error('벽 검사 범위가 너무 커요. 긴 벽이나 장애물 수를 줄여 주세요.');
   const normalized = { ...cloneStage(s), title: s.title.trim(), zoomY: s.goalY - 5 };
   if (new TextEncoder().encode(JSON.stringify(mapFile(normalized))).byteLength > MAX_MAP_FILE_BYTES)
     throw new Error('맵 데이터는 1MB 이하로 줄여 주세요.');
@@ -291,7 +417,13 @@ export function saveMaps(storage: Pick<Storage, 'getItem' | 'setItem'>, maps: Sa
   const raw = storage.getItem(MAPS_KEY);
   if (raw) {
     let damaged = false;
-    try { readSavedMaps(storage, () => { damaged = true; }); } catch { damaged = true; }
+    try {
+      readSavedMaps(storage, () => {
+        damaged = true;
+      });
+    } catch {
+      damaged = true;
+    }
     if (damaged) {
       const base = MAPS_BACKUP_PREFIX + Date.now();
       let key = base;

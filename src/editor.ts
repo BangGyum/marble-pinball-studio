@@ -1,6 +1,6 @@
 import { blankStage, cloneStage, validateStage, exportMap, MAX_MAP_IMPORT_BYTES, type SavedMap } from './model';
 import type { StageDef } from './data/maps';
-import type { MapEntity } from './types/MapEntity.type';
+import type { MapEntity } from './types/map-entity';
 import { drawEntities } from './draw';
 import { drawMapArt, drawMapOverlay } from './map-art';
 import { drawWind } from './wind-render';
@@ -45,7 +45,9 @@ export class Editor {
   private ctx = this.canvas.getContext('2d')!;
   private dialog = el<HTMLDialogElement>('editor-dialog');
   constructor(private actions: EditorActions) {
-    window.addEventListener('pinball-theme-change', () => { if (this.dialog.open) this.render(); });
+    window.addEventListener('pinball-theme-change', () => {
+      if (this.dialog.open) this.render();
+    });
     this.canvas.width = 26 * SCALE;
     el('tools').addEventListener('click', (e) => {
       const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-tool]');
@@ -252,7 +254,9 @@ export class Editor {
     this.tool = tool;
     el('tools')
       .querySelectorAll<HTMLButtonElement>('[data-tool]')
-      .forEach((b) => b.classList.toggle('selected', b.dataset.tool === tool));
+      .forEach((b) => {
+        b.classList.toggle('selected', b.dataset.tool === tool);
+      });
     el('tool-help').textContent = HELP[tool];
     this.canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
   }
@@ -340,7 +344,9 @@ export class Editor {
             rotation: this.tool === 'boost' ? Math.PI / 2 : this.tool === 'ramp' ? 0.3 : 0,
             color: this.tool === 'boost' ? '#ffc653' : '#65efda',
             ...(this.tool === 'boost' ? { boostSpeed: 35 } : {}),
-            ...(this.tool === 'spring' ? { spring: { distance: 1.2, direction: -Math.PI / 2, cooldown: { scope: 'personal', seconds: 10 } } } : {}),
+            ...(this.tool === 'spring'
+              ? { spring: { distance: 1.2, direction: -Math.PI / 2, cooldown: { scope: 'personal', seconds: 10 } } }
+              : {}),
           },
       props: {
         density: 1,
@@ -434,7 +440,7 @@ export class Editor {
     for (let i = entities.length - 1; i >= 0; i--) {
       const e = entities[i],
         s = e.shape;
-      let x = p.x - e.position.x,
+      const x = p.x - e.position.x,
         y = p.y - e.position.y;
       if (s.type === 'circle' && Math.hypot(x, y) < s.radius + 0.35) return i;
       if (s.type === 'box') {
@@ -481,18 +487,28 @@ export class Editor {
     else if (id === 'prop-bounce') e.props.restitution = v;
     else if (id === 'prop-spin') {
       e.props.angularVelocity = (v * Math.PI) / 180;
-      e.type = v || e.props.oscillation || e.props.timedGate || e.props.spinCycle || e.props.sliding || (e.shape.type === 'box' && e.shape.spring) ? 'kinematic' : 'static';
+      e.type =
+        v ||
+        e.props.oscillation ||
+        e.props.timedGate ||
+        e.props.spinCycle ||
+        e.props.sliding ||
+        (e.shape.type === 'box' && e.shape.spring)
+          ? 'kinematic'
+          : 'static';
     } else if (e.shape.type === 'box') {
       if (id === 'prop-width') e.shape.width = v / 2;
       if (id === 'prop-height') e.shape.height = v / 2;
       if (id === 'prop-angle') e.shape.rotation = (v * Math.PI) / 180;
       if (e.shape.spring && (id === 'prop-spring-scope' || id === 'prop-spring-seconds')) {
         const cooldown = e.shape.spring.cooldown ?? { scope: 'personal', seconds: 10 };
-        e.shape.spring.cooldown = id === 'prop-spring-scope'
-          ? { ...cooldown, scope: input.value as 'shared' | 'personal' } : { ...cooldown, seconds: v };
+        e.shape.spring.cooldown =
+          id === 'prop-spring-scope'
+            ? { ...cooldown, scope: input.value as 'shared' | 'personal' }
+            : { ...cooldown, seconds: v };
       }
       if (id === 'prop-spring-distance' && e.shape.spring) e.shape.spring.distance = v;
-      if (id === 'prop-spring-direction' && e.shape.spring) e.shape.spring.direction = v * Math.PI / 180;
+      if (id === 'prop-spring-direction' && e.shape.spring) e.shape.spring.direction = (v * Math.PI) / 180;
       if (id === 'prop-boost' && e.shape.boostSpeed !== undefined) e.shape.boostSpeed = v;
     } else if (e.shape.type === 'circle' && id === 'prop-radius') e.shape.radius = v;
     try {
@@ -536,7 +552,9 @@ export class Editor {
       if (e.shape.spring) {
         el<HTMLSelectElement>('prop-spring-scope').value = e.shape.spring.cooldown?.scope ?? 'personal';
         put('prop-spring-seconds', e.shape.spring.cooldown?.seconds ?? 10);
-        put('prop-spring-distance', e.shape.spring.distance); put('prop-spring-direction', e.shape.spring.direction * 180 / Math.PI); }
+        put('prop-spring-distance', e.shape.spring.distance);
+        put('prop-spring-direction', (e.shape.spring.direction * 180) / Math.PI);
+      }
       if (boost) put('prop-boost', e.shape.boostSpeed!);
       put('prop-width', e.shape.width * 2);
       put('prop-height', e.shape.height * 2);
@@ -552,7 +570,10 @@ export class Editor {
     c.fillRect(0, 0, this.canvas.width, this.canvas.height);
     c.save();
     c.scale(SCALE, SCALE);
-    const liveArt = this.stage.art?.style === 'reversal-ladder' || this.stage.art?.style === 'infinite-funnel' || this.stage.art?.style === 'twin-funnel';
+    const liveArt =
+      this.stage.art?.style === 'reversal-ladder' ||
+      this.stage.art?.style === 'infinite-funnel' ||
+      this.stage.art?.style === 'twin-funnel';
     drawMapArt(c, this.stage, SCALE, !liveArt);
     c.strokeStyle = sceneColor('#23323d');
     c.lineWidth = 0.5 / SCALE;
@@ -588,7 +609,16 @@ export class Editor {
       shape: e.shape,
       life: e.props.life ?? -1,
     }));
-    drawEntities(c, entities, SCALE, this.selected, false, undefined, !!this.stage.art, this.stage.art?.style === 'reversal-ladder');
+    drawEntities(
+      c,
+      entities,
+      SCALE,
+      this.selected,
+      false,
+      undefined,
+      !!this.stage.art,
+      this.stage.art?.style === 'reversal-ladder'
+    );
     if (liveArt || this.stage.art?.style === 'orbiting-gate') drawMapOverlay(c, this.stage, entities, SCALE, false);
     drawWind(c, this.stage.windZones ?? [], 0, SCALE);
     if (!drawGoalArea(c, this.stage, SCALE)) {
@@ -610,7 +640,10 @@ export class Editor {
       c.lineWidth = 2 / SCALE;
       c.beginPath();
       c.moveTo(this.drag.start.x, this.drag.start.y);
-      if (this.tool === 'freehand') this.stroke.forEach((p) => c.lineTo(p.x, p.y));
+      if (this.tool === 'freehand')
+        this.stroke.forEach((p) => {
+          c.lineTo(p.x, p.y);
+        });
       else c.lineTo(this.wallEnd.x, this.wallEnd.y);
       c.stroke();
     }

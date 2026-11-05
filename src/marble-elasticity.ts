@@ -1,8 +1,15 @@
 export type MarbleSquash = { angle: number; amount: number };
 
 type Motion = {
-  x: number; y: number; time: number; sampledAt: number; vx?: number; vy?: number;
-  hitAt?: number; angle?: number; peak?: number;
+  x: number;
+  y: number;
+  time: number;
+  sampledAt: number;
+  vx?: number;
+  vy?: number;
+  hitAt?: number;
+  angle?: number;
+  peak?: number;
 };
 
 const DURATION = 240;
@@ -11,7 +18,9 @@ const DURATION = 240;
 export class MarbleElasticity {
   private motions = new Map<number, Motion>();
 
-  reset() { this.motions.clear(); }
+  reset() {
+    this.motions.clear();
+  }
 
   sample(id: number, x: number, y: number, time: number, now: number) {
     const previous = this.motions.get(id);
@@ -22,9 +31,11 @@ export class MarbleElasticity {
       return;
     }
     if (dt === 0) return;
-    const vx = (x - previous.x) / dt, vy = (y - previous.y) / dt;
+    const vx = (x - previous.x) / dt,
+      vy = (y - previous.y) / dt;
     if (previous.vx !== undefined && previous.vy !== undefined) {
-      const dx = vx - previous.vx, dy = vy - previous.vy;
+      const dx = vx - previous.vx,
+        dy = vy - previous.vy;
       const impulse = Math.hypot(dx, dy);
       const approach = impulse ? -(previous.vx * dx + previous.vy * dy) / impulse : 0;
       if (impulse > 8 && approach > 3 && now - (previous.hitAt ?? -Infinity) > 130) {
@@ -33,8 +44,12 @@ export class MarbleElasticity {
         previous.peak = Math.min(0.17, 0.08 + (impulse - 8) * 0.007);
       }
     }
-    previous.x = x; previous.y = y; previous.time = time; previous.sampledAt = now;
-    previous.vx = vx; previous.vy = vy;
+    previous.x = x;
+    previous.y = y;
+    previous.time = time;
+    previous.sampledAt = now;
+    previous.vx = vx;
+    previous.vy = vy;
   }
 
   effect(id: number, now: number, reducedMotion = false): MarbleSquash | undefined {

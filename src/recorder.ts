@@ -1,5 +1,6 @@
 export class Recorder {
   private recorder: MediaRecorder | null = null;
+  constructor(private onUnexpectedStop: () => void = () => {}) {}
   static supported(canvas: HTMLCanvasElement) {
     return typeof MediaRecorder !== 'undefined' && typeof canvas.captureStream === 'function';
   }
@@ -15,7 +16,7 @@ export class Recorder {
     try {
       rec = new MediaRecorder(stream, { videoBitsPerSecond: 5000000, ...(mimeType ? { mimeType } : {}) });
     } catch (e) {
-      stream.getTracks().forEach((t) => t.stop());
+      for (const track of stream.getTracks()) track.stop();
       throw e;
     }
     const chunks: Blob[] = [];
@@ -23,7 +24,11 @@ export class Recorder {
       if (e.data.size) chunks.push(e.data);
     };
     rec.onstop = () => {
-      stream.getTracks().forEach((t) => t.stop());
+      for (const track of stream.getTracks()) track.stop();
+      if (this.recorder === rec) {
+        this.recorder = null;
+        this.onUnexpectedStop();
+      }
       if (!chunks.length) return;
       const actualType = rec.mimeType || chunks[0].type;
       const url = URL.createObjectURL(new Blob(chunks, { type: actualType }));
@@ -35,11 +40,17 @@ export class Recorder {
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 30000);
     };
-    rec.start(1000);
+    try {
+      rec.start(1000);
+    } catch (e) {
+      for (const track of stream.getTracks()) track.stop();
+      throw e;
+    }
     this.recorder = rec;
   }
   stop() {
-    if (this.recorder && this.recorder.state !== 'inactive') this.recorder.stop();
+    const rec = this.recorder;
     this.recorder = null;
+    if (rec && rec.state !== 'inactive') rec.stop();
   }
 }
