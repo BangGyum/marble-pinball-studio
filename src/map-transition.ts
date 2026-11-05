@@ -25,7 +25,7 @@ export class MapTransition {
     layer.style.setProperty('--from-x', `${Math.max(0, Math.min(window.innerWidth, bounds.left + bounds.width / 2)) - window.innerWidth / 2}px`);
     layer.style.setProperty('--from-y', `${Math.max(0, Math.min(window.innerHeight, bounds.top + bounds.height / 2)) - window.innerHeight / 2}px`);
     layer.innerHTML = '<div class="map-transition-cover"></div><div class="map-transition-ring"></div><div class="map-transition-beam"></div><div class="map-transition-copy"><span></span><strong></strong><div class="map-transition-track"><i></i></div></div>';
-    layer.querySelector('span')!.textContent = `MAP ${card.querySelector('.map-card-number')!.textContent} · LET’S ROLL`;
+    layer.querySelector('span')!.textContent = `코스 ${card.querySelector('.map-card-number')!.textContent} · 경주 준비`;
     layer.querySelector('strong')!.textContent = card.querySelector('.map-card-title')!.textContent;
     this.layer = layer;
     this.card = card;

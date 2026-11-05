@@ -133,7 +133,7 @@ export class MapGallery {
       card.setAttribute('aria-label', `${map.stage.title} · 맵 선택`);
       if (map.id === selected) card.setAttribute('aria-current', 'true');
       card.style.setProperty('--map-color', color);
-      card.innerHTML = `<span class="map-preview"><span class="map-card-number" aria-hidden="true"></span><span class="map-card-tag"></span></span><span class="map-card-body"><span class="map-card-title"></span><span class="map-card-description"></span><span class="map-card-action">이 맵 선택 <span aria-hidden="true">↗</span></span></span>`;
+      card.innerHTML = `<span class="map-card-heading"><span class="map-card-number" aria-hidden="true"></span><span class="map-card-title"></span></span><span class="map-preview"><span class="map-card-tag"></span></span><span class="map-card-body"><span class="map-card-description"></span><span class="map-card-action">이 맵으로 준비 <span class="map-card-ball" aria-hidden="true"></span></span></span>`;
       card.querySelector('.map-card-number')!.textContent = String(index + 1).padStart(2, '0');
       card.querySelector('.map-card-tag')!.textContent = tag;
       card.querySelector('.map-card-title')!.textContent = map.stage.title;
