@@ -75,10 +75,11 @@ const near = (ball, points, margin = 0.3) => points.some((a, i) => {
   }
   const race = new Race(); await race.physics.init();
   const physics = race.physics, random = Math.random;
-  for (const [x, y] of [[32.44, 32.28], [33.2958, 32.5187]]) {
+  for (const [x, y] of [[32.44, 32.28], [33.2958, 32.5187]]) for (const vy of [-18, -12, -6, 0]) for (const vx of [-6, 0, 6]) {
     physics.createStage(stage);
     for (let i = 0; i < 40 * 60; i++) physics.step(1 / 60);
     physics.createMarble(0, x, y); physics.start();
+    physics.setMarbleVelocity(0, vx, vy);
     for (let i = 0; i < 30 * 60 && !physics.isMarbleOnBridge(0); i++) physics.step(1 / 60);
     assert.equal(physics.isMarbleOnBridge(0), true, 'an upward rebound on either side of the released core gate must roll back to the exit');
     physics.clearMarbles(); physics.clear();

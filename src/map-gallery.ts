@@ -5,6 +5,7 @@ import { drawMapArt, drawMapOverlay } from './map-art';
 import { drawWind } from './wind-render';
 import { drawGoalArea } from './finish';
 import { drawMarble } from './marble-art';
+import { getMarbleDesign } from './marble-design';
 import { el } from './ui';
 import { GalleryIntro } from './gallery-intro';
 import { MapTransition } from './map-transition';
@@ -64,6 +65,7 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
     drawMarble(ctx, (stage.spawnX ?? 12.85) + (i - 1) * 0.85, 4, 0.4, color));
   canvas.dataset.rendered = 'true';
   canvas.dataset.theme = getSceneTheme();
+  canvas.dataset.marbleDesign = getMarbleDesign();
 }
 
 export class MapGallery {
@@ -83,7 +85,7 @@ export class MapGallery {
   }, { rootMargin: '240px' });
 
   constructor(select: (id: string) => void) {
-    window.addEventListener('pinball-theme-change', () => {
+    for (const event of ['pinball-theme-change', 'pinball-marble-design-change']) window.addEventListener(event, () => {
       this.intro.stop();
       this.observer.disconnect();
       for (const canvas of this.grid.querySelectorAll('canvas')) {
@@ -145,7 +147,7 @@ export class MapGallery {
         this.thumbnails.set(map.stage, canvas); this.stages.set(canvas, map.stage);
       }
       card.querySelector('.map-preview')!.append(canvas);
-      if (canvas.dataset.theme !== getSceneTheme()) canvas.removeAttribute('data-rendered');
+      if (canvas.dataset.theme !== getSceneTheme() || canvas.dataset.marbleDesign !== getMarbleDesign()) canvas.removeAttribute('data-rendered');
       return card;
     });
     this.grid.replaceChildren(...cards);

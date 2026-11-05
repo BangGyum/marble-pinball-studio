@@ -67,6 +67,7 @@ export class Game extends Race {
     this.springControls = new SpringControls(canvas, index => this.activateSpring(index), () => this.state === 'running');
     this.ctx = canvas.getContext('2d', { alpha: false })!;
     window.addEventListener('pinball-theme-change', () => { this.renderDirty = true; });
+    window.addEventListener('pinball-marble-design-change', () => { this.renderDirty = true; });
     new ResizeObserver(() => this.resize()).observe(canvas);
     const followMinimap = (e: PointerEvent) => {
       this.renderDirty = true;

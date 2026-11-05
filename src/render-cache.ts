@@ -9,6 +9,7 @@ import type { StageDef } from './data/maps';
 import type { MapEntityState } from './types/MapEntity.type';
 import { drawEntities } from './draw';
 import { drawMarble } from './marble-art';
+import { getMarbleDesign } from './marble-design';
 import type { MarbleSquash } from './marble-elasticity';
 import { getSceneTheme, type SceneTheme } from './scene-theme';
 
@@ -41,7 +42,7 @@ export class RenderCache {
     if (typeof OffscreenCanvas === 'undefined') return false;
     // Rasterize in small resolution buckets; continuous zoom reuses these bitmaps.
     const resolution = Math.ceil(scale / 8) * 8;
-    const key = `${resolution}/${dpr}/${ball.color}`;
+    const key = `${getMarbleDesign()}/${getSceneTheme()}/${resolution}/${dpr}/${ball.color}`;
     let cached = this.balls.get(ball);
     const font = Math.min(17, Math.max(12, scale * 0.24)), rasterFont = Math.ceil(font);
     const labelKey = `${getSceneTheme()}/${rasterFont}/${dpr}/${ball.color}/${ball.name}`;

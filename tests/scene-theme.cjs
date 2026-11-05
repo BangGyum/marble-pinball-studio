@@ -102,7 +102,7 @@ const ball = { name: '구슬', color: '#92e5da', x: 1, y: 1 };
 setSceneTheme('dark'); cache.drawBall(ctx, ball, 32, 1);
 const count = bitmaps.length;
 setSceneTheme('beige'); cache.drawBall(ctx, ball, 32, 1);
-assert.equal(bitmaps.length, count + 1, 'only the label is rebuilt; marble identity and sprite are retained');
+assert.equal(bitmaps.length, count + 2, 'marble paint and label are rebuilt for the new theme');
 assert.equal(bitmaps.at(-1).ctx.fillStyle, '#44382d');
 assert.equal(bitmaps.at(-1).ctx.strokeStyle, '#fff8eb');
 console.log('PASS theme-aware background, minimap and label caches without repeated allocations');

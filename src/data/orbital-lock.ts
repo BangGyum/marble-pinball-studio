@@ -48,7 +48,8 @@ export const orbitalLock: StageDef = {
   windZones: [
     { type: 'vortex', x: 32, y: 40, radius: 28.3, innerRadius: 18.3, speed: 18, radial: -15, gust: 0.08 },
     { type: 'vortex', x: 32, y: 40, radius: 18.3, innerRadius: 8.3, speed: 14, radial: -13, gust: 0.08, phase: 2 },
-    { type: 'vortex', x: 32, y: 40, radius: 7.8, speed: 10, radial: 2, gust: 0.03 },
+    // Leave the rim to gravity so the vortex cannot hold a rebound against the gate lip.
+    { type: 'vortex', x: 32, y: 40, radius: 7.2, speed: 10, radial: 2, gust: 0.03 },
     { type: 'directional', x: 42.2, y: 20.1, width: 2.4, height: 6, velocityX: -7, velocityY: 14, strength: 8, turbulence: 1 },
     { type: 'directional', x: 38.8, y: 28.8, width: 2.5, height: 5, velocityX: -7, velocityY: 14, strength: 8, turbulence: 1 },
     { type: 'directional', x: 32, y: 46, width: 4, height: 4, velocityX: 0, velocityY: 14, strength: 7 },

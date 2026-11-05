@@ -122,6 +122,7 @@ console.log('PASS LAN .5/1/2/4/8x rebound, repeated snapshots and stale sample r
 
 // Inspect the actual drawing transforms, including restoration before the name label.
 const { drawMarble } = require('../src/marble-art.ts');
+const { setMarbleDesign } = require('../src/marble-design.ts');
 function drawingTransforms(draw) {
   let matrix = [1, 0, 0, 1];
   const stack = [], drawn = [], ctx = context();
@@ -133,26 +134,30 @@ function drawingTransforms(draw) {
     const [a, b, c, d] = matrix, cos = Math.cos(angle), sin = Math.sin(angle);
     matrix = [a * cos + c * sin, b * cos + d * sin, c * cos - a * sin, d * cos - b * sin];
   };
-  ctx.drawImage = ctx.ellipse = () => drawn.push([...matrix]);
+  ctx.drawImage = ctx.fill = () => drawn.push([...matrix]);
   draw(ctx);
   assert.deepEqual(matrix, [1, 0, 0, 1], 'drawing must restore the surrounding canvas transform');
   return drawn;
 }
-for (const angle of [-Math.PI, -Math.PI / 2, 0, Math.PI / 4, Math.PI]) {
-  for (const amount of [0, .0041, .17, -.02]) {
-    const squash = { angle, amount }, cos = Math.cos(angle), sin = Math.sin(angle);
-    const [sprite, label] = drawingTransforms(ctx => cache.drawBall(ctx, ball, 40, 1, 2, 3, squash));
-    const [vector] = drawingTransforms(ctx => drawMarble(ctx, 2, 3, .25, ball.color, squash));
-    assert.deepEqual(sprite, vector, 'cached and vector marbles must use the same deformation');
-    assert.deepEqual(label, [1, 0, 0, 1], 'names must remain upright and unstretched');
-    const [a, b, c, d] = sprite;
-    for (const [x, y, scale] of [[cos, sin, 1 - amount], [-sin, cos, 1 + amount * .7]]) {
-      assert.ok(Math.hypot(a * x + c * y - x * scale, b * x + d * y - y * scale) < 1e-10,
-        'squash must stretch each impact axis without spinning the sphere lighting');
+for (const design of ['ceramic', 'racing-band']) {
+  setMarbleDesign(design);
+  for (const angle of [-Math.PI, -Math.PI / 2, 0, Math.PI / 4, Math.PI]) {
+    for (const amount of [0, .0041, .17, -.02]) {
+      const squash = { angle, amount }, cos = Math.cos(angle), sin = Math.sin(angle);
+      const [sprite, label] = drawingTransforms(ctx => cache.drawBall(ctx, ball, 40, 1, 2, 3, squash));
+      const [vector] = drawingTransforms(ctx => drawMarble(ctx, 2, 3, .25, ball.color, squash));
+      assert.deepEqual(sprite, vector, 'cached and vector marbles must use the same deformation');
+      assert.deepEqual(label, [1, 0, 0, 1], 'names must remain upright and unstretched');
+      const [a, b, c, d] = sprite;
+      for (const [x, y, scale] of [[cos, sin, 1 - amount], [-sin, cos, 1 + amount * .7]]) {
+        assert.ok(Math.hypot(a * x + c * y - x * scale, b * x + d * y - y * scale) < 1e-10,
+          'squash must stretch each impact axis without spinning the sphere lighting');
+      }
     }
   }
 }
-console.log('PASS cached/vector lighting stays oriented through impact and recovery; labels stay unchanged');
+setMarbleDesign('ceramic');
+console.log('PASS both designs keep cached/vector lighting oriented through impact and recovery; labels stay unchanged');
 
 const crowdedCache = new RenderCache();
 const crowd = Array.from({ length: 100 }, (_, id) => ({ ...ball, id, name: `Ball ${id}` }));

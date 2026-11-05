@@ -8,11 +8,13 @@ import { Editor } from './editor';
 import { Rankings } from './rankings';
 import { MapGallery } from './map-gallery';
 import { initTheme } from './theme';
+import { initMarbleDesign } from './marble-design';
 import { ViewHistory } from './view-history';
 import { DolphinSettingsPanel } from './dolphin-settings';
 import './dolphin.css';
 
 initTheme();
+initMarbleDesign();
 const library = new MapLibrary(stages, hiddenStages);
 try {
   library.load(localStorage, (count) => toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`));

@@ -78,6 +78,7 @@ export class LanView {
       });
     this.springControls = new SpringControls(canvas, index => this.onSpring(index), () => this.state === 'running');
     this.ctx = canvas.getContext('2d', { alpha: false })!;
+    window.addEventListener('pinball-marble-design-change', () => { this.renderDirty = true; });
     new ResizeObserver(() => {
       const size = canvas.getBoundingClientRect();
       this.width = Math.max(1, size.width); this.height = Math.max(1, size.height);

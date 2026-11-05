@@ -12,7 +12,9 @@ import { decodeScene, serializeCommand } from './protocol';
 import { DolphinSettingsPanel } from '../dolphin-settings';
 import '../dolphin.css';
 import { validateDolphins } from '../dolphin';
+import { initMarbleDesign } from '../marble-design';
 
+initMarbleDesign();
 const view = new LanView(el<HTMLCanvasElement>('game'));
 const rankings = new Rankings((id) => selectBall(view.focusedBallId === id ? null : id));
 const rankingList = el('ranking-list'), gameView = el('game-view'), panel = el('control-panel');
