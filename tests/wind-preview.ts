@@ -17,7 +17,7 @@ async function init() {
     const physics = new Box2dPhysics();
     await physics.init();
     const game: Game = Object.create(Game.prototype);
-    Object.assign(game, { physics, recorder: { stop() {} }, render() {}, onFinish() {} });
+    Object.assign(game, { physics, recorder: { stop() {} }, onZoomChange() {}, render() {}, onFinish() {} });
     const prepare = () =>
       game.prepare(
         stage,

@@ -55,6 +55,8 @@ export class LanView {
   private elasticFrameSeq = -1;
   private ctx: CanvasRenderingContext2D;
   private camera = { x: 12.85, y: 4 };
+  private goalScale = 0;
+  private goalFollow = false;
   private manual: { x: number; y: number } | null = null;
   private minimap = { x: 16, y: 26, w: 115, h: 400, scale: 4 };
   private width = 1000;
@@ -197,6 +199,7 @@ export class LanView {
     this.renderDirty = true;
   }
   follow(closeOverview = false) {
+    if (closeOverview && this.state !== 'ready') this.goalFollow = true;
     if (closeOverview && this.state === 'ready' && this.dolphinOverview) {
       this.dolphinOverview = false;
       this.camera = { ...this.readyCamera };
@@ -235,6 +238,10 @@ export class LanView {
       this.elasticFrameSeq = -1;
     }
     if (this.scene?.raceId !== scene.raceId) {
+      if (this.scene && JSON.stringify(this.scene.stage) !== JSON.stringify(scene.stage)) this.setZoom(1);
+      this.goalScale = 0;
+      this.goalFollow = false;
+      this.lastDraw = 0;
       this.dolphinPreviewElapsed = DOLPHIN_DURATION / 2;
       this.dolphinPreviewLast = 0;
       this.drainCueAt = 0;
@@ -292,13 +299,13 @@ export class LanView {
     this.playback.push(frame);
   }
   private viewScale() {
-    if (this.scene?.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview))
-      return (
-        Math.min(
-          Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.scene.stage.width ?? 26) + 4),
-          Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)
-        ) * this.zoom
+    if (this.scene?.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview)) {
+      const fitted = Math.min(
+        Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.scene.stage.width ?? 26) + 4),
+        Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)
       );
+      return (this.state !== 'ready' && this.goalScale ? this.goalScale : fitted) * this.zoom;
+    }
     if (this.state === 'ready' && this.dolphinOverview && this.scene)
       return (
         Math.min(
@@ -408,13 +415,24 @@ export class LanView {
     const lastWinningRank = scene.settings.order === 'desc' ? balls.length : scene.settings.picks;
     const target =
       selected ??
-      active[Math.min(active.length - 1, Math.max(0, lastWinningRank - (balls.length - active.length) - 1))];
-    const scale = this.viewScale();
+      active[Math.min(active.length - 1, Math.max(0, lastWinningRank - (balls.length - active.length) - 1))] ??
+      (scene.stage.goalArea ? balls.find((ball) => ball.rank === balls.length) : undefined);
+    const overview = !shown.winners.length && this.zoom <= 1 && !this.goalFollow && !selected;
     this.cameraMoving = false;
+    if (scene.stage.goalArea && this.state !== 'ready') {
+      const desired = overview
+        ? Math.min(
+            Math.max(1, w - (w < 600 ? 24 : 180)) / ((scene.stage.width ?? 26) + 4),
+            Math.max(1, h - 45) / (scene.stage.goalY + 4)
+          )
+        : Math.min(w / 20, h / 13, 70);
+      this.goalScale = this.goalScale ? this.goalScale + (desired - this.goalScale) * (1 - 0.9 ** (dt * 60)) : desired;
+      this.cameraMoving = Math.abs(desired - this.goalScale) > 0.01;
+    }
+    const scale = this.viewScale();
     if (
       scene.stage.goalArea &&
-      (this.state !== 'ready' || this.dolphinOverview) &&
-      this.zoom <= 1 &&
+      (this.state === 'ready' ? this.dolphinOverview : overview) &&
       !this.manual &&
       !selected
     ) {
@@ -422,7 +440,7 @@ export class LanView {
     } else if (target && !this.manual && (this.state !== 'ready' || selected)) {
       this.camera.x += (target.x - this.camera.x) * (1 - 0.94 ** (dt * 60));
       this.camera.y += (target.y - this.camera.y) * (1 - 0.87 ** (dt * 60));
-      this.cameraMoving = Math.abs(target.x - this.camera.x) + Math.abs(target.y - this.camera.y) > 0.01;
+      this.cameraMoving ||= Math.abs(target.x - this.camera.x) + Math.abs(target.y - this.camera.y) > 0.01;
     }
     const cam = this.manual ?? this.camera;
     const view = {

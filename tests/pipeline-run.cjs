@@ -50,6 +50,7 @@ Math.random = () => {
     springControls: { reset() {} },
     springCooldowns: { reset() {} },
     recorder: { stop() {} },
+    onZoomChange() {},
     render() {},
     onFinish() {},
   });

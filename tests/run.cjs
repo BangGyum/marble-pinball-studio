@@ -93,6 +93,7 @@ async function run() {
     elapsed: 0,
     recording: false,
     recorder: new Recorder(),
+    onZoomChange() {},
     render: () => {},
     onFinish: () => {},
   });

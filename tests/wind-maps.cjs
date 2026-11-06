@@ -37,6 +37,7 @@ async function simulate(physics, stage, count, initial, limit = 120) {
     springControls: { reset() {} },
     springCooldowns: { reset() {} },
     recorder: { stop() {} },
+    onZoomChange() {},
     render() {},
     onFinish() {},
   });

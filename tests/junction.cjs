@@ -83,6 +83,7 @@ async function run() {
     springControls: { reset() {} },
     springCooldowns: { reset() {} },
     recorder: { stop() {} },
+    onZoomChange() {},
     render() {},
     onFinish() {},
   });

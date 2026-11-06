@@ -23,6 +23,7 @@ async function run() {
     springControls: { reset() {} },
     springCooldowns: { reset() {} },
     recorder: { stop() {} },
+    onZoomChange() {},
     render() {},
   });
   const original = JSON.stringify(neonJunction);
