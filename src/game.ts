@@ -15,7 +15,8 @@ import { MarbleElasticity } from './marble-elasticity';
 import { getSceneTheme, sceneColor } from './scene-theme';
 import { drawFunnelEntryCue } from './funnel-art';
 import { DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from './dolphin';
-import { DolphinRenderer } from './dolphin-render';
+import { SeaAnimalRenderer as DolphinRenderer } from './sea-animal-render';
+import type { AnimalKind } from './sea-animals';
 import { DolphinDrag } from './dolphin-drag';
 import type { MapEntityState } from './types/map-entity';
 export type { Ball } from './race';
@@ -68,12 +69,14 @@ export class Game extends Race {
     this.dolphinDrag = new DolphinDrag(
       canvas,
       () => this.state === 'ready' && this.dolphinPreview,
-      () => this.dolphins,
+      () => (this.dolphinRenderer.kind === 'manta' ? this.dolphins.manta! : this.dolphins),
       () => this.stage,
       (index, y, commit) => {
-        const rows = [...this.dolphins.rows];
+        const manta = this.dolphinRenderer.kind === 'manta';
+        const options = manta ? this.dolphins.manta! : this.dolphins;
+        const rows = [...options.rows];
         rows[index] = y;
-        this.setDolphins({ ...this.dolphins, rows });
+        this.setDolphins(manta ? { ...this.dolphins, manta: { ...options, rows } } : { ...this.dolphins, rows });
         this.onDolphinChange(this.dolphins, commit);
       }
     );
@@ -165,6 +168,7 @@ export class Game extends Race {
     this.manual = null;
     this.springControls.reset();
     super.prepare(stage, names, dolphins);
+    if (!this.dolphins.manta?.enabled) this.dolphinRenderer.kind = 'dolphin';
     const rows = Math.ceil(names.length / 10);
     const spawnOffset = (stage.spawnX ?? 12.85) - 12.85;
     this.camera = {
@@ -177,11 +181,13 @@ export class Game extends Race {
   setDolphins(settings: DolphinSettings) {
     if (this.state !== 'ready') return;
     this.dolphins = validateDolphins(settings, this.stage);
-    if (!settings.enabled && this.dolphinOverview) {
+    if (!(this.dolphinRenderer.kind === 'manta' ? settings.manta?.enabled : settings.enabled) && this.dolphinOverview) {
       this.dolphinOverview = false;
       this.camera = { ...this.readyCamera };
       this.manual = null;
     }
+    if (!(this.dolphinRenderer.kind === 'manta' ? settings.manta?.enabled : settings.enabled))
+      this.dolphinRenderer.kind = settings.enabled ? 'dolphin' : settings.manta?.enabled ? 'manta' : 'dolphin';
     this.renderDirty = true;
     this.render();
   }
@@ -190,8 +196,13 @@ export class Game extends Race {
     this.dolphinPreviewLast = 0;
     this.renderDirty = true;
   }
-  showDolphinLayout() {
-    if (this.state !== 'ready' || !this.dolphins.enabled) return;
+  showDolphinLayout(kind?: AnimalKind) {
+    if (kind) this.dolphinRenderer.kind = kind;
+    if (
+      this.state !== 'ready' ||
+      !(this.dolphinRenderer.kind === 'manta' ? this.dolphins.manta?.enabled : this.dolphins.enabled)
+    )
+      return;
     this.dolphinOverview = true;
     this.manual = null;
     this.zoom = 1;
@@ -295,7 +306,7 @@ export class Game extends Race {
     const previewing =
       this.state === 'ready' &&
       this.dolphinPreview &&
-      this.dolphins?.enabled &&
+      (this.dolphins?.enabled || this.dolphins?.manta?.enabled) &&
       !this.reducedMotion?.matches &&
       (typeof document === 'undefined' || !document.hidden);
     if (previewing) {
@@ -452,7 +463,11 @@ export class Game extends Race {
           ctx,
           this.stage,
           this.dolphins,
-          this.reducedMotion?.matches ? DOLPHIN_DURATION / 2 : this.dolphinPreviewElapsed,
+          this.dolphinRenderer.previewTime(
+            this.dolphins,
+            this.dolphinPreviewElapsed,
+            this.reducedMotion?.matches ?? false
+          ),
           view,
           true
         );

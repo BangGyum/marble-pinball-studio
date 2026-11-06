@@ -262,6 +262,7 @@ for (const width of [400, 1000])
           stage: map,
           balls: [],
           zoom: 3,
+          dolphinRenderer: { kind: 'dolphin' },
           onZoomChange() {},
           render() {},
         });

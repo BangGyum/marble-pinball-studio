@@ -1,18 +1,22 @@
 import type { StageDef } from './stage-def';
-import {
-  dolphinPose,
-  dolphinScale,
-  dolphinWaves,
-  DOLPHIN_DURATION,
-  DOLPHIN_SWIM,
-  DOLPHIN_WIDTH,
-  type DolphinSettings,
-} from './dolphin';
+import { dolphinScale, DOLPHIN_DURATION, DOLPHIN_SWIM, DOLPHIN_WIDTH, type DolphinSettings } from './dolphin';
 import { sceneColor } from './scene-theme';
 import { DOLPHIN_HEIGHT, DOLPHIN_OUTLINE, DOLPHIN_SPRITE_RECT } from './dolphin-hitbox';
+import { MANTA_HEIGHT, MANTA_OUTLINE, MANTA_SPRITE_RECT } from './manta-hitbox';
+import { animalOptions, animalPose, animalWaves, type AnimalKind } from './sea-animals';
 
 type View = { left: number; right: number; top: number; bottom: number };
 export class DolphinRenderer {
+  constructor(private kind: AnimalKind = 'dolphin') {}
+  private get height() {
+    return this.kind === 'manta' ? MANTA_HEIGHT : DOLPHIN_HEIGHT;
+  }
+  private get outline() {
+    return this.kind === 'manta' ? MANTA_OUTLINE : DOLPHIN_OUTLINE;
+  }
+  private get rect() {
+    return this.kind === 'manta' ? MANTA_SPRITE_RECT : DOLPHIN_SPRITE_RECT;
+  }
   private body?: HTMLCanvasElement;
   private splash?: HTMLCanvasElement;
   private width = -1;
@@ -23,20 +27,20 @@ export class DolphinRenderer {
   private guideScale = -1;
   private drawBody(ctx: CanvasRenderingContext2D) {
     if (this.body) {
-      ctx.drawImage(this.body, -DOLPHIN_WIDTH / 2, -DOLPHIN_HEIGHT / 2, DOLPHIN_WIDTH, DOLPHIN_HEIGHT);
+      ctx.drawImage(this.body, -DOLPHIN_WIDTH / 2, -this.height / 2, DOLPHIN_WIDTH, this.height);
       return;
     }
     // Keep the collision visible while the texture is loading, including late LAN joins.
     ctx.fillStyle = '#76bdce';
     ctx.beginPath();
-    ctx.moveTo(...DOLPHIN_OUTLINE[0]);
-    for (let i = 1; i < DOLPHIN_OUTLINE.length; i++) ctx.lineTo(...DOLPHIN_OUTLINE[i]);
+    ctx.moveTo(...this.outline[0]);
+    for (let i = 1; i < this.outline.length; i++) ctx.lineTo(...this.outline[i]);
     ctx.closePath();
     ctx.fill();
   }
   private load(width = 384) {
-    width = Math.min(1675, Math.max(384, width));
-    if (this.body && this.body.width >= width && this.splash) return true;
+    width = Math.min(this.rect[2], Math.max(384, width));
+    if (this.body && this.body.width >= width && (this.kind === 'manta' || this.splash)) return true;
     if (typeof document === 'undefined') return false;
     const crop = (id: string, rect: readonly number[], width: number) => {
       const image = document.getElementById(id) as HTMLImageElement | null;
@@ -50,20 +54,21 @@ export class DolphinRenderer {
       return canvas;
     };
     if (!this.body || this.body.width < width)
-      this.body = crop('dolphin-sprite', DOLPHIN_SPRITE_RECT, width) ?? this.body;
-    this.splash ??= crop('dolphin-splash', [69, 133, 1651, 671], 320);
-    return !!this.body && !!this.splash;
+      this.body = crop(this.kind === 'manta' ? 'manta-sprite' : 'dolphin-sprite', this.rect, width) ?? this.body;
+    if (this.kind === 'dolphin') this.splash ??= crop('dolphin-splash', [69, 133, 1651, 671], 320);
+    return !!this.body && (this.kind === 'manta' || !!this.splash);
   }
   guides(ctx: CanvasRenderingContext2D, stage: StageDef, settings: DolphinSettings, scale: number, mini = false) {
-    if (!settings.enabled) return;
+    const options = animalOptions(settings, this.kind);
+    if (!options?.enabled) return;
     const width = stage.width ?? 26,
-      factor = dolphinScale(settings);
+      factor = dolphinScale(options);
     if (!mini && (this.guideWidth !== width || this.guideScale !== factor)) {
       this.guidePath = new Path2D();
       this.guideWidth = width;
       this.guideScale = factor;
       for (let i = 0; i <= 90; i++) {
-        const p = dolphinPose(stage, 0, (i / 90) * DOLPHIN_DURATION, 1, factor);
+        const p = animalPose(this.kind)(stage, 0, (i / 90) * DOLPHIN_DURATION, 1, factor);
         i ? this.guidePath.lineTo(p.x, p.y) : this.guidePath.moveTo(p.x, p.y);
       }
     }
@@ -74,13 +79,13 @@ export class DolphinRenderer {
     ctx.setLineDash([6 / scale, 5 / scale]);
     ctx.font = `${12 / scale}px sans-serif`;
     ctx.textAlign = 'left';
-    settings.rows.forEach((row, index) => {
+    options.rows.forEach((row, index) => {
       ctx.beginPath();
       ctx.moveTo(0, row);
       ctx.lineTo(width, row);
       ctx.stroke();
       if (!mini) {
-        ctx.fillText(`↕ ${index + 1}번 줄`, 0.3, row - 5 / scale);
+        ctx.fillText(`↕ ${this.kind === 'manta' ? '만타 ' : ''}${index + 1}번 줄`, 0.3, row - 5 / scale);
         ctx.save();
         ctx.globalAlpha = 0.35;
         ctx.translate(0, row);
@@ -98,13 +103,14 @@ export class DolphinRenderer {
     view: View,
     preview = false
   ) {
-    if (!settings.enabled) return;
+    const options = animalOptions(settings, this.kind);
+    if (!options?.enabled) return;
     const transform = ctx.getTransform(),
-      factor = dolphinScale(settings);
+      factor = dolphinScale(options);
     this.load(Math.ceil((DOLPHIN_WIDTH * factor * Math.hypot(transform.a, transform.b)) / 128) * 128);
-    const waves = dolphinWaves(settings, elapsed, preview);
+    const waves = animalWaves(settings, elapsed, preview).filter((wave) => wave.kind === this.kind);
     if (!waves.length) return;
-    if (this.width !== (stage.width ?? 26) || this.effectScale !== factor) {
+    if (this.kind === 'dolphin' && (this.width !== (stage.width ?? 26) || this.effectScale !== factor)) {
       this.width = stage.width ?? 26;
       this.effectScale = factor;
       this.events = Array.from({ length: 6 }, (_, i) => {
@@ -115,21 +121,21 @@ export class DolphinRenderer {
           hi = (hop + (exiting ? DOLPHIN_SWIM / 2 : 1 - DOLPHIN_SWIM / 2)) * period;
         for (let j = 0; j < 24; j++) {
           const at = (lo + hi) / 2,
-            p = dolphinPose(stage, 0, at, 1, factor),
+            p = animalPose(this.kind)(stage, 0, at, 1, factor),
             front = p.y + ((Math.sin(p.angle) * 62) / 36) * factor;
           if (exiting ? front > 0 : front < 0) lo = at;
           else hi = at;
         }
         const at = (lo + hi) / 2,
-          p = dolphinPose(stage, 0, at, 1, factor);
+          p = animalPose(this.kind)(stage, 0, at, 1, factor);
         return { at, x: p.x + ((Math.cos(p.angle) * 62) / 36) * factor };
       });
     }
     for (const { time, wave } of waves)
-      settings.rows.forEach((row, index) => {
+      options.rows.forEach((row, index) => {
         if (row < view.top - 3 * factor || row > view.bottom + 5 * factor) return;
-        const direction = (wave + index) % 2 ? -1 : 1,
-          p = dolphinPose(stage, row, time, direction, factor);
+        const direction: 1 | -1 = (wave + index) % 2 ? -1 : 1;
+        const p = animalPose(this.kind)(stage, row, time, direction, factor);
         ctx.save();
         for (const event of this.events) {
           const age = time - event.at;
@@ -152,9 +158,11 @@ export class DolphinRenderer {
         }
         ctx.globalAlpha = 1;
         if (time <= DOLPHIN_DURATION && p.x + 3 * factor >= view.left && p.x - 3 * factor <= view.right) {
-          ctx.beginPath();
-          ctx.rect(view.left, view.top, view.right - view.left, Math.max(0, row - view.top));
-          ctx.clip();
+          if (this.kind === 'dolphin') {
+            ctx.beginPath();
+            ctx.rect(view.left, view.top, view.right - view.left, Math.max(0, row - view.top));
+            ctx.clip();
+          }
           ctx.translate(p.x, p.y);
           ctx.scale(direction * factor, factor);
           ctx.rotate(p.angle);

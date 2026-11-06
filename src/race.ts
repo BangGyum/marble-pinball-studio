@@ -5,18 +5,9 @@ import type { StageDef } from './data/maps';
 import { shuffled, type WinnerOrder } from './model';
 import { WallGuard, WALL_GUARD_MAX_SPEED } from './wall-guard';
 import { finishFraction, raceProgress } from './finish';
-import {
-  dolphinBounce,
-  dolphinContact,
-  dolphinPose,
-  dolphinScale,
-  dolphinWaves,
-  DOLPHIN_DURATION,
-  DOLPHIN_WIDTH,
-  validateDolphins,
-  type DolphinSettings,
-} from './dolphin';
-import { DOLPHIN_HEIGHT } from './dolphin-hitbox';
+import { dolphinBounce, dolphinContact, validateDolphins, type DolphinSettings } from './dolphin';
+import { animalPoses, animalsEnabled } from './sea-animals';
+import { mantaContact } from './manta-hitbox';
 
 export type Ball = {
   id: number;
@@ -190,7 +181,7 @@ export class Race {
   advance() {
     this.physics.step(
       STEP,
-      this.dolphins.enabled ? (dt, offset) => this.stepDolphins(dt, this.elapsed + offset) : undefined
+      animalsEnabled(this.dolphins) ? (dt, offset) => this.stepDolphins(dt, this.elapsed + offset) : undefined
     );
     this.elapsed += STEP;
     const crossing: { ball: Ball; fraction: number }[] = [];
@@ -280,33 +271,9 @@ export class Race {
     this.physics.removeMarble(ball.id);
   }
   private stepDolphins(dt: number, elapsed: number) {
-    const scale = dolphinScale(this.dolphins),
-      speed = this.dolphins.speed ?? 1;
     const touching = this.dolphinNextContacts;
     touching.clear();
-    const poses = dolphinWaves(this.dolphins, elapsed).flatMap(({ wave, time }) => {
-      if (time + dt * speed > DOLPHIN_DURATION) return [];
-      return this.dolphins.rows.map((row, index) => {
-        const direction = (wave + index) % 2 ? -1 : 1;
-        const before = dolphinPose(this.stage, row, time, direction, scale),
-          p = dolphinPose(this.stage, row, time + dt * speed, direction, scale);
-        const motion = {
-          vx: (p.x - before.x) / dt,
-          vy: (p.y - before.y) / dt,
-          omega: (direction * Math.atan2(Math.sin(p.angle - before.angle), Math.cos(p.angle - before.angle))) / dt,
-        };
-        const c = Math.abs(Math.cos(p.angle)),
-          s = Math.abs(Math.sin(p.angle));
-        return {
-          p,
-          motion,
-          wave,
-          index,
-          halfWidth: ((DOLPHIN_WIDTH * c + DOLPHIN_HEIGHT * s) * scale) / 2 + 0.25,
-          halfHeight: ((DOLPHIN_WIDTH * s + DOLPHIN_HEIGHT * c) * scale) / 2 + 0.25,
-        };
-      });
-    });
+    const poses = animalPoses(this.dolphins, this.stage, elapsed, dt);
     if (!poses.length) {
       this.dolphinContacts.clear();
       return;
@@ -314,13 +281,13 @@ export class Race {
     for (const ball of this.balls) {
       if (ball.rank) continue;
       const pos = this.physics.getMarblePosition(ball.id);
-      for (const { p, motion, wave, index, halfWidth, halfHeight } of poses) {
+      for (const { kind, p, motion, wave, index, halfWidth, halfHeight } of poses) {
         if (Math.abs(pos.x - p.x) > halfWidth || Math.abs(pos.y - p.y) > halfHeight || pos.y > p.waterY + 0.25)
           continue;
         // Only real outline contacts need WASM velocities and restitution tracking.
-        const surface = dolphinContact(pos, p);
+        const surface = kind === 'manta' ? mantaContact(pos, p) : dolphinContact(pos, p);
         if (!surface) continue;
-        const key = `${wave}:${index}:${ball.id}`,
+        const key = `${kind === 'manta' ? 'manta:' : ''}${wave}:${index}:${ball.id}`,
           alreadyHit = this.dolphinContacts.has(key);
         const contact = dolphinBounce(
           { ...pos, ...this.physics.getMarbleVelocity(ball.id) },

@@ -9,7 +9,7 @@ import { MapLibrary } from '../map-library';
 import { el, toast, message, STALLED_MESSAGE } from '../ui';
 import type { Command, Frame, Identity, Info, Scene, ServerMessage, Settings } from './protocol';
 import { decodeScene, serializeCommand } from './protocol';
-import { DolphinSettingsPanel } from '../dolphin-settings';
+import { SeaAnimalSettingsPanel } from '../sea-animal-settings';
 import '../dolphin.css';
 import { validateDolphins } from '../dolphin';
 import { initMarbleDesign } from '../marble-design';
@@ -38,14 +38,14 @@ let preferredPicks = 2,
 const library = new MapLibrary(stages, hiddenStages);
 let inputTimer: ReturnType<typeof setTimeout>, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
-const dolphinPanel = new DolphinSettingsPanel(
+const dolphinPanel = new SeaAnimalSettingsPanel(
   el('dolphin-settings'),
   (settings, commit) => {
     view.setDolphins(settings);
     if (commit) void prepareUI();
   },
   (show) => view.setDolphinPreview(show),
-  () => view.showDolphinLayout()
+  (kind) => view.showDolphinLayout(true, kind)
 );
 view.onDolphinChange = (settings, commit) => {
   dolphinPanel.moved(settings);

@@ -1,0 +1,10 @@
+{
+  "source": "src/assets/effects/manta-v1/manta.png",
+  "sha256": "469ff4765cbec6efcac30650a72fa0cbf3836b80ee23fa6e6e9fcd4128aa799e",
+  "sourceRect": [88, 31, 1602, 830],
+  "alphaThreshold": 128,
+  "contourTolerancePixels": 1.25,
+  "rawVertices": 5632,
+  "vertices": 152,
+  "areaError": 9.934250944407408e-5
+}

@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-06",
+  "scope": "In-app browser direct play, standalone and built LAN UI, plus targeted regression tests",
+  "fixed": "Reduced-motion preview used the first dolphin slot even when editing manta; now seeks the selected species midpoint at its configured speed.",
+  "manualChecks": {
+    "marbles": 100,
+    "allArrived": true,
+    "pauseAndResume": true,
+    "pausedSettingsLocked": true,
+    "resetRetainsMantaOptions": true,
+    "disableDolphinRetainsManta": true,
+    "reducedMotionSelectedMantaVisible": true,
+    "builtLanReducedMotionSelectedMantaVisible": true,
+    "originalParticipantNamesRestored": true,
+    "temporaryMediaOverridesRestored": true,
+    "browserConsoleErrors": 0
+  },
+  "regressions": {
+    "staticPreviewSpeedCombinations": 18,
+    "sourceAlphaSamples": 61771,
+    "transformedHitboxContacts": 4560,
+    "referenceCollisionCases": 6000,
+    "actualMantaReflections": 18,
+    "mapRuns": 38,
+    "mapRunScope": "19 maps, manta-only and alternating, 100 marbles, 6 rows, 12 simulated seconds",
+    "lanSuite": "passed",
+    "renderPerformanceInteractionControls": "passed",
+    "typeCheckLintStandaloneBuildLanBuild": "passed"
+  }
+}

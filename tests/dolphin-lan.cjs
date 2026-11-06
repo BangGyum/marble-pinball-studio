@@ -64,7 +64,14 @@ async function connect(port, host = false) {
     const host = await connect(app.port, true),
       guest = await connect(app.port);
     clients.push(host, guest);
-    const dolphins = { enabled: true, rows: [12, 22, 32], interval: 5, size: 150, speed: 0.5 };
+    const dolphins = {
+      enabled: true,
+      rows: [12, 22, 32],
+      interval: 5,
+      size: 150,
+      speed: 0.5,
+      manta: { enabled: true, rows: [15, 25], interval: 7, size: 80, speed: 1.3 },
+    };
     const settings = { names: 'a,b,c,d', mapId: 0, order: 'asc', picks: 1, dolphins };
     assert.equal(
       (await guest.command({ type: 'configure', settings })).ok,
@@ -111,13 +118,18 @@ async function connect(port, host = false) {
       { ...dolphins, speed: 1.51 },
       { ...dolphins, speed: '1' },
       { ...dolphins, speed: null },
+      { ...dolphins, manta: null },
+      { ...dolphins, manta: { ...dolphins.manta, rows: [999] } },
+      { ...dolphins, manta: { ...dolphins.manta, speed: 2 } },
+      { ...dolphins, manta: { ...dolphins.manta, unexpected: true } },
+      { ...dolphins, manta: { ...dolphins.manta, manta: {} } },
     ]) {
       assert.equal((await host.command({ type: 'configure', settings: { ...settings, dolphins: invalid } })).ok, false);
       assert.equal(host.scene.raceId, raceId, 'invalid settings preserve the prepared race');
     }
     assert.equal((await host.command({ type: 'start' })).ok, true);
     assert.equal((await host.command({ type: 'configure', settings })).ok, false, 'settings are locked during a race');
-    for (let i = 0; i < 510 && app.race.state === 'running'; i++) app.race.advance();
+    for (let i = 0; i < 660 && app.race.state === 'running'; i++) app.race.advance();
     const late = await connect(app.port);
     clients.push(late);
     assert.deepEqual(late.scene.settings.dolphins, dolphins, 'late join receives row positions and interval');
