@@ -82,6 +82,7 @@ async function run() {
     physics,
     springControls: { reset() {} },
     springCooldowns: { reset() {} },
+    dolphinRenderer: { kind: 'dolphin' },
     recorder: { stop() {} },
     onZoomChange() {},
     render() {},
