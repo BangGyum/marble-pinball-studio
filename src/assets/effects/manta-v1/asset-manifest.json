@@ -1,0 +1,29 @@
+{
+  "name": "만타가오리",
+  "version": 1,
+  "created": "2026-11-06",
+  "status": "game-and-lan-effect",
+  "generatedWith": "Codex built-in image_gen; transparent_background=true",
+  "reference": "../dolphin-v1/dolphin-tail-fixed.png (style only)",
+  "file": "manta.png",
+  "prompt": "prompt.txt",
+  "size": [1774, 887],
+  "sourceRect": [88, 31, 1602, 830],
+  "pivot": [0.5, 0.5],
+  "facing": "right",
+  "leftDirection": "mirror horizontally at render time",
+  "worldWidth": 4,
+  "previewBaseScale": 3,
+  "hitbox": {
+    "source": "PNG alpha >= 128",
+    "generatedBy": "scripts/trace-manta-hitbox.py",
+    "data": "src/data/manta-outline.ts",
+    "contact": "src/manta-hitbox.ts",
+    "vertices": 152,
+    "contourTolerancePixels": 1.25,
+    "areaErrorPercent": 0.009934250944407408,
+    "marbleRadius": 0.25
+  },
+  "preview": "tests/manta-preview.html",
+  "scope": "일반 경기·설정·LAN에 연결. 돌고래/만타 개별 설정과 번갈아 출몰. 기존 독립 디자인 미리보기 보존."
+}

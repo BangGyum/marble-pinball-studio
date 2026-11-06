@@ -14,17 +14,19 @@ export class DolphinSettingsPanel {
     private root: HTMLElement,
     private change: (settings: DolphinSettings, commit: boolean) => void,
     private previewChange: (show: boolean) => void,
-    private overview: () => void
+    private overview: () => void,
+    kind: 'dolphin' | 'manta' = 'dolphin'
   ) {
     root.classList.add('dolphin-settings');
-    root.innerHTML = `<div class="dolphin-heading"><label><strong>돌고래 효과</strong> <input data-dolphin="enabled" type="checkbox" role="switch" aria-label="돌고래 효과" /></label></div>
-      <fieldset data-dolphin="fields" hidden><div class="dolphin-field"><label for="dolphin-count">줄 개수</label><div class="dolphin-stepper"><button data-dolphin="minus" type="button" aria-label="돌고래 줄 줄이기">−</button><input id="dolphin-count" data-dolphin="count" type="number" min="1" max="6" value="3" /><button data-dolphin="plus" type="button" aria-label="돌고래 줄 늘리기">＋</button></div></div>
-      <div class="dolphin-field"><label for="dolphin-gap">균등 간격</label><div class="dolphin-spacing"><input data-dolphin="slider" type="range" min="0.5" max="100" step="0.5" value="20" aria-label="돌고래 줄 간격" /><input id="dolphin-gap" data-dolphin="gap" type="number" min="0.5" max="100" step="0.5" value="20" /><span>칸</span></div></div>
-      <div class="dolphin-field"><label for="dolphin-interval">출몰 간격</label><div class="inline"><input id="dolphin-interval" data-dolphin="interval" type="number" min="5" max="120" step="1" value="5" /><span>초</span></div></div>
-      <div class="dolphin-field"><label for="dolphin-size">크기</label><div class="dolphin-spacing"><input data-dolphin="size-slider" type="range" min="50" max="200" step="1" value="100" aria-label="돌고래 크기" /><input id="dolphin-size" data-dolphin="size" type="number" min="50" max="200" step="1" value="100" /><span>%</span></div></div>
-      <div class="dolphin-field"><label for="dolphin-speed">이동 속도</label><div class="dolphin-spacing"><input data-dolphin="speed-slider" type="range" min="0.5" max="1.5" step="0.1" value="1" aria-label="돌고래 이동 속도" /><input id="dolphin-speed" data-dolphin="speed" type="number" min="0.5" max="1.5" step="0.1" value="1" /><span>배</span></div></div>
-      <div class="dolphin-preview"><label class="check"><input data-dolphin="preview" type="checkbox" checked /> 움직이는 미리보기</label><button data-dolphin="overview" type="button">전체 배치 보기</button></div>
-      <p data-dolphin="hint">점선을 위아래로 드래그해 줄마다 위치를 바꿀 수 있어요.</p><p class="muted">미리보기는 공을 건드리지 않고 계속 재생돼요. 실제 경기에서는 시작과 함께 등장하고, 설정한 출몰 간격을 따라요. 이동 속도는 돌고래에만 적용돼요. 느린 속도에서는 다음 출몰과 겹칠 수 있어요. 출몰 간격은 배속이 적용된 경기 시간 기준입니다.</p></fieldset>`;
+    const label = kind === 'manta' ? '만타가오리' : '돌고래';
+    root.innerHTML = `<div class="dolphin-heading"><label><strong>${label} 효과</strong> <input data-dolphin="enabled" type="checkbox" role="switch" aria-label="${label} 효과" /></label></div>
+      <fieldset data-dolphin="fields" hidden><div class="dolphin-field"><label for="${kind}-count">줄 개수</label><div class="dolphin-stepper"><button data-dolphin="minus" type="button" aria-label="${label} 줄 줄이기">−</button><input id="${kind}-count" data-dolphin="count" type="number" min="1" max="6" value="3" /><button data-dolphin="plus" type="button" aria-label="${label} 줄 늘리기">＋</button></div></div>
+      <div class="dolphin-field"><label for="${kind}-gap">균등 간격</label><div class="dolphin-spacing"><input data-dolphin="slider" type="range" min="0.5" max="100" step="0.5" value="20" aria-label="${label} 줄 간격" /><input id="${kind}-gap" data-dolphin="gap" type="number" min="0.5" max="100" step="0.5" value="20" /><span>칸</span></div></div>
+      <div class="dolphin-field"><label for="${kind}-interval">출몰 간격</label><div class="inline"><input id="${kind}-interval" data-dolphin="interval" type="number" min="5" max="120" step="1" value="5" /><span>초</span></div></div>
+      <div class="dolphin-field"><label for="${kind}-size">크기</label><div class="dolphin-spacing"><input data-dolphin="size-slider" type="range" min="50" max="200" step="1" value="100" aria-label="${label} 크기" /><input id="${kind}-size" data-dolphin="size" type="number" min="50" max="200" step="1" value="100" /><span>%</span></div></div>
+      <div class="dolphin-field"><label for="${kind}-speed">이동 속도</label><div class="dolphin-spacing"><input data-dolphin="speed-slider" type="range" min="0.5" max="1.5" step="0.1" value="1" aria-label="${label} 이동 속도" /><input id="${kind}-speed" data-dolphin="speed" type="number" min="0.5" max="1.5" step="0.1" value="1" /><span>배</span></div></div>
+      <div class="dolphin-preview"><label class="check"><input data-dolphin="preview" type="checkbox" checked /> 움직이는 미리보기</label><button data-dolphin="overview" type="button">${label} 배치 보기</button></div>
+      <p data-dolphin="hint">점선을 위아래로 드래그해 줄마다 위치를 바꿀 수 있어요.</p><p class="muted">미리보기는 공을 건드리지 않고 계속 재생돼요. 실제 경기에서는 시작과 함께 등장하고, 설정한 출몰 간격을 따라요. 이동 속도는 ${label}에만 적용돼요. 느린 속도에서는 다음 출몰과 겹칠 수 있어요. 출몰 간격은 배속이 적용된 경기 시간 기준입니다.</p></fieldset>`;
     const notify = (commit: boolean) => {
       this.sync();
       this.change(this.value, commit);

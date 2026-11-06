@@ -10,7 +10,7 @@ import { MapGallery } from './map-gallery';
 import { initTheme } from './theme';
 import { initMarbleDesign } from './marble-design';
 import { ViewHistory } from './view-history';
-import { DolphinSettingsPanel } from './dolphin-settings';
+import { SeaAnimalSettingsPanel } from './sea-animal-settings';
 import './dolphin.css';
 
 initTheme();
@@ -62,7 +62,7 @@ winnerCount.addEventListener('change', () => (preferredWinnerCount = Number(winn
 const initialMapIndex = DEFAULT_MAP_INDEX;
 let currentStage: StageDef = stages[initialMapIndex];
 let initialized = false;
-const dolphinPanel = new DolphinSettingsPanel(
+const dolphinPanel = new SeaAnimalSettingsPanel(
   el('dolphin-settings'),
   (settings) => {
     if (!initialized) return;
@@ -70,7 +70,7 @@ const dolphinPanel = new DolphinSettingsPanel(
     game.setDolphins(settings);
   },
   (show) => game.setDolphinPreview(show),
-  () => game.showDolphinLayout()
+  (kind) => game.showDolphinLayout(kind)
 );
 game.onDolphinChange = (settings) => dolphinPanel.moved(settings);
 const gameView = el('game-view'),

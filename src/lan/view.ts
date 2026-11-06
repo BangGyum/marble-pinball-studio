@@ -16,7 +16,8 @@ import type { Ball } from '../race';
 import type { StageDef } from '../data/maps';
 import type { MapEntityState } from '../types/map-entity';
 import { DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from '../dolphin';
-import { DolphinRenderer } from '../dolphin-render';
+import { SeaAnimalRenderer as DolphinRenderer } from '../sea-animal-render';
+import type { AnimalKind } from '../sea-animals';
 import { DolphinDrag } from '../dolphin-drag';
 
 export class LanView {
@@ -88,12 +89,14 @@ export class LanView {
     this.dolphinDrag = new DolphinDrag(
       canvas,
       () => this.canControl && this.state === 'ready' && this.dolphinPreview,
-      () => this.dolphins,
+      () => (this.dolphinRenderer.kind === 'manta' ? this.dolphins.manta! : this.dolphins),
       () => this.scene?.stage,
       (index, y, commit) => {
-        const rows = [...this.dolphins.rows];
+        const manta = this.dolphinRenderer.kind === 'manta';
+        const options = manta ? this.dolphins.manta! : this.dolphins;
+        const rows = [...options.rows];
         rows[index] = y;
-        this.setDolphins({ ...this.dolphins, rows });
+        this.setDolphins(manta ? { ...this.dolphins, manta: { ...options, rows } } : { ...this.dolphins, rows });
         this.onDolphinChange(this.dolphins, commit);
       }
     );
@@ -172,11 +175,13 @@ export class LanView {
   setDolphins(settings: DolphinSettings) {
     if (this.state !== 'ready' || !this.scene || !this.canControl) return;
     this.dolphinDraft = validateDolphins(settings, this.scene.stage);
-    if (!settings.enabled && this.dolphinOverview) {
+    if (!(this.dolphinRenderer.kind === 'manta' ? settings.manta?.enabled : settings.enabled) && this.dolphinOverview) {
       this.dolphinOverview = false;
       this.camera = { ...this.readyCamera };
       this.manual = null;
     }
+    if (!(this.dolphinRenderer.kind === 'manta' ? settings.manta?.enabled : settings.enabled))
+      this.dolphinRenderer.kind = settings.enabled ? 'dolphin' : settings.manta?.enabled ? 'manta' : 'dolphin';
     this.renderDirty = true;
   }
   setDolphinPreview(show: boolean) {
@@ -184,8 +189,14 @@ export class LanView {
     this.dolphinPreviewLast = 0;
     this.renderDirty = true;
   }
-  showDolphinLayout(resetZoom = true) {
-    if (this.state !== 'ready' || !this.scene || !this.dolphins.enabled) return;
+  showDolphinLayout(resetZoom = true, kind?: AnimalKind) {
+    if (kind) this.dolphinRenderer.kind = kind;
+    if (
+      this.state !== 'ready' ||
+      !this.scene ||
+      !(this.dolphinRenderer.kind === 'manta' ? this.dolphins.manta?.enabled : this.dolphins.enabled)
+    )
+      return;
     this.dolphinOverview = true;
     this.manual = null;
     if (resetZoom) {
@@ -232,7 +243,13 @@ export class LanView {
   }
   setScene(scene: Scene) {
     this.dolphinDraft = undefined;
-    if (!scene.settings.dolphins?.enabled) this.dolphinOverview = false;
+    if (!scene.settings.dolphins?.manta?.enabled) this.dolphinRenderer.kind = 'dolphin';
+    if (
+      !(this.dolphinRenderer.kind === 'manta'
+        ? scene.settings.dolphins?.manta?.enabled
+        : scene.settings.dolphins?.enabled)
+    )
+      this.dolphinOverview = false;
     if (this.scene?.raceId !== scene.raceId || this.scene.revision !== scene.revision) {
       this.marbleElasticity.reset();
       this.elasticFrameSeq = -1;
@@ -263,7 +280,7 @@ export class LanView {
     this.springControls.reset();
     this.scene = scene;
     this.playback.reset();
-    if (this.dolphinOverview && this.dolphins.enabled && this.state === 'ready') this.showDolphinLayout(false);
+    if (this.dolphinOverview && this.state === 'ready') this.showDolphinLayout(false);
     this.renderDirty = true;
     this.entities = scene.entities.map((entity) => ({ ...entity }));
     this.positions = new WeakMap();
@@ -327,7 +344,7 @@ export class LanView {
     const previewing =
       this.state === 'ready' &&
       this.dolphinPreview &&
-      this.dolphins?.enabled &&
+      (this.dolphins?.enabled || this.dolphins?.manta?.enabled) &&
       !this.reducedMotion?.matches &&
       (typeof document === 'undefined' || !document.hidden);
     if (previewing) {
@@ -496,7 +513,11 @@ export class LanView {
           ctx,
           scene.stage,
           this.dolphins,
-          this.reducedMotion?.matches ? DOLPHIN_DURATION / 2 : this.dolphinPreviewElapsed,
+          this.dolphinRenderer.previewTime(
+            this.dolphins,
+            this.dolphinPreviewElapsed,
+            this.reducedMotion?.matches ?? false
+          ),
           view,
           true
         );
