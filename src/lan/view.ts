@@ -19,6 +19,8 @@ import { DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from '../dol
 import { SeaAnimalRenderer as DolphinRenderer } from '../sea-animal-render';
 import type { AnimalKind } from '../sea-animals';
 import { DolphinDrag } from '../dolphin-drag';
+import { PersonalSpringPlacement, drawPlacedSprings } from './spring-placement';
+import type { SpringPlacement } from '../personal-spring';
 
 export class LanView {
   private focusedId: number | null = null;
@@ -31,6 +33,13 @@ export class LanView {
   }
   canControl = false;
   onSpring: (index: number) => void = () => {};
+  onPlaceSpring: (placement: SpringPlacement) => void = () => {};
+  onUseSpring: () => void = () => {};
+  onPlacementChange: () => void = () => {};
+  readonly springPlacement = new PersonalSpringPlacement();
+  personalSpring?: Frame['personalSpring'];
+  springConnected = false;
+  private springView = { x: 0, y: 0, scale: 1 };
   private springControls: SpringControls;
   zoom = 1;
   celebrationRightInset = 18;
@@ -88,7 +97,7 @@ export class LanView {
   constructor(readonly canvas: HTMLCanvasElement) {
     this.dolphinDrag = new DolphinDrag(
       canvas,
-      () => this.canControl && this.state === 'ready' && this.dolphinPreview,
+      () => this.canControl && this.state === 'ready' && this.dolphinPreview && !this.springPlacement.active,
       () => (this.dolphinRenderer.kind === 'manta' ? this.dolphins.manta! : this.dolphins),
       () => this.scene?.stage,
       (index, y, commit) => {
@@ -128,6 +137,22 @@ export class LanView {
     };
     const release = () => this.onBoost(false);
     canvas.addEventListener('pointerdown', (event) => {
+      if (this.springPlacement.active) {
+        if (event.isPrimary === false || (event.button !== 0 && event.pointerType !== 'touch') || !this.springConnected)
+          return;
+        event.preventDefault();
+        try {
+          const placement = this.springPlacement.choose(this.springPoint(event));
+          if (placement) {
+            this.cancelSpringPlacement();
+            this.onPlaceSpring(placement);
+          } else this.onPlacementChange();
+        } catch (error) {
+          toast(error instanceof Error ? error.message : String(error));
+        }
+        this.renderDirty = true;
+        return;
+      }
       if (this.springControls.select(event)) {
         release();
         this.renderDirty = true;
@@ -140,6 +165,12 @@ export class LanView {
       }
     });
     canvas.addEventListener('pointermove', (event) => {
+      if (this.springPlacement.active) {
+        if (event.isPrimary === false) return;
+        this.springPlacement.move(this.springPoint(event));
+        this.renderDirty = true;
+        return;
+      }
       if (event.pointerType === 'mouse' && !(event.buttons & 1)) release();
       if (event.pointerType !== 'touch') followMinimap(event);
     });
@@ -153,6 +184,33 @@ export class LanView {
       this.follow();
     });
     window.addEventListener('blur', release);
+    window.addEventListener(
+      'keydown',
+      (event) => {
+        if (event.key === 'Escape' && this.springPlacement.active) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          this.cancelSpringPlacement();
+          return;
+        }
+        const target = event.target as HTMLElement | null;
+        if (
+          event.code !== 'Space' ||
+          target?.isContentEditable ||
+          ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName ?? '') ||
+          document.querySelector('dialog[open]')
+        )
+          return;
+        if (!this.springPlacement.active && this.springControls.selected >= 0) return;
+        if (this.springPlacement.active || this.personalSpring?.state === 'placed') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (!event.repeat && !this.springPlacement.active && this.springConnected && this.state === 'running')
+            this.onUseSpring();
+        }
+      },
+      { capture: true }
+    );
     canvas.addEventListener(
       'wheel',
       (event) => {
@@ -171,6 +229,33 @@ export class LanView {
   }
   get arrivals() {
     return this.balls.filter((ball) => ball.rank).sort((a, b) => a.rank! - b.rank!);
+  }
+  beginSpringPlacement() {
+    if (!this.scene || !this.springConnected || this.personalSpring?.state !== 'available' || this.state === 'finished')
+      return;
+    this.springPlacement.begin(this.scene.stage);
+    this.springControls.selected = -1;
+    this.dolphinOverview = false;
+    this.onBoost(false);
+    this.manual = null;
+    this.setZoom(1);
+    this.onPlacementChange();
+  }
+  cancelSpringPlacement() {
+    this.springPlacement.cancel();
+    if (this.state === 'ready') this.camera = { ...this.readyCamera };
+    this.renderDirty = true;
+    this.onPlacementChange();
+  }
+  private springPoint(event: PointerEvent) {
+    const rect = this.canvas.getBoundingClientRect(),
+      x = event.clientX - rect.left,
+      y = event.clientY - rect.top,
+      m = this.minimap,
+      t = this.springView;
+    return x >= m.x && x <= m.x + m.w && y >= m.y && y <= m.y + m.h
+      ? { x: (x - m.x) / m.scale, y: (y - m.y) / m.scale }
+      : { x: (x - t.x) / t.scale, y: (y - t.y) / t.scale };
   }
   setDolphins(settings: DolphinSettings) {
     if (this.state !== 'ready' || !this.scene || !this.canControl) return;
@@ -242,6 +327,10 @@ export class LanView {
     }
   }
   setScene(scene: Scene) {
+    const keepPlayback =
+      this.scene?.raceId === scene.raceId &&
+      JSON.stringify(this.scene.settings) === JSON.stringify(scene.settings) &&
+      JSON.stringify(this.scene.entities) === JSON.stringify(scene.entities);
     this.dolphinDraft = undefined;
     if (!scene.settings.dolphins?.manta?.enabled) this.dolphinRenderer.kind = 'dolphin';
     if (
@@ -250,11 +339,13 @@ export class LanView {
         : scene.settings.dolphins?.enabled)
     )
       this.dolphinOverview = false;
-    if (this.scene?.raceId !== scene.raceId || this.scene.revision !== scene.revision) {
+    if (!keepPlayback && (this.scene?.raceId !== scene.raceId || this.scene.revision !== scene.revision)) {
       this.marbleElasticity.reset();
       this.elasticFrameSeq = -1;
     }
     if (this.scene?.raceId !== scene.raceId) {
+      this.springPlacement?.cancel();
+      this.personalSpring = undefined;
       if (this.scene && JSON.stringify(this.scene.stage) !== JSON.stringify(scene.stage)) this.setZoom(1);
       this.goalScale = 0;
       this.goalFollow = false;
@@ -279,7 +370,7 @@ export class LanView {
     }
     this.springControls.reset();
     this.scene = scene;
-    this.playback.reset();
+    if (!keepPlayback) this.playback.reset();
     if (this.dolphinOverview && this.state === 'ready') this.showDolphinLayout(false);
     this.renderDirty = true;
     this.entities = scene.entities.map((entity) => ({ ...entity }));
@@ -307,6 +398,9 @@ export class LanView {
       this.elasticFrameSeq = -1;
     }
     this.springControls.setStatuses(frame.springs ?? []);
+    this.personalSpring = frame.personalSpring;
+    if (this.springPlacement?.active && (frame.personalSpring?.state !== 'available' || frame.state === 'finished'))
+      this.cancelSpringPlacement();
     if (frame.state === 'running' && this.state === 'ready' && this.dolphinOverview) {
       this.camera = { ...this.readyCamera };
       this.manual = null;
@@ -316,6 +410,15 @@ export class LanView {
     this.playback.push(frame);
   }
   private viewScale() {
+    if (this.springPlacement?.active && this.springPlacement.origin)
+      return Math.min(this.width / 20, this.height / 13, 70) * this.zoom;
+    if (this.springPlacement?.active && this.scene)
+      return (
+        Math.min(
+          Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.scene.stage.width ?? 26) + 4),
+          Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)
+        ) * this.zoom
+      );
     if (this.scene?.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview)) {
       const fitted = Math.min(
         Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.scene.stage.width ?? 26) + 4),
@@ -447,7 +550,12 @@ export class LanView {
       this.cameraMoving = Math.abs(desired - this.goalScale) > 0.01;
     }
     const scale = this.viewScale();
-    if (
+    if (this.springPlacement?.active) {
+      this.camera = this.springPlacement.origin ?? {
+        x: (scene.stage.width ?? 26) / 2,
+        y: scene.stage.goalY / 2 - (h * 0.07) / scale,
+      };
+    } else if (
       scene.stage.goalArea &&
       (this.state === 'ready' ? this.dolphinOverview : overview) &&
       !this.manual &&
@@ -460,6 +568,7 @@ export class LanView {
       this.cameraMoving ||= Math.abs(target.x - this.camera.x) + Math.abs(target.y - this.camera.y) > 0.01;
     }
     const cam = this.manual ?? this.camera;
+    this.springView = { x: w * 0.56 - cam.x * scale, y: h * 0.43 - cam.y * scale, scale };
     const view = {
       left: cam.x - (w * 0.56) / scale,
       right: cam.x + (w * 0.44) / scale,
@@ -506,6 +615,19 @@ export class LanView {
     }
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
     drawMapOverlay(ctx, scene.stage, entities, scale, true, view);
+    if (scene.stage.art?.style === 'reversal-ladder')
+      drawEntities(
+        ctx,
+        entities.filter(
+          (entity) =>
+            entity.shape.type === 'box' &&
+            entity.shape.spring &&
+            !scene.stage.entities?.some((definition) => definition.shape === entity.shape)
+        ),
+        scale
+      );
+    drawPlacedSprings(ctx, scene.stage, scene.placedSprings ?? [], this.personalSpring?.id, scale);
+    this.springPlacement?.draw(ctx, scale);
     if (this.state === 'ready') {
       if (this.dolphinPreview) {
         this.dolphinRenderer.guides(ctx, scene.stage, this.dolphins, scale);

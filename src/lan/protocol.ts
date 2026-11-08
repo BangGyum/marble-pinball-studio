@@ -2,6 +2,7 @@ import type { StageDef } from '../data/maps';
 import type { WinnerOrder } from '../model';
 import type { EntityShape, MapEntityState } from '../types/map-entity';
 import type { DolphinSettings } from '../dolphin';
+import type { PlacedSpring, SpringPlacement } from '../personal-spring';
 export const LAN_PORT = 43190;
 export const MAX_LAN_MESSAGE_BYTES = 1024 * 1024;
 export type Settings = {
@@ -21,6 +22,7 @@ export type Scene = {
   entities: MapEntityState[];
   fixed: boolean[];
   balls: { id: number; name: string; color: string }[];
+  placedSprings?: PlacedSpring[];
 };
 type WireEntity = Omit<MapEntityState, 'shape'> & { shapeIndex?: number; shape?: EntityShape };
 export type WireScene = Omit<Scene, 'settings' | 'entities'> & {
@@ -73,6 +75,7 @@ export type Frame = {
   bridgeIds?: number[];
   // Per-recipient real-time cooldown remaining in milliseconds, and physical return lock.
   springs?: [index: number, remainingMs: number, busy: boolean][];
+  personalSpring?: { state: 'available' | 'placed' | 'used'; id?: string };
   // Remaining marbles were trapped and ranked by depth.
   stalled?: boolean;
 };
@@ -84,6 +87,8 @@ export type Command = { requestId: string; raceId: string } & (
   | { type: 'speed'; value: number }
   | { type: 'boost'; active: boolean }
   | { type: 'spring'; index: number; revision: number }
+  | ({ type: 'place-spring' } & SpringPlacement)
+  | { type: 'use-spring' }
 );
 export type CommandResult = { type: 'result'; requestId: string; ok: boolean; error?: string };
 export type ServerMessage = WireScene | Frame | Identity | CommandResult;

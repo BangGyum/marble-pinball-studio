@@ -1,5 +1,5 @@
 import type { StageDef } from './data/maps';
-import type { MapEntityState } from './types/map-entity';
+import type { EntityBoxShape, MapEntity, MapEntityState } from './types/map-entity';
 
 export interface IPhysics {
   init(): Promise<void>;
@@ -11,6 +11,10 @@ export interface IPhysics {
   clearMarbles(): void;
 
   createStage(stage: StageDef): void;
+
+  createEntities(entities: MapEntity[]): void;
+
+  removeSpring(shape: EntityBoxShape): void;
 
   createMarble(id: number, x: number, y: number): void;
 

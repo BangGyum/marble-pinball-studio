@@ -172,6 +172,7 @@ const ctx = Object.fromEntries(
     'save',
     'restore',
     'translate',
+    'rotate',
     'scale',
     'beginPath',
     'moveTo',
@@ -188,6 +189,7 @@ const ctx = Object.fromEntries(
   ].map((key) => [key, noop])
 );
 ctx.createRadialGradient = () => ({ addColorStop: noop });
+ctx.createLinearGradient = () => ({ addColorStop: noop });
 const canvas = { getContext: () => ctx, addEventListener: noop };
 const scene = {
   type: 'scene',
@@ -233,6 +235,33 @@ for (const hz of [30, 120, 144])
   assert.ok(Math.abs(cameraAt(hz) - camera60) < 1e-8, 'camera follow speed does not depend on refresh rate');
 console.log('PASS actual LAN renderer interpolation, selected marble and refresh-independent camera');
 
+const metadataView = new LanView(canvas);
+metadataView.setScene(scene);
+metadataView.push(frame(0, 1, 'running', 0));
+metadataView.push(frame(0.2, 2, 'running', 200));
+metadataView.playback.sample(200);
+const timelineBeforePlacement = metadataView.playback.sample(250).elapsed;
+metadataView.setScene({
+  ...structuredClone(scene),
+  revision: 2,
+  placedSprings: [{ id: 'other-player', x: 13, y: 20, direction: 0 }],
+});
+const timelineAfterPlacement = metadataView.playback.sample(250);
+assert.ok(timelineAfterPlacement, 'another player placing a spring cannot clear the visible race');
+assert.equal(
+  timelineAfterPlacement.elapsed,
+  timelineBeforePlacement,
+  'placement-only updates preserve the interpolation cursor'
+);
+metadataView.push({ ...frame(0.3, 3, 'running', 300), revision: 2 });
+assert.ok(
+  metadataView.playback.sample(300).elapsed >= timelineBeforePlacement,
+  'new-revision frames continue on the same timeline'
+);
+metadataView.setScene({ ...structuredClone(scene), raceId: 'next-race', revision: 3 });
+assert.equal(metadataView.playback.sample(300), undefined, 'a genuinely new race still clears old frames');
+console.log('PASS spring placement metadata preserves playback while a new race resets it');
+
 // Translations use the same buffered samples as marbles, including returning to the scene origin.
 ctx.rotate = noop;
 const slideShape = { type: 'box', width: 3, height: 0.3, rotation: 0, color: '#b579ff' };
@@ -252,6 +281,28 @@ assert.equal(drawnEntities[0].x, 10, 'omitted translation returns to scene posit
 slideView.draw(900);
 assert.equal(drawnEntities[0].x, 10, 'paused platforms stay still');
 console.log('PASS actual renderer sliding platform interpolation and pause');
+
+const bufferedSlide = new LanView(canvas);
+const slideScene = { ...scene, entities: [{ x: 10, y: 30, angle: 0, shape: slideShape, life: -1 }], fixed: [false] };
+bufferedSlide.setScene(slideScene);
+let renderedX;
+bufferedSlide.renderMinimap = (entities) => {
+  renderedX = entities[0].x;
+};
+bufferedSlide.playback.push({ ...frame(0, 1), positions: [[0, 12, 30]] }, 0);
+bufferedSlide.playback.push({ ...frame(0.2, 2), positions: [[0, 16, 30]] }, 200);
+bufferedSlide.draw(200);
+const priorX = renderedX;
+bufferedSlide.setScene({
+  ...structuredClone(slideScene),
+  revision: 2,
+  placedSprings: [{ id: 'other', x: 13, y: 40, direction: 0 }],
+});
+bufferedSlide.draw(200);
+assert.equal(renderedX, priorX, 'metadata updates preserve moving-device coordinates and buffered origins');
+bufferedSlide.setScene({ ...slideScene, revision: 3, entities: [{ ...slideScene.entities[0], x: 11 }] });
+assert.equal(bufferedSlide.playback.sample(200), undefined, 'changed physical origins still invalidate the old buffer');
+console.log('PASS moving-device continuity across spring previews and invalidation on real geometry changes');
 
 const pointerHandlers = {},
   windowHandlers = {},
@@ -331,3 +382,95 @@ assert.equal(interactive.zoom, 1);
 console.log(
   'PASS restored minimap hover/touch/follow, host-only mouse acceleration, release/cancel/blur and wheel zoom'
 );
+
+interactive.springConnected = true;
+interactive.personalSpring = { state: 'available' };
+interactive.canControl = false;
+const placed = [],
+  used = [];
+interactive.onPlaceSpring = (value) => placed.push(value);
+interactive.onUseSpring = () => used.push(true);
+interactive.beginSpringPlacement();
+interactive.draw(1000);
+const springPointer = (x, y, pointerType = 'mouse') => ({
+  ...pointer,
+  clientX: 10 + interactive.springView.x + x * interactive.springView.scale,
+  clientY: 20 + interactive.springView.y + y * interactive.springView.scale,
+  pointerType,
+  preventDefault() {},
+});
+pointerHandlers.pointerdown(springPointer(13, 40, 'touch'));
+assert.deepEqual(interactive.springPlacement.origin, { x: 13, y: 40 });
+pointerHandlers.pointerdown({ ...springPointer(16, 40, 'touch'), isPrimary: false });
+assert.equal(placed.length, 0, 'a second finger cannot accidentally confirm the placement');
+pointerHandlers.pointermove({ ...springPointer(1, 1, 'touch'), isPrimary: false });
+assert.deepEqual(interactive.springPlacement.pointer, { x: 13, y: 38 }, 'a second finger cannot rotate the preview');
+const overviewScale = interactive.springView.scale;
+interactive.draw(1010);
+assert.ok(interactive.springView.scale > overviewScale, 'direction step magnifies the selected location on long maps');
+pointerHandlers.pointerdown(springPointer(16, 40, 'touch'));
+assert.equal(placed.length, 1);
+assert.deepEqual(placed[0], { x: 13, y: 40, direction: 0 }, 'two touch taps select position then direction');
+assert.equal(interactive.springPlacement.active, false);
+interactive.beginSpringPlacement();
+windowHandlers.keydown({ key: 'Escape', preventDefault() {}, stopImmediatePropagation() {} });
+assert.equal(interactive.springPlacement.active, false, 'Escape cancels without spending a spring');
+interactive.personalSpring = { state: 'placed', id: 'mine' };
+global.document = { querySelector: () => null };
+const space = (repeat = false, tagName = 'CANVAS') =>
+  windowHandlers.keydown({
+    code: 'Space',
+    repeat,
+    target: { tagName },
+    preventDefault() {},
+    stopImmediatePropagation() {},
+  });
+space();
+space(true);
+space(false, 'TEXTAREA');
+assert.equal(used.length, 1, 'Space fires once, ignores key repeat and typing');
+interactive.springControls.selected = 0;
+space();
+assert.equal(used.length, 1, 'an explicitly selected map spring retains its existing Space control');
+interactive.springControls.selected = -1;
+interactive.state = 'paused';
+space();
+interactive.state = 'running';
+interactive.springConnected = false;
+space();
+assert.equal(used.length, 1, 'pause and disconnect cannot fire');
+console.log('PASS actual LAN two-tap touch placement, cancel, Space priority, repeat/typing/pause/offline guards');
+
+interactive.springConnected = true;
+interactive.personalSpring = { state: 'available' };
+interactive.beginSpringPlacement();
+interactive.springPlacement.choose({ x: 13, y: 40 });
+interactive.setScene({
+  ...structuredClone(scene),
+  revision: 2,
+  placedSprings: [{ id: 'another', x: 13, y: 20, direction: 0 }],
+});
+assert.deepEqual(
+  interactive.springPlacement.origin,
+  { x: 13, y: 40 },
+  'another player placing a spring does not cancel an unfinished direction choice'
+);
+interactive.setScene({ ...structuredClone(scene), raceId: 'replacement-race', revision: 3 });
+assert.equal(interactive.springPlacement.active, false, 'map/reset switches discard the old placement draft');
+assert.equal(interactive.personalSpring, undefined, 'old inventory is cleared until the next authoritative frame');
+interactive.push({
+  ...frame(0, 10, 'ready'),
+  raceId: 'replacement-race',
+  revision: 3,
+  personalSpring: { state: 'available' },
+});
+interactive.beginSpringPlacement();
+interactive.push({
+  ...frame(1, 11, 'finished'),
+  raceId: 'replacement-race',
+  revision: 3,
+  personalSpring: { state: 'available' },
+});
+assert.equal(interactive.springPlacement.active, false, 'race finish cancels an unfinished placement');
+assert.equal(placed.length, 1, 'cancelled drafts never submit an extra placement');
+console.log('PASS other-player updates, mid-draft map/reset changes and finish without unwanted placement');

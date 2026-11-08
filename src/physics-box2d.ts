@@ -5,7 +5,7 @@ import { windPower } from './wind-power';
 import { timedGateAngle } from './timed-gate';
 import { rotorPower } from './rotor-cycle';
 import type { IPhysics } from './i-physics';
-import type { MapEntity, MapEntityState } from './types/map-entity';
+import type { EntityBoxShape, MapEntity, MapEntityState } from './types/map-entity';
 
 type PhysicsEntity = {
   body: Box2D.b2Body;
@@ -351,6 +351,14 @@ export class Box2dPhysics implements IPhysics {
   isSpringBusy(index: number) {
     const e = this.entities[index];
     return !!e && e.springAt !== undefined && this.motionTime - e.springAt < 1;
+  }
+  removeSpring(shape: EntityBoxShape) {
+    const spring = this.springs.find((entity) => entity.shape === shape);
+    if (!spring) return;
+    this.world.DestroyBody(spring.body);
+    this.entities = this.entities.filter((entity) => entity !== spring);
+    this.springs = this.springs.filter((entity) => entity !== spring);
+    this.previousCount = -1;
   }
   activateSpring(index: number) {
     const e = this.entities[index];

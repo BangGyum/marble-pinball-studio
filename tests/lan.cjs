@@ -646,6 +646,204 @@ async function connect(port, cookie, options = {}) {
       'PASS restored host speed/held acceleration/pause, validated editor maps, spectator restrictions and empty roster'
     );
 
+    const personalStage = { title: '참여자 일회용 스프링', width: 26, goalY: 60, zoomY: 55, entities: [] };
+    await host.command({
+      type: 'configure',
+      settings: { ...settings, names: '한 번만', picks: 1, stage: personalStage },
+    });
+    await guest2.until(
+      () => guest2.scene.stage.title === personalStage.title && guest2.frame.personalSpring?.state === 'available'
+    );
+    assert.equal((await guest2.command({ type: 'use-spring' })).ok, false, 'cannot use an unplaced spring');
+    for (const invalid of [
+      { x: '13', y: 20, direction: 0 },
+      { x: 0, y: 20, direction: 0 },
+      { x: 13, y: 20, direction: 99 },
+      { x: 13, y: 20, direction: 0, extra: true },
+    ])
+      assert.equal((await guest2.command({ type: 'place-spring', ...invalid })).ok, false);
+    const place = { type: 'place-spring', x: 13, y: 20, direction: -Math.PI / 2 };
+    assert.equal((await guest2.command(place, 'personal_place_once')).ok, true);
+    assert.equal(
+      (await guest2.command(place, 'personal_place_once')).ok,
+      true,
+      'retry of the same request is idempotent'
+    );
+    assert.equal((await guest2.command(place)).ok, false, 'second placement is rejected');
+    await host.until(() => host.scene.placedSprings.length === 1);
+    assert.equal(app.race.physics.getEntities().length, 0, 'unfired spring cannot block the track');
+    assert.equal(host.frame.personalSpring.state, 'available', 'inventory is per participant');
+    assert.deepEqual(
+      guest2.scene.placedSprings,
+      host.scene.placedSprings,
+      'placement and direction are public scene data'
+    );
+    assert.equal((await host.command({ type: 'place-spring', x: 18, y: 15, direction: 0 })).ok, true);
+    assert.equal((await guest2.command({ type: 'use-spring' })).ok, false, 'ready state does not consume the use');
+    await host.command({ type: 'start' });
+    await host.command({ type: 'pause' });
+    assert.equal((await guest2.command({ type: 'use-spring' })).ok, false, 'pause does not consume the use');
+    guest2.ws.close();
+    await delay(30);
+    const personalReconnect = await connect(port, guest2Session.cookie);
+    clients.push(personalReconnect);
+    assert.equal(personalReconnect.frame.personalSpring.state, 'placed', 'refresh/reconnect retains the placed spring');
+    assert.equal((await personalReconnect.command(place)).ok, false, 'reconnect does not grant an extra spring');
+    await host.command({ type: 'pause' });
+    app.race.physics.placeMarble(0, 13, 19.4);
+    assert.equal((await personalReconnect.command({ type: 'use-spring' }, 'personal_use_once')).ok, true);
+    assert.equal((await personalReconnect.command({ type: 'use-spring' }, 'personal_use_once')).ok, true);
+    assert.equal(app.race.physics.getEntities().length, 1, 'retry creates only one physical spring');
+    assert.equal((await personalReconnect.command({ type: 'use-spring' })).ok, false);
+    assert.equal((await personalReconnect.command(place)).ok, false);
+    await host.until(() => host.scene.entities.length === 1);
+    assert.equal(
+      (await host.command({ type: 'spring', index: 0 })).ok,
+      false,
+      'other players cannot activate a personal spring through the legacy command'
+    );
+    assert.equal(
+      (await personalReconnect.command({ type: 'spring', index: 0 })).ok,
+      false,
+      'legacy command cannot bypass the one-use limit'
+    );
+    for (let i = 0; i < 8; i++) app.race.advance();
+    assert.ok(app.race.physics.getMarblePosition(0).y < 19, 'the server physically launches the marble');
+    await personalReconnect.until(() =>
+      personalReconnect.frame.positions?.some(([index, , y]) => index === 0 && y < 20)
+    );
+    for (let i = 0; i < 60; i++) app.race.advance();
+    await host.until(() => host.scene.entities.length === 0);
+    assert.equal(app.race.physics.world.GetBodyCount(), 1, 'spring body disappears after the single return stroke');
+    assert.equal(host.frame.personalSpring.state, 'placed', 'another participant retains their own use');
+    assert.equal(
+      (await resumed.command({ type: 'use-spring' })).ok,
+      false,
+      'an unplaced spring cannot be fired during a race'
+    );
+    assert.equal(
+      (await resumed.command({ type: 'place-spring', x: 18, y: 35, direction: 0 })).ok,
+      true,
+      'participants can also place a spring after the race starts'
+    );
+    const afterUse = await connect(port, guest2Session.cookie);
+    clients.push(afterUse);
+    assert.equal(afterUse.frame.personalSpring.state, 'used', 'used state survives refresh and another tab');
+    assert.equal((await afterUse.command({ type: 'use-spring' })).ok, false);
+    await host.command({ type: 'reset' });
+    await afterUse.until(() => afterUse.frame.personalSpring.state === 'available');
+    assert.equal(afterUse.scene.placedSprings.length, 0, 'new race removes every old placement');
+    assert.equal((await afterUse.command(place)).ok, true, 'new race grants one new spring');
+    await host.command({ type: 'start' });
+    app.race.physics.placeMarble(0, 13, 61);
+    app.race.advance();
+    await host.until(() => host.frame.state === 'finished');
+    assert.equal(
+      (await host.command({ type: 'place-spring', x: 10, y: 20, direction: 0 })).ok,
+      false,
+      'finished race rejects new placements'
+    );
+    assert.equal((await afterUse.command({ type: 'use-spring' })).ok, false);
+    console.log(
+      'PASS personal spring placement, public preview, four-state gating, ownership, one use, duplicate requests, reconnect, physical launch/removal and new-race reset'
+    );
+
+    await host.command({ type: 'reset' });
+    await Promise.all(
+      [host, resumed, afterUse].map((client) =>
+        client.until(() => client.frame.state === 'ready' && client.frame.personalSpring.state === 'available')
+      )
+    );
+    const placements = await Promise.all([
+      host.command({ type: 'place-spring', x: 18, y: 15, direction: 0 }),
+      resumed.command({ type: 'place-spring', x: 8, y: 35, direction: Math.PI }),
+      afterUse.command(place),
+    ]);
+    assert.ok(
+      placements.every((result) => result.ok),
+      'independent participants can place concurrently'
+    );
+    await host.until(() => host.scene.placedSprings.length === 3);
+    assert.equal(new Set(host.scene.placedSprings.map((spring) => spring.id)).size, 3);
+    await host.command({ type: 'start' });
+    const uses = await Promise.all([
+      host.command({ type: 'use-spring' }),
+      resumed.command({ type: 'use-spring' }),
+      afterUse.command({ type: 'use-spring' }),
+      personalReconnect.command({ type: 'use-spring' }),
+    ]);
+    assert.equal(
+      uses.filter((result) => result.ok).length,
+      3,
+      'two tabs racing on the same session still get only one use'
+    );
+    assert.equal(
+      app.race.physics.getEntities().length,
+      3,
+      'concurrent requests create exactly one body per participant'
+    );
+    await Promise.all(
+      [host, resumed, afterUse].map((client) => client.until(() => client.frame.personalSpring.state === 'used'))
+    );
+    for (let i = 0; i < 65; i++) app.race.advance();
+    await host.until(() => host.scene.entities.length === 0);
+    assert.equal(
+      app.race.physics.world.GetBodyCount(),
+      Object.keys(app.race.physics.marbleMap).length,
+      'all simultaneous spring bodies are removed'
+    );
+    console.log(
+      'PASS simultaneous participant placement/use, same-session racing requests and complete physical cleanup'
+    );
+
+    const slidingStage = {
+      ...personalStage,
+      title: '배치 목록과 움직이는 장치',
+      entities: [
+        {
+          position: { x: 13, y: 30 },
+          type: 'kinematic',
+          shape: { type: 'box', width: 2, height: 0.2, rotation: 0 },
+          props: { density: 1, restitution: 0.8, angularVelocity: 0, sliding: { amplitude: 4, period: 4, phase: 0 } },
+        },
+      ],
+    };
+    await host.command({ type: 'reset' });
+    await host.command({
+      type: 'configure',
+      settings: { ...settings, names: '기준점 검사', picks: 1, stage: slidingStage },
+    });
+    await resumed.until(() => resumed.scene.stage.title === slidingStage.title);
+    const originalBases = structuredClone(resumed.scene.entities),
+      staleRaceId = resumed.scene.raceId;
+    await host.command({ type: 'start' });
+    for (let i = 0; i < 15; i++) app.race.advance();
+    assert.notEqual(app.race.physics.getEntities()[0].x, originalBases[0].x);
+    assert.equal((await resumed.command({ type: 'place-spring', x: 18, y: 20, direction: 0 })).ok, true);
+    assert.deepEqual(
+      resumed.scene.entities,
+      originalBases,
+      'preview-only changes keep old frame position bases even while a device moves'
+    );
+    await resumed.until(() => resumed.frame.positions?.some(([index, x]) => index === 0 && x !== originalBases[0].x));
+    await host.command({ type: 'reset' });
+    await resumed.until(
+      () => resumed.scene.raceId !== staleRaceId && resumed.frame.personalSpring.state === 'available'
+    );
+    assert.equal(
+      (await resumed.command({ ...place, raceId: staleRaceId })).ok,
+      false,
+      'delayed old-race placement cannot consume the new allocation'
+    );
+    assert.equal(
+      (await resumed.command({ type: 'use-spring', raceId: staleRaceId })).ok,
+      false,
+      'delayed old-race activation cannot affect the new race'
+    );
+    assert.equal(resumed.frame.personalSpring.state, 'available');
+    assert.equal(resumed.scene.placedSprings.length, 0);
+    console.log('PASS moving-device frame bases across placement and delayed placement/use rejection after reset');
+
     await host.command({ type: 'reset' });
     await host.command({ type: 'configure', settings: { ...settings, names: '부하테스트*300', mapId: 8 } });
     for (let i = 0; i < 7; i++) {
