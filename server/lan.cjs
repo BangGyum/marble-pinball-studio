@@ -11,6 +11,7 @@ const { stages, hiddenStages, DEFAULT_MAP_INDEX } = require('../.lan-build/data/
 const { parseNames, winningRange, validateStage } = require('../.lan-build/model.js');
 const { LAN_PORT, MAX_LAN_MESSAGE_BYTES, encodeScene } = require('../.lan-build/lan/protocol.js');
 const { validateDolphins } = require('../.lan-build/dolphin.js');
+const { personalSpringEntity } = require('../.lan-build/personal-spring.js');
 const MAX_LAN_BUFFERED_BYTES = 2 * MAX_LAN_MESSAGE_BYTES;
 /** @typedef {import('../src/lan/protocol').Settings} Settings */
 /** @typedef {import('../src/lan/protocol').Scene} Scene */
@@ -47,6 +48,8 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
   let boostOwner = null;
   /** @type {Map<string, Session>} */
   const sessions = new Map();
+  /** @type {Map<Session, import('../src/personal-spring').PlacedSpring & { used: boolean, shape?: import('../src/types/map-entity').EntityBoxShape, removeAt?: number }>} */
+  const personalSprings = new Map();
   /** @type {Map<import('ws').WebSocket, { session: Session, alive: boolean, count: number, window: number }>} */
   const clients = new Map();
   const attempts = new Map();
@@ -117,6 +120,9 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       entities,
       fixed: entities.map((e) => fixed.has(e.shape)),
       balls: race.balls.map(({ id, name, color }) => ({ id, name, color })),
+      placedSprings: [...personalSprings.values()]
+        .filter((spring) => !spring.used)
+        .map(({ id, x, y, direction }) => ({ id, x, y, direction })),
     };
     sceneMessage = JSON.stringify(encodeScene(scene));
     for (const ws of clients.keys()) send(ws, sceneMessage);
@@ -125,6 +131,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     raceId = randomUUID();
     accumulator = 0;
     boostOwner = null;
+    personalSprings.clear();
     race.prepare(settings.stage ?? stages[settings.mapId], parseNames(settings.names), settings.dolphins);
     makeScene();
   }
@@ -162,13 +169,27 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     };
   }
   function broadcast() {
+    for (const spring of personalSprings.values()) {
+      if (spring.shape && (race.elapsed >= (spring.removeAt ?? Infinity) || race.state === 'finished')) {
+        race.physics.removeSpring(spring.shape);
+        spring.shape = undefined;
+      }
+    }
     const entities = race.physics.getEntities();
     const snapshot = frame(entities),
       hasSprings = entities.some((e) => e.shape.type === 'box' && e.shape.spring);
-    const data = JSON.stringify(snapshot);
     for (const [ws, client] of clients)
       if (ws.bufferedAmount < 256 * 1024)
-        send(ws, hasSprings ? { ...snapshot, springs: race.springStatuses(client.session, entities) } : data);
+        send(ws, {
+          ...snapshot,
+          ...(hasSprings ? { springs: race.springStatuses(client.session, entities) } : {}),
+          personalSpring: personalSpringStatus(client.session),
+        });
+  }
+  /** @param {Session} session @returns {NonNullable<Frame['personalSpring']>} */
+  function personalSpringStatus(session) {
+    const spring = personalSprings.get(session);
+    return spring ? { state: spring.used ? 'used' : 'placed', id: spring.id } : { state: 'available' };
   }
   /** @param {Session} session @param {Command} msg */
   function execute(session, msg) {
@@ -185,17 +206,51 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       speed: ['value'],
       boost: ['active'],
       spring: ['index', 'revision'],
+      'place-spring': ['x', 'y', 'direction'],
+      'use-spring': [],
     };
     requireThat(
       Object.hasOwn(keys, msg.type) && allowedKeys(msg, ['type', 'requestId', 'raceId', ...keys[msg.type]]),
       '허용되지 않은 요청입니다.'
     );
+    if (msg.type === 'place-spring') {
+      requireThat(race.state !== 'finished', '다음 경기가 준비되면 배치할 수 있어요.');
+      requireThat(!personalSprings.has(session), '이번 경기의 스프링은 이미 배치했어요.');
+      personalSpringEntity(race.stage, msg);
+      personalSprings.set(session, { id: randomUUID(), x: msg.x, y: msg.y, direction: msg.direction, used: false });
+      // A placement changes only its preview list. Retain the position bases used by buffered frames.
+      const entities = race.physics.getEntities();
+      makeScene(entities.length === scene.entities.length ? scene.entities : entities);
+      return;
+    }
+    if (msg.type === 'use-spring') {
+      requireThat(race.state === 'running', '경기가 진행 중일 때 발동할 수 있어요.');
+      const spring = personalSprings.get(session);
+      if (!spring || spring.used) throw new Error('배치한 스프링이 없거나 이미 사용했어요.');
+      const entity = personalSpringEntity(race.stage, spring);
+      race.physics.createEntities([entity]);
+      const index = race.physics.getEntities().findIndex((entry) => entry.shape === entity.shape);
+      if (!race.activateSpring(index, session)) {
+        race.physics.removeSpring(entity.shape);
+        throw new Error('스프링을 발동하지 못했어요. 다시 시도해 주세요.');
+      }
+      spring.used = true;
+      spring.shape = entity.shape;
+      spring.removeAt = race.elapsed + 1;
+      makeScene();
+      return;
+    }
     if (msg.type === 'spring') {
       // A contact may have removed an obstacle since the last scheduled snapshot.
       syncScene(race.physics.getEntities());
       requireThat(
         Number.isInteger(msg.revision) && msg.revision === revision,
         '맵 장치가 바뀌었어요. 최신 화면에서 스프링을 다시 선택해 주세요.'
+      );
+      const shape = race.physics.getEntities()[msg.index]?.shape;
+      requireThat(
+        ![...personalSprings.values()].some((spring) => spring.shape === shape && shape),
+        '참여자 스프링은 소유자만 한 번 발동할 수 있어요.'
       );
       requireThat(
         Number.isInteger(msg.index) && race.activateSpring(msg.index, session),
@@ -379,7 +434,11 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       const entities = race.physics.getEntities(),
         snapshot = frame(entities);
       send(ws, sceneMessage);
-      send(ws, { ...snapshot, springs: race.springStatuses(session, entities) });
+      send(ws, {
+        ...snapshot,
+        springs: race.springStatuses(session, entities),
+        personalSpring: personalSpringStatus(session),
+      });
       send(ws, identity(session));
     });
   });
