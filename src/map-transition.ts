@@ -41,7 +41,7 @@ export class MapTransition {
       `${Math.max(0, Math.min(window.innerHeight, bounds.top + bounds.height / 2)) - window.innerHeight / 2}px`
     );
     layer.innerHTML =
-      '<div class="map-transition-cover"></div><div class="map-transition-ring"></div><div class="map-transition-beam"></div><div class="map-transition-copy"><span></span><strong></strong><div class="map-transition-track"><i></i></div></div>';
+      '<div class="map-transition-cover"></div><div class="map-transition-ring"><div class="map-transition-orbit"><i class="map-transition-marble"></i></div></div><div class="map-transition-beam"></div><div class="map-transition-copy"><span></span><strong></strong><div class="map-transition-track"><i></i></div></div>';
     layer.querySelector('span')!.textContent =
       `코스 ${card.querySelector('.map-card-number')!.textContent} · 경주 준비`;
     layer.querySelector('strong')!.textContent = card.querySelector('.map-card-title')!.textContent;
