@@ -9,11 +9,7 @@ export class SeaAnimalRenderer {
   previewTime(settings: DolphinSettings, elapsed: number, reducedMotion: boolean) {
     if (!reducedMotion) return elapsed;
     const manta = settings.manta;
-    if (manta?.enabled && (this.kind === 'manta' || !settings.enabled))
-      return (
-        (settings.enabled ? (DOLPHIN_DURATION + 0.65) / (settings.speed ?? 1) : 0) +
-        DOLPHIN_DURATION / (2 * (manta.speed ?? 1))
-      );
+    if (manta?.enabled && !settings.enabled) return DOLPHIN_DURATION / (2 * (manta.speed ?? 1));
     return DOLPHIN_DURATION / (2 * (settings.speed ?? 1));
   }
   guides(...args: Parameters<DolphinRenderer['guides']>) {

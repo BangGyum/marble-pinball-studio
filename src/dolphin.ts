@@ -20,7 +20,9 @@ export function dolphinRows(stage: StageDef, count = 3, gap = 20, first = 12) {
   );
 }
 export function validateDolphins(value: unknown, stage: StageDef): DolphinSettings {
-  return validateEffect(value, stage, true);
+  const settings = validateEffect(value, stage, true);
+  if (settings.enabled && settings.manta?.enabled) throw new Error('돌고래와 만타가오리 효과는 하나만 켤 수 있어요.');
+  return settings;
 }
 function validateEffect(value: unknown, stage: StageDef, allowManta: boolean): DolphinSettings {
   if (value === undefined) return { enabled: false, rows: dolphinRows(stage), interval: 5 };

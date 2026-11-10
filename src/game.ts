@@ -168,7 +168,7 @@ export class Game extends Race {
     this.manual = null;
     this.springControls.reset();
     super.prepare(stage, names, dolphins);
-    if (!this.dolphins.manta?.enabled) this.dolphinRenderer.kind = 'dolphin';
+    this.dolphinRenderer.kind = this.dolphins.manta?.enabled ? 'manta' : 'dolphin';
     const rows = Math.ceil(names.length / 10);
     const spawnOffset = (stage.spawnX ?? 12.85) - 12.85;
     this.camera = {

@@ -332,7 +332,7 @@ export class LanView {
       JSON.stringify(this.scene.settings) === JSON.stringify(scene.settings) &&
       JSON.stringify(this.scene.entities) === JSON.stringify(scene.entities);
     this.dolphinDraft = undefined;
-    if (!scene.settings.dolphins?.manta?.enabled) this.dolphinRenderer.kind = 'dolphin';
+    this.dolphinRenderer.kind = scene.settings.dolphins?.manta?.enabled ? 'manta' : 'dolphin';
     if (
       !(this.dolphinRenderer.kind === 'manta'
         ? scene.settings.dolphins?.manta?.enabled

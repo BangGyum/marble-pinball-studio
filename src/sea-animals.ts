@@ -20,29 +20,9 @@ type Wave = { kind: AnimalKind; options: AnimalOptions; wave: number; time: numb
 
 // Stateless race-time scheduling also lets late LAN viewers reconstruct every active wave.
 export function animalWaves(settings: DolphinSettings, elapsed: number, preview = false): Wave[] {
-  const dolphin = settings.enabled,
-    manta = settings.manta?.enabled;
-  if (!dolphin || !manta) {
-    const kind = dolphin ? 'dolphin' : 'manta',
-      options = animalOptions(settings, kind);
-    return options?.enabled ? dolphinWaves(options, elapsed, preview).map((w) => ({ ...w, kind, options })) : [];
-  }
-  const options = [settings, settings.manta!],
-    intervals = options.map((o) => (preview ? (DOLPHIN_DURATION + 0.65) / (o.speed ?? 1) : o.interval)),
-    cycle = intervals[0] + intervals[1],
-    lifetime = Math.max(...options.map((o) => (DOLPHIN_DURATION + 0.65) / (o.speed ?? 1))),
-    latest = Math.floor((elapsed + 1e-9) / cycle),
-    first = Math.max(0, Math.floor((elapsed - lifetime) / cycle));
-  const waves: Wave[] = [];
-  for (let index = first; index <= latest; index++)
-    for (const [slot, kind] of (['dolphin', 'manta'] as const).entries()) {
-      const age = elapsed - index * cycle - (slot ? intervals[0] : 0),
-        option = options[slot],
-        time = Math.max(0, age) * (option.speed ?? 1);
-      if (age >= -1e-9 && time < DOLPHIN_DURATION + 0.65)
-        waves.push({ kind, options: option, wave: index * 2 + slot, time });
-    }
-  return waves;
+  const kind = settings.enabled ? 'dolphin' : 'manta',
+    options = animalOptions(settings, kind);
+  return options?.enabled ? dolphinWaves(options, elapsed, preview).map((w) => ({ ...w, kind, options })) : [];
 }
 
 export function animalPoses(settings: DolphinSettings, stage: StageDef, elapsed: number, dt: number) {

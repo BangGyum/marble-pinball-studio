@@ -137,6 +137,10 @@ export class DolphinSettingsPanel {
     this.sync();
     this.input('hint').textContent = '개별 위치로 조정됨 · 균등 간격을 바꾸면 다시 정렬돼요.';
   }
+  setEnabled(enabled: boolean) {
+    this.value = { ...this.value, enabled };
+    this.sync();
+  }
   setLocked(locked: boolean) {
     this.locked = locked;
     this.sync();

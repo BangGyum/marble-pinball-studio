@@ -18,15 +18,23 @@ export class SeaAnimalSettingsPanel {
     root.classList.add('sea-animal-settings');
     const info = document.createElement('p');
     info.className = 'sea-animal-order';
-    info.textContent =
-      '둘 다 켜면 돌고래 → 만타가오리 순서로 번갈아 나와요. 각 효과의 출몰 간격 뒤에 다음 동물이 등장해요.';
+    info.textContent = '돌고래와 만타가오리는 하나만 켤 수 있어요. 다른 효과를 켜면 기존 효과는 자동으로 꺼져요.';
     root.append(info);
-    const notify = (_: DolphinSettings, commit: boolean) => change(this.value, commit);
     const make = (kind: AnimalKind) => {
       const section = document.createElement('section');
       section.dataset.animal = kind;
       root.append(section);
-      return new DolphinSettingsPanel(section, notify, previewChange, () => overview(kind), kind);
+      return new DolphinSettingsPanel(
+        section,
+        (settings, commit) => {
+          const other = kind === 'dolphin' ? this.manta : this.dolphin;
+          if (settings.enabled && other.value.enabled) other.setEnabled(false);
+          change(this.value, commit);
+        },
+        previewChange,
+        () => overview(kind),
+        kind
+      );
     };
     this.dolphin = make('dolphin');
     this.manta = make('manta');

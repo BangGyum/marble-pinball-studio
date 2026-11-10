@@ -20,11 +20,20 @@ const { encodeScene, decodeScene } = require('../src/lan/protocol.ts');
 const stage = { title: 'Sea effects audit', width: 26, goalY: 100, zoomY: 95, entities: [] };
 const dolphin = { enabled: true, rows: [32], interval: 7, size: 150, speed: 0.5 };
 const manta = { enabled: true, rows: [18, 42], interval: 11, size: 80, speed: 1.3 };
-const settings = { ...dolphin, manta };
+assert.throws(
+  () => validateDolphins({ ...dolphin, manta }, stage),
+  /하나만/,
+  'standalone and LAN validation reject enabling both animal effects'
+);
+const settings = { ...dolphin, manta: { ...manta, enabled: false } };
+const mantaSettings = { ...dolphin, enabled: false, manta };
 assert.deepEqual(validateDolphins(dolphin, stage), dolphin, 'legacy settings retain their exact shape');
 const copy = validateDolphins(settings, stage);
+copy.rows[0] = 33;
 copy.manta.rows[0] = 19;
+assert.equal(settings.rows[0], 32);
 assert.equal(settings.manta.rows[0], 18, 'settings copy owns both row arrays');
+assert.deepEqual(validateDolphins(mantaSettings, stage), mantaSettings);
 for (const invalid of [
   null,
   {},
@@ -47,47 +56,59 @@ const wire = {
   balls: [],
 };
 assert.deepEqual(decodeScene(encodeScene(wire)).settings.dolphins, settings);
-for (let wave = 0; wave < 20; wave++) {
-  const at = Math.floor(wave / 2) * 18 + (wave % 2 ? 7 : 0),
-    latest = animalWaves(settings, at).at(-1);
-  assert.equal(latest.wave, wave);
-  assert.equal(latest.kind, wave % 2 ? 'manta' : 'dolphin');
-  assert.equal(latest.time, 0);
-  assert.deepEqual(
-    animalWaves(settings, at),
-    animalWaves(JSON.parse(JSON.stringify(settings)), at),
-    'late viewer reconstructs the same waves'
-  );
-}
-assert.equal(animalWaves({ ...settings, enabled: false }, 11).at(-1).kind, 'manta');
+for (const options of [settings, mantaSettings])
+  for (let wave = 0; wave < 20; wave++) {
+    const kind = options.enabled ? 'dolphin' : 'manta',
+      active = options.enabled ? options : options.manta,
+      at = wave * active.interval,
+      waves = animalWaves(options, at),
+      latest = waves.at(-1);
+    assert.equal(latest.wave, wave);
+    assert.equal(latest.kind, kind);
+    assert.equal(latest.time, 0);
+    assert.ok(
+      waves.every((wave) => wave.kind === kind),
+      'only the enabled animal appears'
+    );
+    assert.deepEqual(
+      waves,
+      animalWaves(JSON.parse(JSON.stringify(options)), at),
+      'late viewer reconstructs the same waves'
+    );
+  }
+assert.deepEqual(animalWaves({ ...settings, enabled: false }, 11), [], 'both effects may be disabled');
 assert.deepEqual(animalWaves({ ...dolphin, enabled: false }, 20), []);
 assert.equal(
   animalWaves(settings, 8).find((w) => w.kind === 'dolphin').wave,
   0,
   'slow older dolphin completes its traversal'
 );
-assert.equal(animalWaves(settings, 8).find((w) => w.kind === 'manta').time, 1.3, 'manta uses its own speed');
-const preview = animalWaves(settings, 10 + 0.1, true);
-assert.equal(preview.at(-1).kind, 'manta', 'preview alternates after the first full slow traversal');
-for (const kind of ['dolphin', 'manta'])
-  for (const speed of [0.5, 1, 1.5])
-    for (const mantaSpeed of [0.5, 1, 1.5]) {
-      const renderer = new SeaAnimalRenderer();
-      renderer.kind = kind;
-      const options = { ...dolphin, speed, manta: { ...manta, speed: mantaSpeed } };
-      assert.equal(renderer.previewTime(options, 12.3, false), 12.3, 'animated preview keeps the shared clock');
-      const selected = animalWaves(options, renderer.previewTime(options, 12.3, true), true);
-      assert.equal(selected.length, 1, 'reduced motion shows the edited species only');
-      assert.equal(selected[0].kind, kind);
-      assert.ok(
-        Math.abs(selected[0].time - DOLPHIN_DURATION / 2) < 1e-9,
-        'static preview centers the selected species at every speed'
-      );
-      options.enabled = false;
-      const solo = animalWaves(options, renderer.previewTime(options, 12.3, true), true);
-      assert.equal(solo[0].kind, 'manta', 'manta-only settings do not need a previously selected manta tab');
-      assert.ok(Math.abs(solo[0].time - DOLPHIN_DURATION / 2) < 1e-9);
-    }
+assert.equal(animalWaves(mantaSettings, 12).at(-1).time, 1.3, 'manta uses its own speed');
+for (const options of [settings, mantaSettings]) {
+  const preview = animalWaves(options, 10 + 0.1, true);
+  assert.ok(preview.every((wave) => wave.kind === (options.enabled ? 'dolphin' : 'manta')));
+}
+for (const active of ['dolphin', 'manta'])
+  for (const kind of ['dolphin', 'manta'])
+    for (const speed of [0.5, 1, 1.5])
+      for (const mantaSpeed of [0.5, 1, 1.5]) {
+        const renderer = new SeaAnimalRenderer();
+        renderer.kind = kind;
+        const options = {
+          ...dolphin,
+          enabled: active === 'dolphin',
+          speed,
+          manta: { ...manta, enabled: active === 'manta', speed: mantaSpeed },
+        };
+        assert.equal(renderer.previewTime(options, 12.3, false), 12.3, 'animated preview keeps the shared clock');
+        const selected = animalWaves(options, renderer.previewTime(options, 12.3, true), true);
+        assert.equal(selected.length, 1, 'reduced motion shows only the enabled species');
+        assert.equal(selected[0].kind, active, 'the enabled effect takes precedence over a stale preview selection');
+        assert.ok(
+          Math.abs(selected[0].time - DOLPHIN_DURATION / 2) < 1e-9,
+          'static preview centers the enabled species at every speed'
+        );
+      }
 for (const direction of [-1, 1]) {
   let turns = 0,
     previousSign = 0;
@@ -108,9 +129,9 @@ for (const at of [0, 1.2, 2.175, 4.35]) {
   assert.ok(Math.abs(a.x + b.x - stage.width) < 1e-9);
   assert.equal(a.y, b.y);
 }
-for (const [at, expected, count] of [
-  [2, 'dolphin', 1],
-  [8.5, 'manta', 2],
+for (const [options, expected, count] of [
+  [settings, 'dolphin', 1],
+  [mantaSettings, 'manta', 2],
 ]) {
   const translations = [],
     clips = [];
@@ -123,12 +144,12 @@ for (const [at, expected, count] of [
     { get: (o, key) => (key in o ? o[key] : () => {}) }
   );
   const renderer = new SeaAnimalRenderer();
-  renderer.draw(ctx, stage, { ...settings, speed: 1 }, at, { left: -100, right: 100, top: -100, bottom: 100 });
+  renderer.draw(ctx, stage, { ...options, speed: 1 }, 2, { left: -100, right: 100, top: -100, bottom: 100 });
   assert.equal(translations.length, count);
   assert.equal(clips.length, expected === 'dolphin' ? count : 0, 'manta is not clipped at the dolphin waterline');
 }
 console.log(
-  'PASS separate options, legacy/LAN shape, alternating and overlapping waves, deterministic clocks, zigzag and render parity'
+  'PASS exclusive options, legacy/LAN shape, single-species waves, deterministic clocks, zigzag and render parity'
 );
 (async () => {
   const race = new Race();
@@ -184,13 +205,13 @@ console.log(
     console.log(`PASS ${samples} actual Box2D manta reflections across sizes, speeds and directions`);
     const names = Array.from({ length: 100 }, (_, i) => String(i));
     for (const map of stages)
-      for (const alternating of [false, true]) {
+      for (const kind of ['dolphin', 'manta']) {
         const rows = dolphinRows(map, 6, 20);
         race.prepare(map, names, {
-          enabled: alternating,
+          enabled: kind === 'dolphin',
           rows,
           interval: 5,
-          manta: { enabled: true, rows, interval: 5, size: 100, speed: 1 },
+          manta: { enabled: kind === 'manta', rows, interval: 5, size: 100, speed: 1 },
         });
         race.startRace([1, 1]);
         for (let i = 0; i < 720 && race.state === 'running'; i++) {
@@ -199,7 +220,7 @@ console.log(
         }
       }
     console.log(
-      `PASS ${stages.length * 2} real-map runs, 100 marbles / 6 rows, manta-only and alternating for 12 seconds`
+      `PASS ${stages.length * 2} real-map runs, 100 marbles / 6 rows, dolphin-only and manta-only for 12 seconds`
     );
   } finally {
     race.physics.dispose();
