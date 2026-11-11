@@ -51,6 +51,10 @@ export class SpringControls {
     this.housings.clear();
     this.statuses.clear();
   }
+  rebindSelection(entities: MapEntityState[]) {
+    this.entities = entities;
+    this.selectedShape = entities[this.selected]?.shape;
+  }
   select(event: PointerEvent) {
     if (event.button !== 0 && event.pointerType !== 'touch') return false;
     const r = this.canvas.getBoundingClientRect(),

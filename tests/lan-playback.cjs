@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const vm = require('node:vm');
 const ts = require('typescript');
 require.extensions['.ts'] = (module, file) =>
   module._compile(
@@ -158,6 +159,7 @@ console.log(
 
 // Verify that the actual canvas renderer uses the same timeline and wall-time camera smoothing.
 const { LanView } = require('../src/lan/view.ts');
+const { encodeScene, decodeScene } = require('../src/lan/protocol.ts');
 global.devicePixelRatio = 1;
 global.window = { addEventListener() {} };
 global.requestAnimationFrame = () => 1;
@@ -306,11 +308,13 @@ console.log('PASS moving-device continuity across spring previews and invalidati
 
 const pointerHandlers = {},
   windowHandlers = {},
+  windowListeners = [],
   boosts = [],
   captures = [];
 global.window = {
-  addEventListener: (name, callback) => {
+  addEventListener: (name, callback, options) => {
     windowHandlers[name] = callback;
+    windowListeners.push({ name, callback, capture: options === true || !!options?.capture });
   },
 };
 const interactiveCanvas = {
@@ -474,3 +478,148 @@ interactive.push({
 assert.equal(interactive.springPlacement.active, false, 'race finish cancels an unfinished placement');
 assert.equal(placed.length, 1, 'cancelled drafts never submit an extra placement');
 console.log('PASS other-player updates, mid-draft map/reset changes and finish without unwanted placement');
+
+const mapSpringShape = {
+  type: 'box',
+  width: 1,
+  height: 0.1,
+  rotation: 0,
+  spring: { distance: 1, direction: -Math.PI / 2 },
+};
+const springScene = {
+  ...scene,
+  raceId: 'selected-spring',
+  stage: {
+    ...scene.stage,
+    entities: [
+      {
+        position: { x: 13, y: 20 },
+        type: 'kinematic',
+        shape: mapSpringShape,
+        props: { density: 1, restitution: 0.8, angularVelocity: 0 },
+      },
+    ],
+  },
+  entities: [{ x: 13, y: 20, angle: 0, life: -1, shape: mapSpringShape }],
+  fixed: [false],
+  placedSprings: [],
+};
+const receiveScene = (value) => interactive.setScene(decodeScene(JSON.parse(JSON.stringify(encodeScene(value)))));
+ctx.measureText = (text) => ({ width: text.length * 7 });
+const drawSpringControls = () =>
+  interactive.springControls.draw(ctx, interactive.entities, 0, 0, 1, 600, interactive.scene.stage);
+const selectMapSpring = () => {
+  drawSpringControls();
+  assert.equal(interactive.springControls.select({ button: 0, pointerType: 'mouse', clientX: 23, clientY: 40 }), true);
+};
+const dispatchSpace = () => {
+  const event = {
+    key: ' ',
+    code: 'Space',
+    repeat: false,
+    target: { tagName: 'CANVAS' },
+    preventDefault() {},
+    stopImmediatePropagation() {
+      this.stopped = true;
+    },
+  };
+  for (const listener of windowListeners
+    .filter(({ name }) => name === 'keydown')
+    .sort((a, b) => Number(b.capture) - Number(a.capture))) {
+    listener.callback(event);
+    if (event.stopped) break;
+  }
+};
+receiveScene(springScene);
+interactive.state = 'running';
+interactive.springConnected = true;
+interactive.personalSpring = { state: 'placed', id: 'mine' };
+const mapUses = [],
+  personalUsesBefore = used.length;
+interactive.onSpring = (index) => mapUses.push(index);
+selectMapSpring();
+dispatchSpace();
+assert.deepEqual(mapUses, [0]);
+assert.equal(used.length, personalUsesBefore);
+interactive.springControls.setStatuses([[0, 4900, false]]);
+const selectedShape = interactive.entities[0].shape;
+for (let revision = 2; revision <= 4; revision++) {
+  receiveScene({
+    ...springScene,
+    revision,
+    placedSprings: [{ id: 'another-player', x: 18, y: 25, direction: 0 }],
+  });
+  assert.notEqual(interactive.entities[0].shape, selectedShape, 'wire decoding replaces shape references');
+  assert.equal(interactive.springControls.selected, 0, 'placement updates retain the selected map spring immediately');
+  dispatchSpace();
+  assert.equal(mapUses.length, 1, 'placement updates cannot clear the selected spring cooldown');
+  assert.equal(used.length, personalUsesBefore, 'Space before the next draw cannot spend the personal spring');
+  drawSpringControls();
+  assert.equal(interactive.springControls.selected, 0, 'the next draw retains selection with the new shape reference');
+}
+interactive.springControls.setStatuses([[0, 0, true]]);
+dispatchSpace();
+assert.equal(mapUses.length, 1, 'the selected piston still waits for physical return');
+interactive.springControls.setStatuses([[0, 0, false]]);
+dispatchSpace();
+assert.deepEqual(mapUses, [0, 0], 'Space continues activating the chosen map spring after placement updates');
+assert.equal(used.length, personalUsesBefore, 'the one-use personal spring remains untouched');
+receiveScene({ ...springScene, revision: 5, entities: [{ ...springScene.entities[0], x: 14 }] });
+assert.equal(interactive.springControls.selected, -1, 'real device changes still invalidate the old selection');
+receiveScene({ ...springScene, revision: 6 });
+selectMapSpring();
+receiveScene({ ...springScene, raceId: 'next-spring-race', revision: 7 });
+assert.equal(interactive.springControls.selected, -1, 'a new race clears selection even with identical devices');
+console.log(
+  'PASS selected map spring, cooldown and Space target survive decoded placement updates before and after draw'
+);
+
+const clientSource = ts.createSourceFile(
+  'client.ts',
+  fs.readFileSync('src/lan/client.ts', 'utf8'),
+  ts.ScriptTarget.ES2022
+);
+function findMessageHandler(node) {
+  if (ts.isBinaryExpression(node) && node.left.getText(clientSource) === 'socket.onmessage') return node.right;
+  return ts.forEachChild(node, findMessageHandler);
+}
+const clientHandler = findMessageHandler(clientSource);
+assert.ok(clientHandler);
+const rulesScene = {
+  ...scene,
+  settings: { ...scene.settings, names: 'A,B,C,D', order: 'asc' },
+  balls: Array.from({ length: 4 }, (_, id) => ({ id, name: String(id), color: '#fff' })),
+};
+const rulesUI = vm.createContext({
+  scene: rulesScene,
+  identity: { role: 'viewer' },
+  pendingPreparations: 0,
+  inputTimer: undefined,
+  decodeScene,
+  view: { setScene() {} },
+  dolphinPanel: { setStage() {} },
+  validateDolphins: () => ({}),
+  order: { value: 'asc' },
+  preferredPicks: 1,
+  updatePicks(count) {
+    rulesUI.displayedPicks = Math.min(count, rulesUI.preferredPicks);
+  },
+});
+const receiveRules = vm.runInContext(
+  ts.transpileModule(`const receive = ${clientHandler.getText(clientSource)}; receive;`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+  }).outputText,
+  rulesUI
+);
+const rulesUpdate = { ...rulesScene, revision: 2, settings: { ...rulesScene.settings, order: 'desc', picks: 3 } };
+receiveRules({ data: JSON.stringify(encodeScene(rulesUpdate)) });
+assert.equal(rulesUI.order.value, 'desc', 'all clients display winner-direction changes without a new race');
+assert.equal(rulesUI.displayedPicks, 3, 'all clients display winner-count changes without a new race');
+rulesUI.order.value = 'asc';
+rulesUI.preferredPicks = 1;
+receiveRules({ data: JSON.stringify(encodeScene({ ...rulesUpdate, revision: 3, placedSprings: [] })) });
+assert.equal(rulesUI.order.value, 'asc', 'unrelated placement updates do not overwrite a pending winner-rule edit');
+assert.equal(rulesUI.preferredPicks, 1);
+console.log(
+  'PASS actual LAN client synchronizes changed winner rules and retains edits during unrelated scene updates'
+);

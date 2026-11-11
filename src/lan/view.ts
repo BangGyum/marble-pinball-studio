@@ -368,7 +368,8 @@ export class LanView {
       this.readyCamera = { ...this.camera };
       this.balls = scene.balls.map((b) => ({ ...b, x: 0, y: 0, angle: 0, stuck: 0 }));
     }
-    this.springControls.reset();
+    if (keepPlayback) this.springControls.rebindSelection(scene.entities);
+    else this.springControls.reset();
     this.scene = scene;
     if (!keepPlayback) this.playback.reset();
     if (this.dolphinOverview && this.state === 'ready') this.showDolphinLayout(false);

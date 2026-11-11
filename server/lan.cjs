@@ -276,16 +276,16 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       const stage = s.stage !== undefined ? validateStage(s.stage) : stages[s.mapId];
       const dolphins = s.dolphins === undefined ? {} : { dolphins: validateDolphins(s.dolphins, stage) };
       const next = { ...s, ...dolphins, ...(s.stage !== undefined ? { stage } : {}) };
-      const onlyDolphins =
+      const preserveReadyRace =
         race.state === 'ready' &&
         next.names === settings.names &&
         next.mapId === settings.mapId &&
-        next.order === settings.order &&
-        next.picks === settings.picks &&
         JSON.stringify(next.stage) === JSON.stringify(settings.stage) &&
-        JSON.stringify(next.dolphins) !== JSON.stringify(settings.dolphins);
+        (next.order !== settings.order ||
+          next.picks !== settings.picks ||
+          JSON.stringify(next.dolphins) !== JSON.stringify(settings.dolphins));
       settings = next;
-      if (onlyDolphins) {
+      if (preserveReadyRace) {
         race.dolphins = validateDolphins(settings.dolphins, race.stage);
         makeScene();
       } else prepare();

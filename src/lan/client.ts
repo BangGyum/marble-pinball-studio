@@ -37,7 +37,7 @@ let preferredPicks = 2,
   customStage: StageDef | undefined;
 let springPending = false;
 const library = new MapLibrary(stages, hiddenStages);
-let inputTimer: ReturnType<typeof setTimeout>, boostTimer: ReturnType<typeof setInterval> | undefined;
+let inputTimer: ReturnType<typeof setTimeout> | undefined, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
 const dolphinPanel = new SeaAnimalSettingsPanel(
   el('dolphin-settings'),
@@ -253,11 +253,31 @@ function inputSettings(): Settings {
     ...(map.id.startsWith('builtin-') && map.stage === stages[builtin] ? {} : { stage: map.stage }),
   };
 }
+let prepareQueue = Promise.resolve(),
+  pendingPreparations = 0;
 async function prepare(force = false) {
   clearTimeout(inputTimer);
+  inputTimer = undefined;
   const settings = inputSettings();
-  if (force || JSON.stringify(settings) !== JSON.stringify(scene?.settings))
-    await command({ type: 'configure', settings });
+  pendingPreparations++;
+  const request = prepareQueue
+    .catch(() => {})
+    .then(async () => {
+      if (force || JSON.stringify(settings) !== JSON.stringify(scene?.settings))
+        await command({ type: 'configure', settings });
+    });
+  prepareQueue = request;
+  try {
+    // Start also waits for edits queued while an earlier preparation was in flight.
+    let latest = request;
+    for (;;) {
+      await latest;
+      if (latest === prepareQueue) break;
+      latest = prepareQueue;
+    }
+  } finally {
+    pendingPreparations--;
+  }
 }
 const prepareUI = (force = false) =>
   prepare(force).catch((error) => {
@@ -294,27 +314,37 @@ async function connect() {
       const incoming = JSON.parse(event.data) as ServerMessage;
       if (incoming.type === 'scene') {
         const first = !scene,
-          different = scene?.raceId !== incoming.raceId;
+          different = scene?.raceId !== incoming.raceId,
+          rulesChanged =
+            scene?.settings.order !== incoming.settings.order || scene?.settings.picks !== incoming.settings.picks,
+          keepInputs = identity.role === 'host' && (pendingPreparations > 0 || inputTimer !== undefined);
         scene = decodeScene(incoming);
         view.setScene(scene);
-        dolphinPanel.setStage(scene.stage, scene.settings.dolphins ?? validateDolphins(undefined, scene.stage));
+        if (!keepInputs)
+          dolphinPanel.setStage(scene.stage, scene.settings.dolphins ?? validateDolphins(undefined, scene.stage));
         if (different) {
           frame = undefined;
           selectBall(null);
           collapse(false);
-          names.value = scene.settings.names;
-          order.value = scene.settings.order;
-          preferredPicks = scene.settings.picks || 2;
-          updatePicks(scene.balls.length);
-          customStage = scene.settings.stage;
-          const match = customStage && allMaps().find((m) => JSON.stringify(m.stage) === JSON.stringify(customStage));
-          refreshMaps(customStage ? (match?.id ?? 'preview') : 'builtin-' + scene.settings.mapId);
-          if (first && identity.role === 'host' && !scene.balls.length) {
+          if (!keepInputs) {
+            names.value = scene.settings.names;
+            order.value = scene.settings.order;
+            preferredPicks = scene.settings.picks || 2;
+            updatePicks(scene.balls.length);
+            customStage = scene.settings.stage;
+            const match = customStage && allMaps().find((m) => JSON.stringify(m.stage) === JSON.stringify(customStage));
+            refreshMaps(customStage ? (match?.id ?? 'preview') : 'builtin-' + scene.settings.mapId);
+          }
+          if (first && identity.role === 'host' && !scene.balls.length && !keepInputs) {
             try {
               names.value = localStorage.getItem(namesKey) ?? '하나, 둘, 셋, 넷';
             } catch {}
             void prepareUI();
           }
+        } else if (rulesChanged && !keepInputs) {
+          order.value = scene.settings.order;
+          preferredPicks = scene.settings.picks || 2;
+          updatePicks(scene.balls.length);
         }
       } else if (incoming.type === 'frame') {
         if (

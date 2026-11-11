@@ -646,6 +646,75 @@ async function connect(port, cookie, options = {}) {
       'PASS restored host speed/held acceleration/pause, validated editor maps, spectator restrictions and empty roster'
     );
 
+    const rulesStage = { title: '승자 조건과 배치 보존', width: 26, goalY: 60, zoomY: 55, entities: [] };
+    let rulesSettings = { ...settings, names: '가,나,다,라', order: 'asc', picks: 1, stage: rulesStage };
+    assert.equal((await host.command({ type: 'configure', settings: rulesSettings })).ok, true);
+    await Promise.all([resumed, guest2].map((client) => client.until(() => client.scene.raceId === host.scene.raceId)));
+    for (const [client, x] of [
+      [host, 8],
+      [resumed, 13],
+      [guest2, 18],
+    ])
+      assert.equal((await client.command({ type: 'place-spring', x, y: 20, direction: -Math.PI / 2 })).ok, true);
+    const rulesRaceId = host.scene.raceId;
+    const preparedRulesBalls = app.race.balls;
+    const placedRulesSprings = structuredClone(host.scene.placedSprings);
+    for (const change of [{ picks: 2 }, { order: 'desc' }, { picks: 3 }]) {
+      rulesSettings = { ...rulesSettings, ...change };
+      assert.equal((await host.command({ type: 'configure', settings: rulesSettings })).ok, true);
+      assert.equal(host.scene.raceId, rulesRaceId, 'winner settings preserve the prepared race');
+      assert.equal(app.race.balls, preparedRulesBalls, 'winner settings never reshuffle the prepared marbles');
+      for (const client of [host, resumed, guest2]) {
+        await client.until(
+          () =>
+            client.scene.settings.order === rulesSettings.order &&
+            client.scene.settings.picks === rulesSettings.picks &&
+            client.frame.revision === client.scene.revision
+        );
+        assert.deepEqual(
+          client.scene.placedSprings,
+          placedRulesSprings,
+          'every placement retains its id and direction'
+        );
+        assert.equal(client.frame.personalSpring.state, 'placed', 'each participant keeps their placed spring');
+      }
+    }
+    assert.equal((await host.command({ type: 'start' })).ok, true);
+    assert.equal(
+      (await guest2.command({ type: 'use-spring' })).ok,
+      true,
+      'a preserved spring remains usable after start'
+    );
+    for (const ball of preparedRulesBalls) {
+      app.race.physics.placeMarble(ball.id, 13, 61);
+      app.race.advance();
+    }
+    await resumed.until(() => resumed.frame.state === 'finished');
+    assert.deepEqual(
+      resumed.frame.winners,
+      preparedRulesBalls.slice(-3).map((ball) => ball.id),
+      'the actual race applies the changed DESC three-winner rule'
+    );
+    assert.equal((await host.command({ type: 'reset' })).ok, true);
+    await guest2.until(() => guest2.frame.personalSpring.state === 'available');
+    assert.notEqual(host.scene.raceId, rulesRaceId, 'reset still prepares a new race');
+    assert.equal(host.scene.placedSprings.length, 0);
+    for (const change of [{ names: '가,나,다,라,마' }, { stage: { ...rulesStage, goalY: 65 } }, {}]) {
+      assert.equal((await guest2.command({ type: 'place-spring', x: 13, y: 20, direction: 0 })).ok, true);
+      const beforeReset = host.scene.raceId;
+      rulesSettings = { ...rulesSettings, ...change };
+      assert.equal((await host.command({ type: 'configure', settings: rulesSettings })).ok, true);
+      await guest2.until(
+        () => guest2.scene.raceId === host.scene.raceId && guest2.frame.revision === guest2.scene.revision
+      );
+      assert.notEqual(host.scene.raceId, beforeReset, 'roster/map edits and an explicit identical shuffle still reset');
+      assert.equal(guest2.scene.placedSprings.length, 0);
+      assert.equal(guest2.frame.personalSpring.state, 'available');
+    }
+    console.log(
+      'PASS winner rule edits preserve every placement and prepared roster; start, finish, reset and shuffle remain correct'
+    );
+
     const personalStage = { title: '참여자 일회용 스프링', width: 26, goalY: 60, zoomY: 55, entities: [] };
     await host.command({
       type: 'configure',
