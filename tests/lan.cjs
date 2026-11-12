@@ -58,7 +58,7 @@ async function connect(port, cookie, options = {}) {
     }
   };
   client.command = async (msg, id = `request_${++nextId}`) => {
-    const start = client.messages.length;
+    const previous = client.messages.findLast((m) => m.type === 'result' && m.requestId === id);
     ws.send(
       JSON.stringify({
         raceId: client.scene.raceId,
@@ -68,9 +68,10 @@ async function connect(port, cookie, options = {}) {
       })
     );
     let result;
-    await client.until(
-      () => (result = client.messages.slice(start).find((m) => m.type === 'result' && m.requestId === id))
-    );
+    await client.until(() => {
+      result = client.messages.findLast((m) => m.type === 'result' && m.requestId === id);
+      return result && result !== previous;
+    });
     return result;
   };
   await new Promise((resolve, reject) => {
@@ -157,6 +158,13 @@ async function connect(port, cookie, options = {}) {
       guest = await connect(port, guestSession.cookie),
       guest2 = await connect(port, guest2Session.cookie);
     clients.push(host, guest, guest2);
+    while (guest.messages.length < 1000) guest.messages.push({ type: 'frame' });
+    const fullLogResult = await guest.command({ type: 'pause' }, 'full_log_result');
+    const replayedLogResult = await guest.command({ type: 'pause' }, 'full_log_result');
+    assert.equal(fullLogResult.ok, false, 'viewer commands still receive a rejection with a full message log');
+    assert.notEqual(replayedLogResult, fullLogResult, 'duplicate request IDs must wait for a fresh response');
+    assert.ok(guest.messages.length <= 1000, 'response matching preserves the bounded message log');
+    console.log('PASS command replies and duplicate IDs after the bounded message log rolls over');
     const oversized = await connect(port, guestSession.cookie);
     clients.push(oversized);
     let oversizedCode;
