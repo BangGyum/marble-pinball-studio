@@ -125,7 +125,7 @@ export class MapGallery {
     { rootMargin: '240px' }
   );
 
-  constructor(select: (id: string) => void) {
+  constructor(select: (id: string) => void, reveal: () => void) {
     for (const event of ['pinball-theme-change', 'pinball-marble-design-change'])
       window.addEventListener(event, () => {
         this.intro.stop();
@@ -149,7 +149,7 @@ export class MapGallery {
         this.returnHighlight?.cancel();
         this.returnHighlight = undefined;
         this.intro.stop();
-        this.transition.play(card, () => select(card.dataset.mapId!));
+        this.transition.play(card, () => select(card.dataset.mapId!), reveal);
       }
     });
     el<HTMLImageElement>('canyon-rock-texture').addEventListener('load', () => {

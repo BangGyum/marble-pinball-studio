@@ -4,6 +4,8 @@ export class MapTransition {
   private layer?: HTMLElement;
   private card?: HTMLElement;
   private select?: () => void;
+  private reveal?: () => void;
+  private revealFrame = 0;
   private swapTimer?: ReturnType<typeof setTimeout>;
   private endTimer?: ReturnType<typeof setTimeout>;
 
@@ -21,10 +23,11 @@ export class MapTransition {
     window.addEventListener('pagehide', () => this.finish());
   }
 
-  play(card: HTMLElement, select: () => void) {
+  play(card: HTMLElement, select: () => void, reveal: () => void) {
     if (this.layer || this.gallery.hidden) return;
     if (this.reduced.matches || document.hidden) {
       select();
+      reveal();
       return;
     }
     const bounds = card.getBoundingClientRect();
@@ -48,6 +51,7 @@ export class MapTransition {
     this.layer = layer;
     this.card = card;
     this.select = select;
+    this.reveal = reveal;
     card.classList.add('map-card-launching');
     document.body.append(layer);
     this.gallery.inert = this.game.inert = true;
@@ -60,12 +64,26 @@ export class MapTransition {
     const select = this.select;
     this.select = undefined;
     select?.();
+    // Allow a browser paint between physics preparation and the first cold-cache render.
+    if (select)
+      this.revealFrame = requestAnimationFrame(() => {
+        this.revealFrame = requestAnimationFrame(() => this.show());
+      });
+  }
+
+  private show() {
+    cancelAnimationFrame(this.revealFrame);
+    this.revealFrame = 0;
+    const reveal = this.reveal;
+    this.reveal = undefined;
+    reveal?.();
   }
 
   finish() {
     if (!this.layer) return;
     try {
       this.swap();
+      this.show();
     } finally {
       this.cancel();
     }
@@ -77,6 +95,9 @@ export class MapTransition {
     clearTimeout(this.endTimer);
     this.swapTimer = this.endTimer = undefined;
     this.select = undefined;
+    this.reveal = undefined;
+    cancelAnimationFrame(this.revealFrame);
+    this.revealFrame = 0;
     this.card!.classList.remove('map-card-launching');
     this.layer.remove();
     this.layer = undefined;

@@ -79,14 +79,16 @@ const gameView = el('game-view'),
 const galleryView = el('map-gallery');
 let galleryScroll = 0,
   resumeAfterGallery = false;
-const gallery = new MapGallery((id) => {
-  const selected = allMaps().find((map) => map.id === id);
-  if (!selected) return;
-  currentStage = selected.stage;
-  mapSelect.value = id;
-  prepare();
-  showGame(true);
-});
+const gallery = new MapGallery(
+  (id) => {
+    const selected = allMaps().find((map) => map.id === id);
+    if (!selected) return;
+    currentStage = selected.stage;
+    mapSelect.value = id;
+    prepare();
+  },
+  () => showGame(true)
+);
 const viewHistory = new ViewHistory((view) => {
   if (view === 'game') resumeGame();
   else showGallery();
