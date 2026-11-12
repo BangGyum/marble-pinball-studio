@@ -38,6 +38,9 @@ async function connect(port, cookie, options = {}) {
     headers: { Cookie: cookie, Origin: options.origin ?? `http://127.0.0.1:${port}` },
   });
   const client = { ws, messages: [], frame: null, scene: null, rawScene: null, identity: null, bytes: 0 };
+  ws.on('close', (code, reason) => {
+    client.closed = `${code} ${reason.toString()}`;
+  });
   ws.on('message', (raw) => {
     const msg = JSON.parse(raw);
     client.messages.push(msg);
@@ -53,11 +56,18 @@ async function connect(port, cookie, options = {}) {
   client.until = async (predicate, timeout = 5000) => {
     const deadline = Date.now() + timeout;
     while (!predicate()) {
+      if (client.closed) throw new Error(`LAN connection closed: ${client.closed}`);
       if (Date.now() > deadline) throw new Error('Timed out waiting for LAN state');
       await delay(10);
     }
   };
+  let nextCommandAt = 0;
   client.command = async (msg, id = `request_${++nextId}`) => {
+    // Functional assertions must not accidentally exercise the server's 30 requests/second flood guard.
+    const now = performance.now(),
+      scheduled = Math.max(now, nextCommandAt);
+    nextCommandAt = scheduled + 40;
+    if (scheduled > now) await delay(scheduled - now);
     const previous = client.messages.findLast((m) => m.type === 'result' && m.requestId === id);
     ws.send(
       JSON.stringify({
@@ -165,6 +175,20 @@ async function connect(port, cookie, options = {}) {
     assert.notEqual(replayedLogResult, fullLogResult, 'duplicate request IDs must wait for a fresh response');
     assert.ok(guest.messages.length <= 1000, 'response matching preserves the bounded message log');
     console.log('PASS command replies and duplicate IDs after the bounded message log rolls over');
+    for (let i = 0; i < 35; i++)
+      assert.equal(
+        (await guest.command({ type: 'pause' })).ok,
+        false,
+        'functional commands stay within the rate limit'
+      );
+    console.log('PASS repeated functional commands stay connected below the production rate limit');
+    const flooded = await connect(port, guestSession.cookie);
+    clients.push(flooded);
+    for (let i = 0; i < 31; i++)
+      flooded.ws.send(JSON.stringify({ type: 'pause', raceId: flooded.scene.raceId, requestId: `flood_${i}` }));
+    await flooded.until(() => flooded.closed);
+    assert.equal(flooded.closed, '1008 Too many requests', 'raw flooding still triggers the production guard');
+    console.log('PASS an intentional 31-command burst is rejected by the unchanged production flood guard');
     const oversized = await connect(port, guestSession.cookie);
     clients.push(oversized);
     let oversizedCode;
