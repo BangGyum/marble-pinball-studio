@@ -37,6 +37,7 @@ export class RenderCache {
     scale: number;
     dpr: number;
     theme: SceneTheme;
+    textured: boolean;
     canvas: OffscreenCanvas;
     fixed: Set<MapEntityState['shape']>;
   };
@@ -84,6 +85,11 @@ export class RenderCache {
         sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left: edge, top: edge },
       };
       this.balls.set(ball, cached);
+    }
+    // Body rasterization can consume the entire budget; keep it and defer the label.
+    if ((!label || label.key !== labelKey) && performance.now() >= this.deadline) {
+      this.warming = true;
+      return false;
     }
     const marble = cached.sprite;
     if (squash) {
@@ -149,13 +155,19 @@ export class RenderCache {
       drawEntities(ctx, entities, scale, -1, false, undefined, false, stage.art?.style === 'reversal-ladder');
       return;
     }
+    const texture =
+      stage.art?.style === 'fracture-canyon' && typeof document !== 'undefined'
+        ? (document.getElementById('canyon-rock-texture') as HTMLImageElement | null)
+        : undefined;
+    const textured = !!texture?.complete && !!texture.naturalWidth;
     let cached = this.minimap;
     if (
       !cached ||
       cached.stage !== stage ||
       cached.scale !== scale ||
       cached.dpr !== dpr ||
-      cached.theme !== getSceneTheme()
+      cached.theme !== getSceneTheme() ||
+      cached.textured !== textured
     ) {
       const fixed = new Set(
         (stage.entities ?? []).filter((e) => e.type === 'static' && (e.props.life ?? -1) <= 0).map((e) => e.shape)
@@ -177,7 +189,7 @@ export class RenderCache {
         false,
         stage.art?.style === 'reversal-ladder'
       );
-      cached = this.minimap = { stage, scale, dpr, theme: getSceneTheme(), canvas, fixed };
+      cached = this.minimap = { stage, scale, dpr, theme: getSceneTheme(), textured, canvas, fixed };
     }
     ctx.drawImage(cached.canvas, 0, 0, cached.canvas.width / (scale * dpr), cached.canvas.height / (scale * dpr));
     // Rotors and breakable obstacles stay live, above the fixed map layer.

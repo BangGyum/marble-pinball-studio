@@ -60,6 +60,66 @@ const { visibleArt } = require('../src/art-visibility.ts');
 const { Game } = require('../src/game.ts');
 const { LanView } = require('../src/lan/view.ts');
 
+// A slow body upload must yield before starting the separate label upload.
+{
+  const originalPerformance = global.performance,
+    originalCanvas = global.OffscreenCanvas;
+  let clock = 1000;
+  global.performance = { now: () => clock };
+  global.OffscreenCanvas = class extends originalCanvas {
+    constructor(w, h) {
+      super(w, h);
+      clock += 3;
+    }
+  };
+  try {
+    const cache = new RenderCache(),
+      main = context(),
+      marble = { id: 0, name: 'Slow upload', color: '#fff', x: 0, y: 0 };
+    let mainPaints = 0;
+    main.drawImage = () => mainPaints++;
+    const allocated = bitmaps.length;
+    cache.beginFrame();
+    calls.length = 0;
+    assert.equal(cache.drawBall(main, marble, 40, 1), false);
+    assert.equal(bitmaps.length - allocated, 1, 'do not start a label after the body exhausts the 2ms budget');
+    assert.equal(mainPaints, 0, 'fallback must not paint a marble twice');
+    assert.equal(cache.warming, true);
+    cache.beginFrame();
+    assert.equal(cache.drawBall(main, marble, 40, 1), true, 'the retained body allows the label to finish next frame');
+    assert.equal(bitmaps.length - allocated, 2);
+  } finally {
+    global.performance = originalPerformance;
+    global.OffscreenCanvas = originalCanvas;
+  }
+  console.log('PASS slow body uploads yield before labels without duplicate drawing or lost cache progress');
+}
+
+// A minimap first painted before the canyon image arrives must not stay untextured.
+{
+  const originalDocument = global.document,
+    texture = { complete: false, naturalWidth: 0 };
+  global.document = { getElementById: () => texture };
+  try {
+    const cache = new RenderCache();
+    cache.drawMinimap(ctx, fractureCanyon, [], 2, 1);
+    const first = bitmaps.at(-1);
+    texture.complete = true;
+    texture.naturalWidth = 512;
+    cache.drawMinimap(ctx, fractureCanyon, [], 2, 1);
+    const loaded = bitmaps.at(-1);
+    assert.notEqual(loaded, first, 'late canyon texture arrival invalidates the minimap bitmap');
+    assert.ok(calls.some((call) => call[0] === 'drawImage' && call[1] === texture));
+    cache.drawMinimap(ctx, fractureCanyon, [], 2, 1);
+    assert.equal(bitmaps.at(-1), loaded, 'loaded textures stay cached on later frames');
+  } finally {
+    global.document = originalDocument;
+  }
+  console.log('PASS late canyon textures refresh the minimap once and retain warm-frame caching');
+}
+
+calls.length = 0;
+
 // A settled preparation screen must not compete with the entry overlay for paints.
 {
   const listen = window.addEventListener;
