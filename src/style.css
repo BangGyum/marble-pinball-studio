@@ -315,9 +315,8 @@ hr {
   display: grid;
   grid-template-rows: 1fr;
   opacity: 1;
-  transition:
-    grid-template-rows 0.36s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.22s ease;
+  /* Resize the game once; animating row height rebuilds canvas/minimap bitmaps every frame. */
+  transition: opacity 0.22s ease;
 }
 .panel-clip {
   min-height: 0;

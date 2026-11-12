@@ -94,6 +94,14 @@ export class Game extends Race {
     window.addEventListener('pinball-marble-design-change', () => {
       this.renderDirty = true;
     });
+    // Late image loads must refresh a ready screen even when its frame loop is idle.
+    window.addEventListener(
+      'load',
+      () => {
+        this.renderDirty = true;
+      },
+      true
+    );
     new ResizeObserver(() => this.resize()).observe(canvas);
     const followMinimap = (e: PointerEvent) => {
       this.renderDirty = true;
@@ -356,7 +364,7 @@ export class Game extends Race {
       this.renderCache?.warming ||
       (this.winners.length && now - this.winnerAt < 1400) ||
       (this.drainCueAt && now - this.drainCueAt < 450) ||
-      now - this.lastFrameDraw >= 100
+      (this.state !== 'ready' && now - this.lastFrameDraw >= 100)
     ) {
       this.lastFrameDraw = now;
       this.renderDirty = false;

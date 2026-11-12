@@ -60,6 +60,37 @@ const { visibleArt } = require('../src/art-visibility.ts');
 const { Game } = require('../src/game.ts');
 const { LanView } = require('../src/lan/view.ts');
 
+// A settled preparation screen must not compete with the entry overlay for paints.
+{
+  const listen = window.addEventListener;
+  let loaded;
+  window.addEventListener = (type, handler, capture) => {
+    if (type === 'load' && capture) loaded = handler;
+  };
+  const game = new Game(canvas);
+  window.addEventListener = listen;
+  game.state = 'ready';
+  let paints = 0;
+  game.render = () => paints++;
+  for (let i = 0; i < 240; i++) game.frame(1000 + (i * 1000) / 60);
+  assert.equal(paints, 1, 'ready screen paints once, then stays idle without changes');
+  game.setZoom(0.8);
+  game.frame(5100);
+  assert.equal(paints, 2, 'zoom still repaints the preparation screen');
+  game.renderCache.warming = true;
+  game.frame(5120);
+  assert.equal(paints, 3, 'unfinished sprites still warm at frame cadence');
+  game.renderCache.warming = false;
+  game.dolphins = { enabled: true };
+  game.frame(5140);
+  assert.equal(paints, 4, 'enabled animal preview remains animated');
+  game.dolphins.enabled = false;
+  loaded();
+  game.frame(5160);
+  assert.equal(paints, 5, 'late image loads refresh an otherwise idle screen');
+  console.log('PASS idle preparation avoids periodic paints while zoom, warmup and animal preview remain live');
+}
+
 const canyonMini = new RenderCache(),
   canyonEntities = fractureCanyon.entities.map((e) => ({
     x: e.position.x,
