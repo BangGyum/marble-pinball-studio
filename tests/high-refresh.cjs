@@ -38,13 +38,33 @@ global.fetch = undefined;
 const { Game } = require('../src/game.ts');
 const { LanView } = require('../src/lan/view.ts');
 const { stages } = require('../src/data/maps.ts');
+const { RenderResolution } = require('../src/render-resolution.ts');
+const resolution = new RenderResolution();
+for (let i = 0; i < 40; i++) resolution.sample(25, true, 1.75);
+assert.equal(resolution.ratio(1.75), 1.5, 'sustained slow high-DPI frames reduce only the canvas pixel density');
+for (let i = 0; i < 160; i++) resolution.sample(25, true, 1.75);
+assert.equal(resolution.ratio(1.75), 1, 'automatic resolution has a one-device-pixel-per-CSS-pixel floor');
+for (let i = 0; i < 1499; i++) resolution.sample(10, true, 1.75);
+assert.equal(resolution.ratio(1.75), 1, 'brief recovery cannot repeatedly allocate different resolution sprites');
+resolution.sample(10, true, 1.75);
+assert.equal(resolution.ratio(1.75), 1.25, 'fifteen stable seconds restore quality one step at a time');
+const idleResolution = new RenderResolution();
+for (let i = 0; i < 200; i++) idleResolution.sample(25, false, 2);
+idleResolution.sample(1000, true, 2);
+assert.equal(idleResolution.ratio(2), 2, 'idle, recording and suspended-tab intervals never lower quality');
+for (const hz of [60, 120, 144]) {
+  const fast = new RenderResolution();
+  for (let i = 0; i < hz * 5; i++) fast.sample(1000 / hz, true, 2);
+  assert.equal(fast.ratio(2), 2, 'stable supported refresh rates retain full resolution');
+}
+console.log('PASS sustained-load pixel density, quality floor, slow recovery and idle/recording/background safeguards');
 const realPerformance = global.performance,
   realRandom = Math.random;
 let clock = 1000;
 global.performance = { now: () => clock };
 
 // A 6ms physics allowance can start a second step and consume the entire 120Hz frame.
-function busyFrame(hz) {
+function busyFrame(hz, stepCost = 3.2, renderCost = 2.2) {
   const game = new Game(canvas());
   game.state = 'running';
   game.speed = 4;
@@ -55,11 +75,11 @@ function busyFrame(hz) {
     renders = 0;
   game.advance = () => {
     steps++;
-    clock += 3.2;
+    clock += stepCost;
   };
   game.render = () => {
     renders++;
-    clock += 2.2;
+    clock += renderCost;
   };
   clock = 1000;
   game.frame(1000 + 1000 / hz);
@@ -70,11 +90,35 @@ for (const hz of [120, 144]) {
   assert.ok(result.work < 1000 / hz, `${hz}Hz must yield time to rendering; used ${result.work.toFixed(1)}ms`);
   assert.equal(result.steps, 1, 'one expensive step still advances, but no second one starts');
   assert.equal(result.renders, 1);
-  assert.ok(result.remaining < 1 / 60, 'missed time must not accumulate into the next frame');
+  assert.ok(result.remaining < 2 / 60, 'only one pending step may carry into the next frame');
 }
-assert.equal(busyFrame(60).steps, 2, '60Hz retains the existing physics allowance');
-assert.equal(busyFrame(10).steps, 2, 'a delayed callback must not increase the 6ms ceiling');
-console.log('PASS 120/144Hz physics yields before consuming the display interval; 60Hz and stall limits retained');
+assert.equal(busyFrame(60).steps, 1, 'do not start a second step estimated to exceed the 6ms physics allowance');
+assert.equal(busyFrame(60, 2.4).steps, 2, 'cheap steps still catch up within the same physics allowance');
+assert.equal(busyFrame(10).steps, 1, 'a delayed callback must not increase the 6ms ceiling');
+assert.ok(busyFrame(120, 2.8, 4.5).work < 1000 / 120, 'reserve the next step cost before using the render allowance');
+console.log('PASS predictive 60/120/144Hz physics budgets, cheap-step catch-up and delayed-callback limits');
+
+const jitterGame = new Game(canvas());
+jitterGame.state = 'running';
+jitterGame.last = 1000;
+jitterGame.finishSlowdown = () => 1;
+let jitterSteps = 0,
+  jitterNow = 1000;
+jitterGame.advance = () => {
+  jitterSteps++;
+  clock += 4;
+};
+jitterGame.render = () => {
+  clock += 1;
+};
+for (let i = 0; i < 120; i++) {
+  jitterNow += [16.4, 17][i % 2];
+  clock = jitterNow;
+  jitterGame.frame(jitterNow);
+}
+assert.ok(jitterSteps >= 119, 'sub-millisecond RAF jitter must not drop whole physics steps at normal speed');
+assert.ok(jitterGame.accumulator < 2 / 60, 'jitter recovery remains bounded to one pending step');
+console.log('PASS expensive normal-speed steps retain simulation time through sub-millisecond frame jitter');
 
 async function actualRace(stage, hz, speed) {
   let seed = 123456;

@@ -6,6 +6,7 @@ import { drawWind } from '../wind-render';
 import { drawCelebration } from '../celebration';
 import { drawFunnelEntryCue } from '../funnel-art';
 import { RenderCache } from '../render-cache';
+import { RenderResolution } from '../render-resolution';
 import { drawMarble } from '../marble-art';
 import { MarbleElasticity } from '../marble-elasticity';
 import { Recorder } from '../recorder';
@@ -61,6 +62,8 @@ export class LanView {
   private positions = new WeakMap<Frame, Map<number, [number, number]>>();
   private bridgeIds = new WeakMap<Frame, Set<number>>();
   private cache = new RenderCache();
+  private renderResolution = new RenderResolution();
+  private resolutionAt = 0;
   private marbleElasticity = new MarbleElasticity();
   private elasticFrameSeq = -1;
   private ctx: CanvasRenderingContext2D;
@@ -114,7 +117,7 @@ export class LanView {
       (index) => this.onSpring(index),
       () => this.state === 'running'
     );
-    this.ctx = canvas.getContext('2d', { alpha: false })!;
+    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })!;
     window.addEventListener('pinball-marble-design-change', () => {
       this.renderDirty = true;
     });
@@ -441,6 +444,8 @@ export class LanView {
     );
   }
   private frame(now: number) {
+    const interval = this.resolutionAt ? now - this.resolutionAt : 0;
+    this.resolutionAt = now;
     if (!this.visible) {
       this.dolphinPreviewLast = 0;
       return;
@@ -456,6 +461,16 @@ export class LanView {
       if (this.dolphinPreviewLast && gap < 250) this.dolphinPreviewElapsed += Math.max(0, Math.min(0.1, gap / 1000));
       this.dolphinPreviewLast = now;
     } else this.dolphinPreviewLast = 0;
+    if (
+      this.renderResolution.sample(
+        interval,
+        !this.recording &&
+          (this.state === 'running' || !!previewing) &&
+          (typeof document === 'undefined' || !document.hidden),
+        devicePixelRatio
+      )
+    )
+      this.renderDirty = true;
     if (
       this.state !== 'running' &&
       !previewing &&
@@ -486,7 +501,7 @@ export class LanView {
     const ctx = this.ctx;
     const dt = this.lastDraw ? Math.max(0, Math.min(0.1, (now - this.lastDraw) / 1000)) : 1 / 60;
     this.lastDraw = now;
-    const dpr = Math.min(devicePixelRatio, 2);
+    const dpr = this.renderResolution.ratio(devicePixelRatio);
     if (this.canvas.width !== Math.round(w * dpr)) this.canvas.width = Math.round(w * dpr);
     if (this.canvas.height !== Math.round(h * dpr)) this.canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

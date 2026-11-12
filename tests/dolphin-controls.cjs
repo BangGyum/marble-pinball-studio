@@ -333,6 +333,7 @@ for (const scale of [0.5, 3, 70]) {
 console.log('PASS draggable rows at 3 zoom levels, page offsets, minimap, bounds, pointer ownership and edit lock');
 const { Game } = require('../src/game.ts'),
   { LanView } = require('../src/lan/view.ts');
+const { RenderResolution } = require('../src/render-resolution.ts');
 for (const width of [400, 1000])
   for (const height of [300, 600])
     for (const goal of [20, 300]) {
@@ -366,6 +367,7 @@ for (const width of [400, 1000])
 console.log('PASS full-map fit for short/tall maps and narrow/wide standalone/LAN canvases');
 
 global.requestAnimationFrame = () => 1;
+global.devicePixelRatio = 1;
 global.document = { hidden: false };
 for (const View of [Game, LanView])
   for (const hz of [60, 120, 144]) {
@@ -375,6 +377,8 @@ for (const View of [Game, LanView])
     Object.assign(view, {
       state: 'ready',
       visible: true,
+      renderResolution: new RenderResolution(),
+      resolutionAt: 0,
       dolphinPreview: true,
       dolphinPreviewElapsed: 2.9,
       dolphinPreviewLast: 0,

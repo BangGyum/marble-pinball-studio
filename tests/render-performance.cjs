@@ -55,6 +55,7 @@ const { drawOrbitalArt } = require('../src/orbital-art.ts');
 const { orbitalLock } = require('../src/data/orbital-lock.ts');
 const { fractureCanyon } = require('../src/data/fracture-canyon.ts');
 const { drawMapOverlay } = require('../src/map-art.ts');
+const { setSceneTheme } = require('../src/scene-theme.ts');
 const { visibleArt } = require('../src/art-visibility.ts');
 const { Game } = require('../src/game.ts');
 const { LanView } = require('../src/lan/view.ts');
@@ -244,6 +245,70 @@ assert.equal(
   'clipping scenery preserves the collision geometry and bridge entry'
 );
 console.log('PASS orbital exit wall clipping in cached and fallback views with unchanged physics geometry');
+
+for (const scale of [2, 14, 40]) {
+  const stage = { ...orbitalLock },
+    main = context();
+  let liveMasks = 0;
+  main.clip = (rule) => {
+    if (rule === 'evenodd') liveMasks++;
+  };
+  const first = bitmaps.length;
+  drawMapOverlay(main, stage, orbitalEntities, scale);
+  const warmed = bitmaps.length;
+  for (let frame = 0; frame < 120; frame++) drawMapOverlay(main, stage, orbitalEntities, scale);
+  assert.equal(liveMasks, 0, 'the original exit mask is cached instead of rasterized on the game canvas each frame');
+  assert.equal(bitmaps.length, warmed, 'main and minimap exit textures stay warm without new bitmaps');
+  assert.ok(
+    bitmaps.slice(first).reduce((pixels, bitmap) => pixels + bitmap.width * bitmap.height, 0) < 3 * 1024 * 1024,
+    'exit textures cover the outlet instead of allocating the entire map'
+  );
+  const movedGate = orbitalEntities.map((e) =>
+    e.shape.collisionLayer === 2 && e.shape.type === 'polyline' && e.shape.solid ? { ...e, x: 32, y: 40 } : e
+  );
+  drawMapOverlay(main, stage, movedGate, scale);
+  assert.equal(liveMasks, 1, 'an edited moving gate entering the core still receives the original mask');
+}
+console.log('PASS warm orbital exit masks, bounded outlet textures and clipping for edited moving gates');
+
+for (const theme of ['dark', 'beige']) {
+  setSceneTheme(theme);
+  for (const dpr of [1, 1.75, 2])
+    for (const initialScale of [1.8, 14, 31.8, 515 / 13, 100]) {
+      const stage = { ...orbitalLock };
+      const sample = (scale) => {
+        const main = context(),
+          mini = context();
+        main.getTransform = () => ({ a: scale * dpr, b: 0 });
+        mini.getTransform = () => ({ a: 2 * dpr, b: 0 });
+        drawOrbitalArt(main, stage);
+        drawMapOverlay(main, stage, orbitalEntities, scale);
+        drawMapOverlay(mini, stage, orbitalEntities, 2);
+      };
+      sample(initialScale);
+      const first = bitmaps.length;
+      for (let frame = 1; frame <= 120; frame++) sample(initialScale * (1 + frame / 600));
+      assert.ok(bitmaps.length - first <= 8, 'continuous zoom must reuse outlet textures across nearby scales');
+      const warmed = bitmaps.length;
+      for (let frame = 120; frame >= 0; frame--) sample(initialScale * (1 + frame / 600));
+      assert.equal(bitmaps.length, warmed, 'reverse zoom must reuse the warmed main-view and minimap textures');
+    }
+}
+setSceneTheme('dark');
+const glowStage = { ...orbitalLock };
+for (const scale of [31.999, 32]) {
+  const main = context();
+  main.getTransform = () => ({ a: scale * 1.75, b: 0 });
+  drawMapOverlay(main, glowStage, orbitalEntities, scale);
+  assert.equal(bitmaps.at(-1).ctx.shadowBlur, scale < 32 ? 0 : 7, 'cached walls retain the 32px glow threshold');
+}
+console.log('PASS continuous and reverse orbital zoom across glow thresholds, themes, DPI and minimap scales');
+
+drawOrbitalArt(ctx, { ...orbitalLock, goalY: 20 }, 2);
+assert.ok(
+  Number.isFinite(bitmaps.at(-1).width) && Number.isFinite(bitmaps.at(-1).height) && bitmaps.at(-1).height > 0,
+  'shortened editor maps retain valid outlet texture dimensions'
+);
 
 const roundhouse = { title: 'Test', width: 48, goalY: 100 };
 calls.length = 0;
@@ -533,7 +598,6 @@ assert.ok(
 assert.ok(calls.some((call) => call[0] === 'clip' && call[1] === 'evenodd'));
 console.log('PASS transfer return hides the protruding deck and rails without fading released marbles');
 
-const { setSceneTheme } = require('../src/scene-theme.ts');
 const originalOffscreen = global.OffscreenCanvas;
 for (const stage of [infiniteFunnel, twinFunnel]) {
   const geometry = JSON.stringify(stage);

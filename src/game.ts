@@ -10,6 +10,7 @@ import { drawCelebration } from './celebration';
 import { Recorder } from './recorder';
 import { toast } from './ui';
 import { RenderCache } from './render-cache';
+import { RenderResolution } from './render-resolution';
 import { drawMarble } from './marble-art';
 import { MarbleElasticity } from './marble-elasticity';
 import { getSceneTheme, sceneColor } from './scene-theme';
@@ -54,6 +55,7 @@ export class Game extends Race {
   private height = 600;
   private minimap = { x: 18, y: 20, w: 115, h: 400, scale: 4 };
   private renderCache = new RenderCache();
+  private renderResolution = new RenderResolution();
   private marbleElasticity = new MarbleElasticity();
   private springControls: SpringControls;
   private dolphinRenderer = new DolphinRenderer();
@@ -85,7 +87,7 @@ export class Game extends Race {
       (index) => this.activateSpring(index),
       () => this.state === 'running'
     );
-    this.ctx = canvas.getContext('2d', { alpha: false })!;
+    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })!;
     window.addEventListener('pinball-theme-change', () => {
       this.renderDirty = true;
     });
@@ -295,7 +297,8 @@ export class Game extends Race {
     // ResizeObserver runs after RAF. Keep the previous bitmap until the next render.
   }
   private frame(now: number) {
-    const delta = this.last ? Math.min((now - this.last) / 1000, 0.1) : 0;
+    const interval = this.last ? now - this.last : 0;
+    const delta = Math.min(interval / 1000, 0.1);
     this.last = now;
     if (!this.visible) {
       this.dolphinPreviewLast = 0;
@@ -314,6 +317,16 @@ export class Game extends Race {
       if (this.dolphinPreviewLast && gap < 250) this.dolphinPreviewElapsed += Math.max(0, Math.min(0.1, gap / 1000));
       this.dolphinPreviewLast = now;
     } else this.dolphinPreviewLast = 0;
+    if (
+      this.renderResolution.sample(
+        interval,
+        !this.recording &&
+          (this.state === 'running' || !!previewing) &&
+          (typeof document === 'undefined' || !document.hidden),
+        devicePixelRatio
+      )
+    )
+      this.renderDirty = true;
     if (this.state === 'running') {
       this.accumulator += delta * this.speed * (this.fastForward ? 2 : 1) * this.finishSlowdown();
       const physicsStart = performance.now();
@@ -325,15 +338,14 @@ export class Game extends Race {
         this.accumulator >= 1 / 60 &&
         this.state === 'running' &&
         steps < maxSteps &&
-        (steps === 0 || performance.now() - physicsStart < physicsBudget)
+        (steps === 0 || ((performance.now() - physicsStart) * (steps + 1)) / steps < physicsBudget)
       ) {
         this.advance();
         this.accumulator -= 1 / 60;
         steps++;
       }
-      // Drop overdue wall-clock time, never physics steps: collisions still advance at 1/60.
-      // Under load the race slows down instead of creating a catch-up workload next frame.
-      if (this.accumulator >= 1 / 60) this.accumulator %= 1 / 60;
+      // Retain one pending step for frame jitter; discard larger backlogs to avoid catch-up spikes.
+      if (this.accumulator >= 2 / 60) this.accumulator = 1 / 60 + (this.accumulator % (1 / 60));
     }
     if (
       this.state === 'running' ||
@@ -377,7 +389,7 @@ export class Game extends Race {
     const ctx = this.ctx,
       w = this.width,
       h = this.height,
-      d = Math.min(devicePixelRatio, 2);
+      d = this.renderResolution.ratio(devicePixelRatio);
     const pixelWidth = Math.max(1, Math.round(w * d)),
       pixelHeight = Math.max(1, Math.round(h * d));
     // Changing either dimension clears the canvas; resize and paint in the same callback.
