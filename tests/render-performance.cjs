@@ -60,6 +60,74 @@ const { visibleArt } = require('../src/art-visibility.ts');
 const { Game } = require('../src/game.ts');
 const { LanView } = require('../src/lan/view.ts');
 
+// Starting a goal-area map zooms out; a sharper ready bitmap is still valid.
+{
+  const originalPerformance = global.performance;
+  let clock = 1000;
+  global.performance = { now: () => clock };
+  try {
+    const cache = new RenderCache(),
+      marble = { id: 0, name: '줌 검증', color: '#fff', x: 0, y: 0 };
+    cache.beginFrame();
+    assert.equal(cache.drawBall(ctx, marble, 40, 1.75), true);
+    const allocated = bitmaps.length,
+      body = bitmaps.at(-2),
+      label = bitmaps.at(-1);
+    clock += 3;
+    for (const [scale, dpr] of [
+      [6, 1.75],
+      [2, 1],
+      [40, 1.75],
+    ]) {
+      calls.length = 0;
+      assert.equal(cache.drawBall(ctx, marble, scale, dpr), true, 'zoom-out must reuse the sharper ready sprites');
+      const images = calls.filter(([method]) => method === 'drawImage');
+      assert.equal(images[0][1], body);
+      assert.equal(images[1][1], label);
+      assert.equal(images[0][4], body.width / 1.75 / 40, 'the marble retains its world-space radius');
+      assert.equal(bitmaps.length, allocated, 'zoom and lower canvas density do not allocate replacement sprites');
+      assert.equal(cache.warming, false);
+    }
+    cache.beginFrame();
+    assert.equal(cache.drawBall(ctx, marble, 80, 2), true, 'zoom-in creates a sharper sprite when needed');
+    assert.equal(bitmaps.length, allocated + 2);
+    clock += 3;
+    assert.equal(cache.drawBall(ctx, marble, 6, 1), true);
+    const shrunkLabel = calls.at(-1),
+      font = parseFloat(shrunkLabel[1].ctx.font),
+      factor = (shrunkLabel[4] / (shrunkLabel[1].width / 2)) * 6;
+    assert.ok(Math.abs(font * factor - 12) < 1e-10, 'reusing a larger label retains its 12px CSS font size');
+    assert.equal(cache.drawBall(ctx, { ...marble }, 6, 1), false, 'new marbles still respect the frame budget');
+    marble.color = '#f00';
+    assert.equal(cache.drawBall(ctx, marble, 6, 1), false, 'a different color cannot reuse the old appearance');
+  } finally {
+    global.performance = originalPerformance;
+  }
+  console.log('PASS ready-to-race zoom and adaptive density reuse sharp sprites with unchanged size and color');
+}
+
+{
+  const cache = new RenderCache(),
+    balls = Array.from({ length: 100 }, (_, id) => ({
+      id,
+      name: `구슬 ${id}`,
+      color: `hsl(${id} 85% 72%)`,
+      x: 0,
+      y: 0,
+    }));
+  for (const ball of balls) cache.drawBall(ctx, ball, 16, 1.75);
+  const warm = bitmaps.length;
+  for (const dpr of [1.75, 1.5, 1.25, 1, 1.75]) {
+    cache.beginFrame();
+    for (const ball of balls) {
+      assert.equal(cache.drawBall(ctx, ball, 6, dpr), true, '100-marble overview must keep using its ready bitmaps');
+      assert.equal(cache.drawBall(ctx, ball, 2, dpr), true, 'zooming out again must not fall back to vector labels');
+    }
+  }
+  assert.equal(bitmaps.length, warm, 'camera and adaptive-density changes allocate zero new sprites');
+  console.log('PASS 100 marbles retain their sprites across overview, 35% zoom and all adaptive-density steps');
+}
+
 // A slow body upload must yield before starting the separate label upload.
 {
   const originalPerformance = global.performance,

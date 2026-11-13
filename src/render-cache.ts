@@ -30,8 +30,8 @@ function drawMinimapArt(
 }
 
 export class RenderCache {
-  private balls = new WeakMap<Ball, { key: string; sprite: Sprite }>();
-  private labels = new WeakMap<Ball, { key: string; sprite: Sprite }>();
+  private balls = new WeakMap<Ball, { key: string; resolution: number; density: number; sprite: Sprite }>();
+  private labels = new WeakMap<Ball, { key: string; font: number; density: number; sprite: Sprite }>();
   private minimap?: {
     stage: StageDef;
     scale: number;
@@ -62,18 +62,22 @@ export class RenderCache {
     if (typeof OffscreenCanvas === 'undefined') return false;
     // Rasterize in small resolution buckets; continuous zoom reuses these bitmaps.
     const resolution = Math.ceil(scale / 8) * 8;
-    const key = `${getMarbleDesign()}/${getSceneTheme()}/${resolution}/${dpr}/${ball.color}`;
+    const key = `${getMarbleDesign()}/${getSceneTheme()}/${ball.color}`;
     let cached = this.balls.get(ball);
     const font = Math.min(17, Math.max(12, scale * 0.24)),
       rasterFont = Math.ceil(font);
-    const labelKey = `${getSceneTheme()}/${rasterFont}/${dpr}/${ball.color}/${ball.name}`;
+    const labelKey = `${getSceneTheme()}/${ball.color}/${ball.name}`;
     let label = this.labels.get(ball);
-    if ((!cached || cached.key !== key || !label || label.key !== labelKey) && performance.now() >= this.deadline) {
+    // A sharper bitmap remains valid when the camera zooms out or canvas density falls.
+    // Keep one bitmap per marble/label, and only replace it for more detail or new content.
+    const needsBody = !cached || cached.key !== key || cached.density < resolution * dpr,
+      needsLabel = !label || label.key !== labelKey || label.density < rasterFont * dpr;
+    if ((needsBody || needsLabel) && performance.now() >= this.deadline) {
       // Draw the vector fallback now and build the remaining bitmaps on later frames.
       this.warming = true;
       return false;
     }
-    if (!cached || cached.key !== key) {
+    if (!cached || needsBody) {
       const radius = resolution * 0.25,
         edge = Math.ceil(radius + 14);
       const canvas = new OffscreenCanvas(Math.ceil(edge * 2 * dpr), Math.ceil(edge * 2 * dpr));
@@ -82,16 +86,19 @@ export class RenderCache {
       drawMarble(spriteCtx, 0, 0, radius, ball.color);
       cached = {
         key,
+        resolution,
+        density: resolution * dpr,
         sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left: edge, top: edge },
       };
       this.balls.set(ball, cached);
     }
     // Body rasterization can consume the entire budget; keep it and defer the label.
-    if ((!label || label.key !== labelKey) && performance.now() >= this.deadline) {
+    if (needsLabel && performance.now() >= this.deadline) {
       this.warming = true;
       return false;
     }
-    const marble = cached.sprite;
+    const marble = cached.sprite,
+      marbleScale = cached.resolution;
     if (squash) {
       ctx.save();
       ctx.translate(x, y);
@@ -100,23 +107,23 @@ export class RenderCache {
       ctx.rotate(-squash.angle);
       ctx.drawImage(
         marble.canvas,
-        -marble.left / resolution,
-        -marble.top / resolution,
-        marble.width / resolution,
-        marble.height / resolution
+        -marble.left / marbleScale,
+        -marble.top / marbleScale,
+        marble.width / marbleScale,
+        marble.height / marbleScale
       );
       ctx.restore();
     } else {
       ctx.drawImage(
         marble.canvas,
-        x - marble.left / resolution,
-        y - marble.top / resolution,
-        marble.width / resolution,
-        marble.height / resolution
+        x - marble.left / marbleScale,
+        y - marble.top / marbleScale,
+        marble.width / marbleScale,
+        marble.height / marbleScale
       );
     }
     // Labels keep the original 12–17 CSS pixel policy, independently of marble zoom.
-    if (!label || label.key !== labelKey) {
+    if (!label || needsLabel) {
       const canvas = new OffscreenCanvas(1, 1),
         spriteCtx = canvas.getContext('2d')!;
       spriteCtx.font = `${rasterFont}px sans-serif`;
@@ -132,11 +139,16 @@ export class RenderCache {
       spriteCtx.lineWidth = 3;
       spriteCtx.strokeText(ball.name, 0, 0);
       spriteCtx.fillText(ball.name, 0, 0);
-      label = { key: labelKey, sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left, top } };
+      label = {
+        key: labelKey,
+        font: rasterFont,
+        density: rasterFont * dpr,
+        sprite: { canvas, width: canvas.width / dpr, height: canvas.height / dpr, left, top },
+      };
       this.labels.set(ball, label);
     }
     const s = label.sprite,
-      labelScale = font / rasterFont / scale;
+      labelScale = font / label.font / scale;
     ctx.drawImage(
       s.canvas,
       x - s.left * labelScale,
