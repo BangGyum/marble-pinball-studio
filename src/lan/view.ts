@@ -467,7 +467,15 @@ export class LanView {
         !this.recording &&
           (this.state === 'running' || !!previewing) &&
           (typeof document === 'undefined' || !document.hidden),
-        devicePixelRatio
+        devicePixelRatio,
+        this.state === 'ready' &&
+          !previewing &&
+          !this.recording &&
+          !this.renderDirty &&
+          !this.cameraMoving &&
+          !this.playbackMoving &&
+          !this.cache?.warming &&
+          (typeof document === 'undefined' || !document.hidden)
       )
     )
       this.renderDirty = true;

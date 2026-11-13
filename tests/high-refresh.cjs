@@ -58,10 +58,58 @@ for (const hz of [60, 120, 144]) {
   assert.equal(fast.ratio(2), 2, 'stable supported refresh rates retain full resolution');
 }
 console.log('PASS sustained-load pixel density, quality floor, slow recovery and idle/recording/background safeguards');
+// Slow browser frame delivery alone must not repeatedly rebuild lower-resolution sprites.
+const browserLimited = new RenderResolution();
+for (let i = 0; i < 100; i++) browserLimited.sample(20, false, 1.75, true);
+for (let i = 0; i < 250; i++) browserLimited.sample(20, true, 1.75);
+assert.equal(browserLimited.ratio(1.75), 1.75, 'a 50Hz browser baseline preserves quality at the same game cadence');
+for (let i = 0; i < 40; i++) browserLimited.sample(25, true, 1.75);
+assert.equal(browserLimited.ratio(1.75), 1.5, 'a real slowdown below the idle baseline still lowers pixel density');
+for (let i = 0; i < 750; i++) browserLimited.sample(20, true, 1.75);
+assert.equal(browserLimited.ratio(1.75), 1.75, 'returning to the browser baseline restores quality after 15 seconds');
+const interruptedBaseline = new RenderResolution();
+for (let i = 0; i < 25; i++) interruptedBaseline.sample(20, false, 1.75, true);
+interruptedBaseline.sample(20, false, 1.75);
+for (let i = 0; i < 25; i++) interruptedBaseline.sample(20, false, 1.75, true);
+for (let i = 0; i < 50; i++) interruptedBaseline.sample(20, true, 1.75);
+assert.equal(interruptedBaseline.ratio(1.75), 1.5, 'partial idle samples cannot mix across animation or game start');
+console.log('PASS browser cadence calibration, actual load reduction, baseline recovery and interrupted idle samples');
 const realPerformance = global.performance,
   realRandom = Math.random;
 let clock = 1000;
 global.performance = { now: () => clock };
+
+for (const Type of [Game, LanView]) {
+  const renderer = new Type(canvas());
+  renderer[Type === Game ? 'render' : 'draw'] = () => {};
+  renderer.advance = () => {};
+  renderer.finishSlowdown = () => 1;
+  renderer.renderDirty = false;
+  const cache = Type === Game ? renderer.renderCache : renderer.cache;
+  const tick = (count, interval) => {
+    for (let i = 0; i < count; i++) {
+      clock += interval;
+      renderer.frame(clock);
+    }
+  };
+  global.devicePixelRatio = 1.75;
+  cache.warming = true;
+  tick(120, 40);
+  cache.warming = false;
+  renderer.state = 'running';
+  tick(80, 25);
+  assert.ok(renderer.renderResolution.ratio(1.75) < 1.75, `${Type.name}: cache warmup cannot set a slow baseline`);
+  renderer.renderResolution = new RenderResolution();
+  renderer.state = 'ready';
+  tick(120, 20);
+  renderer.state = 'running';
+  tick(120, 20);
+  assert.equal(renderer.renderResolution.ratio(1.75), 1.75, `${Type.name}: settled ready cadence is used in play`);
+  tick(120, 25);
+  assert.ok(renderer.renderResolution.ratio(1.75) < 1.75, `${Type.name}: a slowdown during play lowers resolution`);
+  global.devicePixelRatio = 1;
+}
+console.log('PASS Game and LAN calibrate settled ready frames and retain load protection after cold-cache frames');
 
 // A 6ms physics allowance can start a second step and consume the entire 120Hz frame.
 function busyFrame(hz, stepCost = 3.2, renderCost = 2.2) {
