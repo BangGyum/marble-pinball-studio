@@ -62,6 +62,7 @@ winnerCount.addEventListener('change', () => (preferredWinnerCount = Number(winn
 const initialMapIndex = DEFAULT_MAP_INDEX;
 let currentStage: StageDef = stages[initialMapIndex];
 let initialized = false;
+let preparedNames: string | undefined;
 const dolphinPanel = new SeaAnimalSettingsPanel(
   el('dolphin-settings'),
   (settings) => {
@@ -186,10 +187,12 @@ function lockControls(locked: boolean) {
 }
 function prepare() {
   if (!initialized) return;
+  preparedNames = undefined;
   try {
     const list = parseNames(names.value);
     dolphinPanel.setStage(currentStage);
     game.prepare(currentStage, list, dolphinPanel.value);
+    preparedNames = names.value;
     updateWinnerCount(list.length);
     updateStandings();
     el('count').textContent = `${list.length}개의 구슬`;
@@ -232,8 +235,11 @@ function startRace() {
   updateWinnerCount(list.length);
   const order = mode.value as WinnerOrder;
   const range = winningRange(order, list.length, Number(winnerCount.value));
-  dolphinPanel.setStage(currentStage);
-  game.prepare(currentStage, list, dolphinPanel.value);
+  if (game.state !== 'ready' || game.stage !== currentStage || preparedNames !== names.value) {
+    dolphinPanel.setStage(currentStage);
+    game.prepare(currentStage, list, dolphinPanel.value);
+    preparedNames = names.value;
+  }
   game.start(range, record.checked, order);
   updateStandings();
   setPanelCollapsed(true);
