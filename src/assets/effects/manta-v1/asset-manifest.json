@@ -1,0 +1,30 @@
+{
+  "name": "만타가오리",
+  "version": 2,
+  "created": "2026-11-06",
+  "updated": "2026-11-14",
+  "status": "game-and-lan-effect",
+  "generatedWith": "Codex built-in image_gen; transparent_background=true",
+  "reference": "Previous manta sprite, edited to a matte 2D cel style with an open mouth pocket",
+  "file": "manta.png",
+  "prompt": "prompt.txt",
+  "size": [1774, 887],
+  "sourceRect": [105, 33, 1569, 834],
+  "pivot": [0.5, 0.5],
+  "facing": "right",
+  "leftDirection": "mirror horizontally at render time",
+  "worldWidth": 4,
+  "previewBaseScale": 3,
+  "hitbox": {
+    "source": "PNG alpha >= 128",
+    "generatedBy": "scripts/trace-manta-hitbox.py",
+    "data": "src/data/manta-outline.ts",
+    "contact": "src/manta-hitbox.ts",
+    "vertices": 156,
+    "contourTolerancePixels": 1.25,
+    "areaErrorPercent": 0.01546860985049978,
+    "marbleRadius": 0.25
+  },
+  "preview": "tests/manta-preview.html",
+  "scope": "일반 경기·설정·LAN에 연결. 2D 셀 스타일과 열린 입구. 크기 50·100·200%에서 공 진입 경로 검증."
+}

@@ -64,6 +64,23 @@ const stage = (entities) => validateStage({ title: 'Physics regression', goalY: 
     }
     physics.clearMarbles();
     physics.clear();
+    physics.createStage(stage([{ ...fragile(), props: { ...props, life: 2 } }]));
+    physics.createMarble(0, -0.3, 0);
+    physics.start();
+    physics.step(1 / 60);
+    assert.equal(physics.getEntities()[0].life, 1, 'one sustained contact consumes one life');
+    physics.step(1 / 60);
+    assert.equal(physics.getEntities()[0].life, 1, 'substeps do not consume extra life');
+    physics.vector.Set(-3, 0);
+    physics.marbleMap[0].SetTransform(physics.vector, 0);
+    physics.step(1 / 60);
+    physics.vector.Set(-0.3, 0);
+    physics.marbleMap[0].SetTransform(physics.vector, 0);
+    physics.marbleMap[0].SetAwake(true);
+    physics.step(1 / 60);
+    assert.equal(physics.getEntities().length, 0, 'a second distinct contact destroys a two-life obstacle');
+    physics.clearMarbles();
+    physics.clear();
     physics.createStage(
       stage([
         {

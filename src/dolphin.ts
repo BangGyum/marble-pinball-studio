@@ -1,7 +1,8 @@
 import type { StageDef } from './stage-def';
 import { dolphinSurface, DOLPHIN_SPRITE_WIDTH } from './dolphin-hitbox';
 
-export type DolphinSettings = { enabled: boolean; rows: number[]; interval: number; size?: number; speed?: number };
+export type AnimalOptions = { enabled: boolean; rows: number[]; interval: number; size?: number; speed?: number };
+export type DolphinSettings = AnimalOptions & { manta?: AnimalOptions };
 export const DOLPHIN_DURATION = 4.35;
 export const DOLPHIN_WIDTH = DOLPHIN_SPRITE_WIDTH;
 export const DOLPHIN_BASE_SCALE = 3;
@@ -19,6 +20,11 @@ export function dolphinRows(stage: StageDef, count = 3, gap = 20, first = 12) {
   );
 }
 export function validateDolphins(value: unknown, stage: StageDef): DolphinSettings {
+  const settings = validateEffect(value, stage, true);
+  if (settings.enabled && settings.manta?.enabled) throw new Error('돌고래와 만타가오리 효과는 하나만 켤 수 있어요.');
+  return settings;
+}
+function validateEffect(value: unknown, stage: StageDef, allowManta: boolean): DolphinSettings {
   if (value === undefined) return { enabled: false, rows: dolphinRows(stage), interval: 5 };
   const s = value as DolphinSettings,
     { min, max } = dolphinBounds(stage);
@@ -26,7 +32,9 @@ export function validateDolphins(value: unknown, stage: StageDef): DolphinSettin
     !s ||
     typeof s !== 'object' ||
     Array.isArray(s) ||
-    Object.keys(s).some((key) => !['enabled', 'rows', 'interval', 'size', 'speed'].includes(key)) ||
+    Object.keys(s).some(
+      (key) => !['enabled', 'rows', 'interval', 'size', 'speed'].includes(key) && !(allowManta && key === 'manta')
+    ) ||
     typeof s.enabled !== 'boolean' ||
     !Number.isFinite(s.interval) ||
     s.interval < 5 ||
@@ -39,7 +47,7 @@ export function validateDolphins(value: unknown, stage: StageDef): DolphinSettin
     s.rows.some((y, i) => !Number.isFinite(y) || y < min || y > max || (i > 0 && y - s.rows[i - 1] < 0.5 - 1e-6))
   )
     throw new Error(
-      '돌고래 설정을 확인해 주세요. 줄은 1~6개, 출몰 간격은 5~120초, 크기는 50~200%, 이동 속도는 0.5~1.5배입니다.'
+      '동물 효과 설정을 확인해 주세요. 줄은 1~6개, 출몰 간격은 5~120초, 크기는 50~200%, 이동 속도는 0.5~1.5배입니다.'
     );
   return {
     enabled: s.enabled,
@@ -47,6 +55,7 @@ export function validateDolphins(value: unknown, stage: StageDef): DolphinSettin
     interval: s.interval,
     ...(s.size === undefined ? {} : { size: s.size }),
     ...(s.speed === undefined ? {} : { speed: s.speed }),
+    ...(s.manta === undefined ? {} : { manta: validateEffect(s.manta, stage, false) }),
   };
 }
 export type DolphinPose = { x: number; y: number; angle: number; direction: number; waterY: number; scale?: number };

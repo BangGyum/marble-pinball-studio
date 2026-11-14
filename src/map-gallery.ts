@@ -111,6 +111,9 @@ export class MapGallery {
   private reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   private returnHighlight?: Animation;
   private grid = el('map-grid');
+  private maps: SavedMap[] = [];
+  private selectedId?: string;
+  private group: 'builtin' | 'custom' = 'builtin';
   private thumbnails = new WeakMap<StageDef, HTMLCanvasElement>();
   private stages = new WeakMap<HTMLCanvasElement, StageDef>();
   private observer = new IntersectionObserver(
@@ -125,7 +128,14 @@ export class MapGallery {
     { rootMargin: '240px' }
   );
 
-  constructor(select: (id: string) => void) {
+  constructor(select: (id: string) => void, reveal: () => void) {
+    for (const group of ['builtin', 'custom'] as const)
+      el<HTMLButtonElement>(`gallery-filter-${group}`).addEventListener('click', () => {
+        if (this.group === group) return;
+        this.intro.stop();
+        this.group = group;
+        this.render();
+      });
     for (const event of ['pinball-theme-change', 'pinball-marble-design-change'])
       window.addEventListener(event, () => {
         this.intro.stop();
@@ -149,7 +159,7 @@ export class MapGallery {
         this.returnHighlight?.cancel();
         this.returnHighlight = undefined;
         this.intro.stop();
-        this.transition.play(card, () => select(card.dataset.mapId!));
+        this.transition.play(card, () => select(card.dataset.mapId!), reveal);
       }
     });
     el<HTMLImageElement>('canyon-rock-texture').addEventListener('load', () => {
@@ -161,9 +171,27 @@ export class MapGallery {
   }
 
   refresh(maps: SavedMap[], selected: string) {
+    if (this.selectedId !== selected) this.group = selected.startsWith('builtin-') ? 'builtin' : 'custom';
+    this.selectedId = selected;
+    this.maps = maps;
+    this.render();
+  }
+
+  private render() {
     this.returnHighlight?.cancel();
     this.returnHighlight = undefined;
     this.observer.disconnect();
+    const builtin = this.group === 'builtin';
+    const maps = this.maps.filter((map) => map.id.startsWith('builtin-') === builtin);
+    el('gallery-list-title').textContent = builtin ? '원래 맵' : '내 맵';
+    el('gallery-list-description').textContent = builtin
+      ? '출발부터 결승선까지, 한눈에 살펴보세요.'
+      : '직접 만든 코스를 골라 보세요.';
+    el('gallery-empty').hidden = builtin || maps.length > 0;
+    el('gallery-storage-note').hidden = builtin;
+    this.grid.setAttribute('aria-label', builtin ? '원래 맵 목록' : '내 맵 목록');
+    for (const group of ['builtin', 'custom'] as const)
+      el<HTMLButtonElement>(`gallery-filter-${group}`).setAttribute('aria-pressed', String(this.group === group));
     const defaultId = `builtin-${DEFAULT_MAP_INDEX}`;
     const ordered = [...maps.filter((map) => map.id === defaultId), ...maps.filter((map) => map.id !== defaultId)];
     const cards = ordered.map((map, index) => {
@@ -176,7 +204,7 @@ export class MapGallery {
       card.className = 'map-card';
       card.dataset.mapId = map.id;
       card.setAttribute('aria-label', `${map.stage.title} · 맵 선택`);
-      if (map.id === selected) card.setAttribute('aria-current', 'true');
+      if (map.id === this.selectedId) card.setAttribute('aria-current', 'true');
       card.style.setProperty('--map-color', color);
       card.innerHTML = `<span class="map-card-heading"><span class="map-card-number" aria-hidden="true"></span><span class="map-card-title"></span></span><span class="map-preview"><span class="map-card-tag"></span></span><span class="map-card-body"><span class="map-card-description"></span><span class="map-card-action">이 맵으로 준비 <span class="map-card-ball" aria-hidden="true"></span></span></span>`;
       card.querySelector('.map-card-number')!.textContent = String(index + 1).padStart(2, '0');

@@ -55,9 +55,169 @@ const { drawOrbitalArt } = require('../src/orbital-art.ts');
 const { orbitalLock } = require('../src/data/orbital-lock.ts');
 const { fractureCanyon } = require('../src/data/fracture-canyon.ts');
 const { drawMapOverlay } = require('../src/map-art.ts');
+const { setSceneTheme } = require('../src/scene-theme.ts');
 const { visibleArt } = require('../src/art-visibility.ts');
 const { Game } = require('../src/game.ts');
 const { LanView } = require('../src/lan/view.ts');
+
+// Starting a goal-area map zooms out; a sharper ready bitmap is still valid.
+{
+  const originalPerformance = global.performance;
+  let clock = 1000;
+  global.performance = { now: () => clock };
+  try {
+    const cache = new RenderCache(),
+      marble = { id: 0, name: '줌 검증', color: '#fff', x: 0, y: 0 };
+    cache.beginFrame();
+    assert.equal(cache.drawBall(ctx, marble, 40, 1.75), true);
+    const allocated = bitmaps.length,
+      body = bitmaps.at(-2),
+      label = bitmaps.at(-1);
+    clock += 3;
+    for (const [scale, dpr] of [
+      [6, 1.75],
+      [2, 1],
+      [40, 1.75],
+    ]) {
+      calls.length = 0;
+      assert.equal(cache.drawBall(ctx, marble, scale, dpr), true, 'zoom-out must reuse the sharper ready sprites');
+      const images = calls.filter(([method]) => method === 'drawImage');
+      assert.equal(images[0][1], body);
+      assert.equal(images[1][1], label);
+      assert.equal(images[0][4], body.width / 1.75 / 40, 'the marble retains its world-space radius');
+      assert.equal(bitmaps.length, allocated, 'zoom and lower canvas density do not allocate replacement sprites');
+      assert.equal(cache.warming, false);
+    }
+    cache.beginFrame();
+    assert.equal(cache.drawBall(ctx, marble, 80, 2), true, 'zoom-in creates a sharper sprite when needed');
+    assert.equal(bitmaps.length, allocated + 2);
+    clock += 3;
+    assert.equal(cache.drawBall(ctx, marble, 6, 1), true);
+    const shrunkLabel = calls.at(-1),
+      font = parseFloat(shrunkLabel[1].ctx.font),
+      factor = (shrunkLabel[4] / (shrunkLabel[1].width / 2)) * 6;
+    assert.ok(Math.abs(font * factor - 12) < 1e-10, 'reusing a larger label retains its 12px CSS font size');
+    assert.equal(cache.drawBall(ctx, { ...marble }, 6, 1), false, 'new marbles still respect the frame budget');
+    marble.color = '#f00';
+    assert.equal(cache.drawBall(ctx, marble, 6, 1), false, 'a different color cannot reuse the old appearance');
+  } finally {
+    global.performance = originalPerformance;
+  }
+  console.log('PASS ready-to-race zoom and adaptive density reuse sharp sprites with unchanged size and color');
+}
+
+{
+  const cache = new RenderCache(),
+    balls = Array.from({ length: 100 }, (_, id) => ({
+      id,
+      name: `구슬 ${id}`,
+      color: `hsl(${id} 85% 72%)`,
+      x: 0,
+      y: 0,
+    }));
+  for (const ball of balls) cache.drawBall(ctx, ball, 16, 1.75);
+  const warm = bitmaps.length;
+  for (const dpr of [1.75, 1.5, 1.25, 1, 1.75]) {
+    cache.beginFrame();
+    for (const ball of balls) {
+      assert.equal(cache.drawBall(ctx, ball, 6, dpr), true, '100-marble overview must keep using its ready bitmaps');
+      assert.equal(cache.drawBall(ctx, ball, 2, dpr), true, 'zooming out again must not fall back to vector labels');
+    }
+  }
+  assert.equal(bitmaps.length, warm, 'camera and adaptive-density changes allocate zero new sprites');
+  console.log('PASS 100 marbles retain their sprites across overview, 35% zoom and all adaptive-density steps');
+}
+
+// A slow body upload must yield before starting the separate label upload.
+{
+  const originalPerformance = global.performance,
+    originalCanvas = global.OffscreenCanvas;
+  let clock = 1000;
+  global.performance = { now: () => clock };
+  global.OffscreenCanvas = class extends originalCanvas {
+    constructor(w, h) {
+      super(w, h);
+      clock += 3;
+    }
+  };
+  try {
+    const cache = new RenderCache(),
+      main = context(),
+      marble = { id: 0, name: 'Slow upload', color: '#fff', x: 0, y: 0 };
+    let mainPaints = 0;
+    main.drawImage = () => mainPaints++;
+    const allocated = bitmaps.length;
+    cache.beginFrame();
+    calls.length = 0;
+    assert.equal(cache.drawBall(main, marble, 40, 1), false);
+    assert.equal(bitmaps.length - allocated, 1, 'do not start a label after the body exhausts the 2ms budget');
+    assert.equal(mainPaints, 0, 'fallback must not paint a marble twice');
+    assert.equal(cache.warming, true);
+    cache.beginFrame();
+    assert.equal(cache.drawBall(main, marble, 40, 1), true, 'the retained body allows the label to finish next frame');
+    assert.equal(bitmaps.length - allocated, 2);
+  } finally {
+    global.performance = originalPerformance;
+    global.OffscreenCanvas = originalCanvas;
+  }
+  console.log('PASS slow body uploads yield before labels without duplicate drawing or lost cache progress');
+}
+
+// A minimap first painted before the canyon image arrives must not stay untextured.
+{
+  const originalDocument = global.document,
+    texture = { complete: false, naturalWidth: 0 };
+  global.document = { getElementById: () => texture };
+  try {
+    const cache = new RenderCache();
+    cache.drawMinimap(ctx, fractureCanyon, [], 2, 1);
+    const first = bitmaps.at(-1);
+    texture.complete = true;
+    texture.naturalWidth = 512;
+    cache.drawMinimap(ctx, fractureCanyon, [], 2, 1);
+    const loaded = bitmaps.at(-1);
+    assert.notEqual(loaded, first, 'late canyon texture arrival invalidates the minimap bitmap');
+    assert.ok(calls.some((call) => call[0] === 'drawImage' && call[1] === texture));
+    cache.drawMinimap(ctx, fractureCanyon, [], 2, 1);
+    assert.equal(bitmaps.at(-1), loaded, 'loaded textures stay cached on later frames');
+  } finally {
+    global.document = originalDocument;
+  }
+  console.log('PASS late canyon textures refresh the minimap once and retain warm-frame caching');
+}
+
+calls.length = 0;
+
+// A settled preparation screen must not compete with the entry overlay for paints.
+{
+  const listen = window.addEventListener;
+  let loaded;
+  window.addEventListener = (type, handler, capture) => {
+    if (type === 'load' && capture) loaded = handler;
+  };
+  const game = new Game(canvas);
+  window.addEventListener = listen;
+  game.state = 'ready';
+  let paints = 0;
+  game.render = () => paints++;
+  for (let i = 0; i < 240; i++) game.frame(1000 + (i * 1000) / 60);
+  assert.equal(paints, 1, 'ready screen paints once, then stays idle without changes');
+  game.setZoom(0.8);
+  game.frame(5100);
+  assert.equal(paints, 2, 'zoom still repaints the preparation screen');
+  game.renderCache.warming = true;
+  game.frame(5120);
+  assert.equal(paints, 3, 'unfinished sprites still warm at frame cadence');
+  game.renderCache.warming = false;
+  game.dolphins = { enabled: true };
+  game.frame(5140);
+  assert.equal(paints, 4, 'enabled animal preview remains animated');
+  game.dolphins.enabled = false;
+  loaded();
+  game.frame(5160);
+  assert.equal(paints, 5, 'late image loads refresh an otherwise idle screen');
+  console.log('PASS idle preparation avoids periodic paints while zoom, warmup and animal preview remain live');
+}
 
 const canyonMini = new RenderCache(),
   canyonEntities = fractureCanyon.entities.map((e) => ({
@@ -244,6 +404,70 @@ assert.equal(
   'clipping scenery preserves the collision geometry and bridge entry'
 );
 console.log('PASS orbital exit wall clipping in cached and fallback views with unchanged physics geometry');
+
+for (const scale of [2, 14, 40]) {
+  const stage = { ...orbitalLock },
+    main = context();
+  let liveMasks = 0;
+  main.clip = (rule) => {
+    if (rule === 'evenodd') liveMasks++;
+  };
+  const first = bitmaps.length;
+  drawMapOverlay(main, stage, orbitalEntities, scale);
+  const warmed = bitmaps.length;
+  for (let frame = 0; frame < 120; frame++) drawMapOverlay(main, stage, orbitalEntities, scale);
+  assert.equal(liveMasks, 0, 'the original exit mask is cached instead of rasterized on the game canvas each frame');
+  assert.equal(bitmaps.length, warmed, 'main and minimap exit textures stay warm without new bitmaps');
+  assert.ok(
+    bitmaps.slice(first).reduce((pixels, bitmap) => pixels + bitmap.width * bitmap.height, 0) < 3 * 1024 * 1024,
+    'exit textures cover the outlet instead of allocating the entire map'
+  );
+  const movedGate = orbitalEntities.map((e) =>
+    e.shape.collisionLayer === 2 && e.shape.type === 'polyline' && e.shape.solid ? { ...e, x: 32, y: 40 } : e
+  );
+  drawMapOverlay(main, stage, movedGate, scale);
+  assert.equal(liveMasks, 1, 'an edited moving gate entering the core still receives the original mask');
+}
+console.log('PASS warm orbital exit masks, bounded outlet textures and clipping for edited moving gates');
+
+for (const theme of ['dark', 'beige']) {
+  setSceneTheme(theme);
+  for (const dpr of [1, 1.75, 2])
+    for (const initialScale of [1.8, 14, 31.8, 515 / 13, 100]) {
+      const stage = { ...orbitalLock };
+      const sample = (scale) => {
+        const main = context(),
+          mini = context();
+        main.getTransform = () => ({ a: scale * dpr, b: 0 });
+        mini.getTransform = () => ({ a: 2 * dpr, b: 0 });
+        drawOrbitalArt(main, stage);
+        drawMapOverlay(main, stage, orbitalEntities, scale);
+        drawMapOverlay(mini, stage, orbitalEntities, 2);
+      };
+      sample(initialScale);
+      const first = bitmaps.length;
+      for (let frame = 1; frame <= 120; frame++) sample(initialScale * (1 + frame / 600));
+      assert.ok(bitmaps.length - first <= 8, 'continuous zoom must reuse outlet textures across nearby scales');
+      const warmed = bitmaps.length;
+      for (let frame = 120; frame >= 0; frame--) sample(initialScale * (1 + frame / 600));
+      assert.equal(bitmaps.length, warmed, 'reverse zoom must reuse the warmed main-view and minimap textures');
+    }
+}
+setSceneTheme('dark');
+const glowStage = { ...orbitalLock };
+for (const scale of [31.999, 32]) {
+  const main = context();
+  main.getTransform = () => ({ a: scale * 1.75, b: 0 });
+  drawMapOverlay(main, glowStage, orbitalEntities, scale);
+  assert.equal(bitmaps.at(-1).ctx.shadowBlur, scale < 32 ? 0 : 7, 'cached walls retain the 32px glow threshold');
+}
+console.log('PASS continuous and reverse orbital zoom across glow thresholds, themes, DPI and minimap scales');
+
+drawOrbitalArt(ctx, { ...orbitalLock, goalY: 20 }, 2);
+assert.ok(
+  Number.isFinite(bitmaps.at(-1).width) && Number.isFinite(bitmaps.at(-1).height) && bitmaps.at(-1).height > 0,
+  'shortened editor maps retain valid outlet texture dimensions'
+);
 
 const roundhouse = { title: 'Test', width: 48, goalY: 100 };
 calls.length = 0;
@@ -533,7 +757,6 @@ assert.ok(
 assert.ok(calls.some((call) => call[0] === 'clip' && call[1] === 'evenodd'));
 console.log('PASS transfer return hides the protruding deck and rails without fading released marbles');
 
-const { setSceneTheme } = require('../src/scene-theme.ts');
 const originalOffscreen = global.OffscreenCanvas;
 for (const stage of [infiniteFunnel, twinFunnel]) {
   const geometry = JSON.stringify(stage);

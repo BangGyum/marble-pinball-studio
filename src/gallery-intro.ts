@@ -26,7 +26,7 @@ export class GalleryIntro {
     for (const card of this.view.querySelectorAll<HTMLElement>('.map-card')) {
       const bounds = card.getBoundingClientRect();
       if (bounds.top < window.innerHeight && bounds.bottom > 0) {
-        card.style.setProperty('--entry-delay', `${340 + Math.min(order++, 3) * 105}ms`);
+        card.style.setProperty('--entry-delay', `${400 + Math.min(order++, 5) * 85}ms`);
         card.classList.add('map-card-entering');
       }
     }
@@ -59,6 +59,14 @@ export class GalleryIntro {
       const radius = ball.offsetWidth / 2;
       const dropHeight = radius * (1.05 + index * 0.1);
       const fallTime = Math.sqrt((2 * dropHeight) / gravity);
+      const impacts = [{ at: fallTime, strength: 0.16 }];
+      let impactTime = fallTime,
+        impactSpeed = gravity * fallTime * 0.36;
+      while (impactSpeed > 4) {
+        impactTime += (2 * impactSpeed) / gravity;
+        impacts.push({ at: impactTime, strength: impacts.at(-1)!.strength * 0.36 });
+        impactSpeed *= 0.36;
+      }
       const heightAt = (time: number) => {
         if (time < fallTime) return dropHeight - (gravity * time * time) / 2;
         let remaining = time - fallTime,
@@ -72,13 +80,19 @@ export class GalleryIntro {
         return 0;
       };
       const positions: Keyframe[] = [],
+        deformations: Keyframe[] = [],
         rotations: Keyframe[] = [],
         shadows: Keyframe[] = [];
       for (let step = 0; step <= 120; step++) {
         const progress = step / 120,
           x = distance * (1 - progress) ** 2;
-        const height = heightAt(progress * duration);
+        const time = progress * duration,
+          height = heightAt(time),
+          compression = Math.max(
+            ...impacts.map(({ at, strength }) => strength * Math.max(0, 1 - Math.abs(time - at) / 0.055))
+          );
         positions.push({ offset: progress, transform: `translate(${x}px, ${-height}px)` });
+        deformations.push({ offset: progress, transform: `scale(${1 + compression * 0.65}, ${1 - compression})` });
         rotations.push({ offset: progress, transform: `rotate(${x / radius}rad)` });
         shadows.push({
           offset: progress,
@@ -93,6 +107,7 @@ export class GalleryIntro {
         fill: 'both',
       };
       ball.animate(positions, timing);
+      ball.querySelector<HTMLElement>('.gallery-marble-body')!.animate(deformations, timing);
       ball.querySelector<HTMLElement>('.gallery-marble-core')!.animate(rotations, timing);
       ball.querySelector<HTMLElement>('.gallery-marble-shadow')!.animate(shadows, timing);
       ball.querySelector<HTMLElement>('.gallery-marble-trail')!.animate(

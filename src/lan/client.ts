@@ -9,7 +9,7 @@ import { MapLibrary } from '../map-library';
 import { el, toast, message, STALLED_MESSAGE } from '../ui';
 import type { Command, Frame, Identity, Info, Scene, ServerMessage, Settings } from './protocol';
 import { decodeScene, serializeCommand } from './protocol';
-import { DolphinSettingsPanel } from '../dolphin-settings';
+import { SeaAnimalSettingsPanel } from '../sea-animal-settings';
 import '../dolphin.css';
 import { validateDolphins } from '../dolphin';
 import { initMarbleDesign } from '../marble-design';
@@ -35,17 +35,18 @@ let info: Info,
   uiUpdate = 0;
 let preferredPicks = 2,
   customStage: StageDef | undefined;
+let springPending = false;
 const library = new MapLibrary(stages, hiddenStages);
-let inputTimer: ReturnType<typeof setTimeout>, boostTimer: ReturnType<typeof setInterval> | undefined;
+let inputTimer: ReturnType<typeof setTimeout> | undefined, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
-const dolphinPanel = new DolphinSettingsPanel(
+const dolphinPanel = new SeaAnimalSettingsPanel(
   el('dolphin-settings'),
   (settings, commit) => {
     view.setDolphins(settings);
     if (commit) void prepareUI();
   },
   (show) => view.setDolphinPreview(show),
-  () => view.showDolphinLayout()
+  (kind) => view.showDolphinLayout(true, kind)
 );
 view.onDolphinChange = (settings, commit) => {
   dolphinPanel.moved(settings);
@@ -108,6 +109,9 @@ function updateControls() {
     playing = frame?.state === 'running' || frame?.state === 'paused';
   document.body.dataset.role = identity.role;
   view.canControl = hosting;
+  view.springConnected = online && !!frame;
+  if (!online && view.springPlacement.active) view.cancelSpringPlacement();
+  updatePersonalSpring();
   dolphinPanel.setLocked(!hosting || !online || !frame || !!playing);
   document.querySelectorAll<HTMLElement>('[data-host]').forEach((item) => {
     item.hidden = !hosting;
@@ -130,6 +134,41 @@ function updateControls() {
   el<HTMLSelectElement>('speed').disabled = !hosting || !online;
   el('pause').textContent = frame?.state === 'paused' ? '계속하기' : '일시정지';
 }
+function updatePersonalSpring() {
+  const state = frame?.personalSpring?.state,
+    placing = view.springPlacement.active,
+    enabled = online && !!frame && frame.state !== 'finished' && !springPending;
+  const place = el<HTMLButtonElement>('spring-place'),
+    back = el<HTMLButtonElement>('spring-back'),
+    cancel = el<HTMLButtonElement>('spring-cancel'),
+    use = el<HTMLButtonElement>('spring-use');
+  place.hidden = state !== 'available' || placing;
+  place.disabled = !enabled;
+  back.hidden = !placing || !view.springPlacement.origin;
+  cancel.hidden = !placing;
+  use.hidden = state !== 'placed';
+  back.disabled = cancel.disabled = !enabled;
+  use.disabled = !enabled || frame?.state !== 'running';
+  el('personal-spring-status').textContent =
+    !online || !frame
+      ? '서버 연결 후 배치할 수 있어요.'
+      : springPending
+        ? '서버에서 확인 중이에요…'
+        : frame.state === 'finished'
+          ? '경기가 끝났어요. 다음 경기에서 다시 1개를 받아요.'
+          : placing
+            ? view.springPlacement.origin
+              ? '② 밀어낼 방향을 한 번 더 눌러 확정 · Esc로 취소'
+              : '① 맵이나 미니맵에서 배치할 위치를 눌러 주세요.'
+            : state === 'placed'
+              ? frame.state === 'running'
+                ? '내 스프링 준비 완료 · 버튼 또는 SPACE로 한 번 발동'
+                : '배치 완료 · 경기가 진행 중일 때 한 번 발동할 수 있어요.'
+              : state === 'used'
+                ? '이번 경기 사용 완료 · 다음 경기에서 다시 1개를 받아요.'
+                : '스프링 선택 → 위치 선택 → 방향 선택 · 시작 전이나 경기 중 배치';
+}
+view.onPlacementChange = updatePersonalSpring;
 function connection(connected: boolean, status: string) {
   online = connected;
   el('connection').textContent = status;
@@ -178,6 +217,25 @@ function command(input: InputCommand) {
   });
 }
 const run = (input: InputCommand) => command(input).catch((error) => toast(message(error)));
+async function personalCommand(input: InputCommand) {
+  if (springPending) return;
+  springPending = true;
+  updatePersonalSpring();
+  try {
+    await command(input);
+  } catch (error) {
+    toast(message(error));
+  } finally {
+    springPending = false;
+    updatePersonalSpring();
+  }
+}
+view.onPlaceSpring = (placement) => void personalCommand({ type: 'place-spring', ...placement });
+view.onUseSpring = () => void personalCommand({ type: 'use-spring' });
+el('spring-place').addEventListener('click', () => view.beginSpringPlacement());
+el('spring-back').addEventListener('click', () => view.beginSpringPlacement());
+el('spring-cancel').addEventListener('click', () => view.cancelSpringPlacement());
+el('spring-use').addEventListener('click', () => view.onUseSpring());
 function inputSettings(): Settings {
   const count = parseNames(names.value).length,
     map = allMaps().find((m) => m.id === mapSelect.value);
@@ -195,11 +253,31 @@ function inputSettings(): Settings {
     ...(map.id.startsWith('builtin-') && map.stage === stages[builtin] ? {} : { stage: map.stage }),
   };
 }
+let prepareQueue = Promise.resolve(),
+  pendingPreparations = 0;
 async function prepare(force = false) {
   clearTimeout(inputTimer);
+  inputTimer = undefined;
   const settings = inputSettings();
-  if (force || JSON.stringify(settings) !== JSON.stringify(scene?.settings))
-    await command({ type: 'configure', settings });
+  pendingPreparations++;
+  const request = prepareQueue
+    .catch(() => {})
+    .then(async () => {
+      if (force || JSON.stringify(settings) !== JSON.stringify(scene?.settings))
+        await command({ type: 'configure', settings });
+    });
+  prepareQueue = request;
+  try {
+    // Start also waits for edits queued while an earlier preparation was in flight.
+    let latest = request;
+    for (;;) {
+      await latest;
+      if (latest === prepareQueue) break;
+      latest = prepareQueue;
+    }
+  } finally {
+    pendingPreparations--;
+  }
 }
 const prepareUI = (force = false) =>
   prepare(force).catch((error) => {
@@ -236,27 +314,37 @@ async function connect() {
       const incoming = JSON.parse(event.data) as ServerMessage;
       if (incoming.type === 'scene') {
         const first = !scene,
-          different = scene?.raceId !== incoming.raceId;
+          different = scene?.raceId !== incoming.raceId,
+          rulesChanged =
+            scene?.settings.order !== incoming.settings.order || scene?.settings.picks !== incoming.settings.picks,
+          keepInputs = identity.role === 'host' && (pendingPreparations > 0 || inputTimer !== undefined);
         scene = decodeScene(incoming);
         view.setScene(scene);
-        dolphinPanel.setStage(scene.stage, scene.settings.dolphins ?? validateDolphins(undefined, scene.stage));
+        if (!keepInputs)
+          dolphinPanel.setStage(scene.stage, scene.settings.dolphins ?? validateDolphins(undefined, scene.stage));
         if (different) {
           frame = undefined;
           selectBall(null);
           collapse(false);
-          names.value = scene.settings.names;
-          order.value = scene.settings.order;
-          preferredPicks = scene.settings.picks || 2;
-          updatePicks(scene.balls.length);
-          customStage = scene.settings.stage;
-          const match = customStage && allMaps().find((m) => JSON.stringify(m.stage) === JSON.stringify(customStage));
-          refreshMaps(customStage ? (match?.id ?? 'preview') : 'builtin-' + scene.settings.mapId);
-          if (first && identity.role === 'host' && !scene.balls.length) {
+          if (!keepInputs) {
+            names.value = scene.settings.names;
+            order.value = scene.settings.order;
+            preferredPicks = scene.settings.picks || 2;
+            updatePicks(scene.balls.length);
+            customStage = scene.settings.stage;
+            const match = customStage && allMaps().find((m) => JSON.stringify(m.stage) === JSON.stringify(customStage));
+            refreshMaps(customStage ? (match?.id ?? 'preview') : 'builtin-' + scene.settings.mapId);
+          }
+          if (first && identity.role === 'host' && !scene.balls.length && !keepInputs) {
             try {
               names.value = localStorage.getItem(namesKey) ?? '하나, 둘, 셋, 넷';
             } catch {}
             void prepareUI();
           }
+        } else if (rulesChanged && !keepInputs) {
+          order.value = scene.settings.order;
+          preferredPicks = scene.settings.picks || 2;
+          updatePicks(scene.balls.length);
         }
       } else if (incoming.type === 'frame') {
         if (

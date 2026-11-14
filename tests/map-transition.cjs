@@ -12,6 +12,7 @@ const { MapTransition } = require('../src/map-transition.ts');
 
 function fixture({ reduced = false, hidden = false } = {}) {
   const timers = new Map(),
+    frames = new Map(),
     documentEvents = {},
     windowEvents = {},
     motionEvents = {},
@@ -86,6 +87,11 @@ function fixture({ reduced = false, hidden = false } = {}) {
     return callback;
   };
   global.clearTimeout = (callback) => timers.delete(callback);
+  global.requestAnimationFrame = (callback) => {
+    frames.set(callback, callback);
+    return callback;
+  };
+  global.cancelAnimationFrame = (callback) => frames.delete(callback);
   const back = element(),
     gallery = element(),
     game = element({ hidden: true, querySelector: () => back });
@@ -97,6 +103,8 @@ function fixture({ reduced = false, hidden = false } = {}) {
   let selections = 0;
   const select = () => {
     selections++;
+  };
+  const reveal = () => {
     gallery.hidden = true;
     game.hidden = false;
   };
@@ -109,6 +117,15 @@ function fixture({ reduced = false, hidden = false } = {}) {
   return {
     transition: new MapTransition(gallery, game),
     select,
+    reveal,
+    paint() {
+      const pending = [...frames.keys()];
+      for (const callback of pending) {
+        frames.delete(callback);
+        callback();
+      }
+    },
+    frames,
     selections: () => selections,
     timers,
     run,
@@ -125,19 +142,28 @@ function fixture({ reduced = false, hidden = false } = {}) {
 }
 
 const f = fixture();
-f.transition.play(f.card, f.select);
+f.transition.play(f.card, f.select, f.reveal);
 assert.equal(f.selections(), 0, 'selection waits until the visual cover is opaque');
 assert.ok(f.gallery.inert && f.game.inert, 'both screens reject stray input during the transition');
 assert.equal(f.layers[0].nodes.strong.textContent, '오비탈 <b>락</b>', 'custom titles remain literal text');
 assert.equal(f.layers[0].style['--map-color'], '#91bcff');
 assert.equal(f.layers[0].style['--from-y'], '360px', 'offscreen card origins are clamped to the viewport');
-f.transition.play(f.card, () => {
-  throw new Error('duplicate selection');
-});
+f.transition.play(
+  f.card,
+  () => {
+    throw new Error('duplicate selection');
+  },
+  f.reveal
+);
 assert.equal(f.layers.length, 1);
 assert.equal(f.timers.size, 2);
 f.run(300);
 assert.equal(f.selections(), 1);
+assert.equal(f.game.hidden, true, 'cold-cache paint is deferred beyond the physics preparation task');
+assert.equal(f.frames.size, 1);
+f.paint();
+assert.equal(f.game.hidden, true, 'the cover can paint before revealing the prepared scene');
+f.paint();
 assert.equal(f.game.hidden, false);
 f.run(1600);
 assert.equal(f.selections(), 1, 'finishing does not select the map twice');
@@ -150,7 +176,7 @@ f.transition.finish();
 f.transition.cancel();
 f.gallery.hidden = false;
 f.game.hidden = true;
-f.transition.play(f.card, f.select);
+f.transition.play(f.card, f.select, f.reveal);
 f.run(1600);
 assert.equal(f.selections(), 2, 'returning to the gallery allows another map transition');
 console.log('PASS map-colored transition, duplicate input guard, single selection, cleanup, focus and repeat use');
@@ -158,7 +184,7 @@ console.log('PASS map-colored transition, duplicate input guard, single selectio
 for (const action of ['hidden', 'resize', 'pagehide', 'reduced', 'finish']) {
   for (const swapped of [false, true]) {
     const f = fixture();
-    f.transition.play(f.card, f.select);
+    f.transition.play(f.card, f.select, f.reveal);
     if (swapped) f.run(300);
     if (action === 'hidden') {
       document.hidden = true;
@@ -170,6 +196,8 @@ for (const action of ['hidden', 'resize', 'pagehide', 'reduced', 'finish']) {
     else f.windowEvents[action]();
     assert.equal(f.selections(), 1, action);
     assert.equal(f.layers.length + f.timers.size, 0, action);
+    assert.equal(f.frames.size, 0, 'early completion flushes and cancels the pending reveal');
+    assert.equal(f.game.hidden, false, 'early completion reveals the prepared map');
     assert.equal(f.gallery.inert || f.game.inert, false, action);
     if (action === 'hidden') assert.equal(f.back.focusCount, 0, 'hidden tabs do not steal focus');
   }
@@ -178,8 +206,12 @@ console.log('PASS early completion before/after screen swap on visibility, resiz
 
 for (const swapped of [false, true]) {
   const f = fixture();
-  f.transition.play(f.card, f.select);
-  if (swapped) f.run(300);
+  f.transition.play(f.card, f.select, f.reveal);
+  if (swapped) {
+    f.run(300);
+    f.paint();
+    f.paint();
+  }
   f.transition.cancel();
   assert.equal(f.selections(), Number(swapped), 'external navigation must not later select a stale map');
   assert.equal(f.layers.length + f.timers.size, 0);
@@ -188,12 +220,30 @@ for (const swapped of [false, true]) {
 }
 for (const options of [{ reduced: true }, { hidden: true }]) {
   const f = fixture(options);
-  f.transition.play(f.card, f.select);
+  f.transition.play(f.card, f.select, f.reveal);
   assert.equal(f.selections(), 1);
   assert.equal(f.layers.length + f.timers.size, 0, 'reduced/hidden entry is immediate without visual work');
   assert.equal(f.gallery.inert || f.game.inert, false);
 }
 console.log('PASS external navigation cancels pending selection and reduced-motion entry remains immediate');
+
+{
+  const f = fixture();
+  f.transition.play(f.card, f.select, f.reveal);
+  f.run(300);
+  f.paint();
+  f.transition.cancel();
+  f.paint();
+  assert.equal(f.game.hidden, true, 'navigation between prepare and paint cannot reveal a stale map');
+  assert.equal(f.frames.size, 0);
+  f.transition.play(f.card, f.select, f.reveal);
+  f.run(300);
+  f.paint();
+  f.paint();
+  f.run(1600);
+  assert.equal(f.game.hidden, false, 'another map selection remains usable after cancelling the deferred paint');
+}
+console.log('PASS deferred reveal cancellation, repeated selection and separate prepare/paint callbacks');
 
 // Selecting a new map prepares it while hidden, before the first visible render.
 {
@@ -201,7 +251,8 @@ console.log('PASS external navigation cancels pending selection and reduced-moti
   const declaration = file.statements
     .flatMap((node) => (ts.isVariableStatement(node) ? [...node.declarationList.declarations] : []))
     .find((node) => node.name.getText(file) === 'gallery');
-  const callback = declaration.initializer.arguments[0];
+  const callback = declaration.initializer.arguments[0],
+    reveal = declaration.initializer.arguments[1];
   const next = { title: 'Next map' },
     calls = [],
     mapSelect = { value: 'old' };
@@ -223,10 +274,12 @@ console.log('PASS external navigation cancels pending selection and reduced-moti
   require('node:vm').runInNewContext(code, context);
   assert.deepEqual(
     calls,
-    ['prepare', 'show'],
+    ['prepare'],
     'the first visible paint must use the selected map, without painting the previous map'
   );
   assert.equal(context.currentStage, next);
   assert.equal(mapSelect.value, 'new');
+  require('node:vm').runInNewContext(`(${reveal.getText(file)})();`, context);
+  assert.deepEqual(calls, ['prepare', 'show']);
   console.log('PASS map selection prepares once before revealing the game');
 }

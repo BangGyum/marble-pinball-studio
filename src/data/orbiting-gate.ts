@@ -35,7 +35,8 @@ export const orbitingGate: StageDef = {
     { type: 'directional', x: 32, y: 12, width: 8, height: 12, velocityX: 13, velocityY: 8, strength: 4 },
   ],
   entities: [
-    wall([[26, -32], [26, 5], [28, 10], rim.at(-1)!], -0.8),
+    // Close the spawn chimney so strong animal rebounds cannot fly over its side walls.
+    wall([[38, -32], [26, -32], [26, 5], [28, 10], rim.at(-1)!], -0.8),
     wall([[38, -32], [38, 5], [36, 10], rim[0]], 0.8),
     wall(rim, 0.8),
     rotatingRing,

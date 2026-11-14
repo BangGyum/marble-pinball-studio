@@ -37,14 +37,21 @@ global.ResizeObserver = class {
 const { Game } = require('../src/game.ts');
 const { LanView } = require('../src/lan/view.ts');
 const { stages } = require('../src/data/maps.ts');
+const { dolphinRows } = require('../src/dolphin.ts');
 const bowl = stages.find((stage) => stage.goalArea);
 const names = ['A', 'B', 'C'];
-const makeScene = (stage, id) => ({
+const makeScene = (stage, id, dolphins) => ({
   type: 'scene',
   raceId: String(id),
   revision: 1,
   stage,
-  settings: { names: names.join(','), mapId: stages.indexOf(stage), order: 'desc', picks: 1 },
+  settings: {
+    names: names.join(','),
+    mapId: stages.indexOf(stage),
+    order: 'desc',
+    picks: 1,
+    ...(dolphins ? { dolphins } : {}),
+  },
   balls: names.map((name, id) => ({ id, name, color: '#ffffff' })),
   entities: [],
   fixed: [],
@@ -60,9 +67,9 @@ function gameView() {
   });
   return view;
 }
-function prepare(view, stage, id) {
-  if (view instanceof Game) view.prepare(stage, names);
-  else view.setScene(makeScene(stage, id));
+function prepare(view, stage, id, dolphins) {
+  if (view instanceof Game) view.prepare(stage, names, dolphins);
+  else view.setScene(makeScene(stage, id, dolphins));
   view.state = 'ready';
 }
 
@@ -93,6 +100,36 @@ for (const View of [Game, LanView]) {
 console.log(
   'PASS all 342 map switches reset zoom and minimap targets; same-map preparation retains zoom in standalone/LAN'
 );
+
+for (const View of [Game, LanView]) {
+  const sequence = ['네온 분기점', '떠도는 입구', '끝없는 나선'],
+    view = View === Game ? gameView() : new View(canvas());
+  view.setVisible(false);
+  for (const [index, title] of sequence.entries()) {
+    const stage = stages.find((stage) => stage.title === title),
+      manta = index > 0,
+      dolphins = {
+        enabled: !manta,
+        rows: dolphinRows(stage),
+        interval: 5,
+        manta: { enabled: manta, rows: dolphinRows(stage), interval: 5 },
+      };
+    prepare(view, stage, `sequence-${index}`, dolphins);
+    assert.equal(
+      view.dolphinRenderer.kind,
+      manta ? 'manta' : 'dolphin',
+      `${View.name}: ${title} selects the enabled effect when the map arrives`
+    );
+    view.showDolphinLayout();
+    assert.equal(view.dolphinOverview, true, 'the enabled effect has working layout guides');
+    assert.equal(view.dolphinDrag.settings().enabled, true, 'row dragging targets the enabled effect');
+  }
+  const fresh = View === Game ? gameView() : new View(canvas());
+  fresh.setVisible(false);
+  prepare(fresh, view.scene?.stage ?? view.stage, 'late-join', view.dolphins);
+  assert.equal(fresh.dolphinRenderer.kind, 'manta', 'first entry into a manta-only map selects its guides');
+}
+console.log('PASS three-map sequence and fresh manta entry select the active layout in standalone/LAN');
 
 let clock = 1000;
 const originalPerformance = global.performance;

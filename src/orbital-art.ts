@@ -2,6 +2,8 @@ import { getSceneTheme, sceneColor, sceneGlow } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { backgroundCache } from './background-cache';
 import { orbitalRings, orbitalTransfers } from './data/orbital-lock';
+import { drawEntities } from './draw';
+import type { MapEntityState } from './types/map-entity';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
@@ -15,6 +17,76 @@ export function clipOrbitalBridgeWalls(ctx: Context, stage: StageDef) {
   ctx.clip('evenodd');
 }
 
+export function drawOrbitalExitWalls(
+  ctx: CanvasRenderingContext2D,
+  stage: StageDef,
+  entities: MapEntityState[],
+  scale: number,
+  cached: boolean
+) {
+  if (!cached || typeof OffscreenCanvas === 'undefined') return entities;
+  const fixed = new Set(
+    (stage.entities ?? []).filter((e) => e.type === 'static' && (e.props.life ?? -1) <= 0).map((e) => e.shape)
+  );
+  let count = 0;
+  for (const { shape } of entities) {
+    if (!fixed.has(shape) || shape.type !== 'polyline' || shape.solid) break;
+    count++;
+  }
+  if (!count) return entities;
+  const walls = entities.slice(0, count);
+  const points = walls.flatMap((e) => {
+    if (e.shape.type !== 'polyline' || e.shape.hidden) return [];
+    const cos = Math.cos(e.angle),
+      sin = Math.sin(e.angle);
+    return e.shape.points.map(([x, y]) => [e.x + cos * x - sin * y, e.y + sin * x + cos * y]);
+  });
+  if (!points.length) return entities;
+  // Bucket padding and strokes with zoom; powers of two preserve the 32px glow boundary.
+  const wallScale = 2 ** (Math.floor(Math.log2(scale) * 8) / 8);
+  const margin = Math.max(0.5, 16 / wallScale),
+    left = Math.min(...points.map(([x]) => x)) - margin,
+    top = Math.min(...points.map(([, y]) => y)) - margin;
+  const width = Math.max(...points.map(([x]) => x)) + margin - left,
+    height = Math.max(...points.map(([, y]) => y)) + margin - top;
+  const transform = ctx.getTransform();
+  backgroundCache.draw(
+    ctx,
+    stage,
+    'orbital/exit-walls/' + wallScale,
+    {
+      x: left,
+      y: top,
+      width,
+      height,
+      density: Math.min(64, Math.ceil(Math.hypot(transform.a, transform.b) / 8) * 8),
+      maxPixels: 2 * 1024 * 1024,
+    },
+    (target) => {
+      target.save();
+      clipOrbitalBridgeWalls(target, stage);
+      drawEntities(target, walls, wallScale, -1, wallScale > 3, undefined, true);
+      target.restore();
+    }
+  );
+  return entities.slice(count);
+}
+
+export function orbitalWallsNeedClip(entities: MapEntityState[], scale: number) {
+  const radius = orbitalRings[2].outer + 0.5 + (scale >= 32 ? 28 : 2) / scale;
+  return entities.some((e) => {
+    const s = e.shape;
+    if (s.hidden) return false;
+    const extent =
+      s.type === 'circle'
+        ? s.radius
+        : s.type === 'box'
+          ? Math.hypot(s.width, s.height)
+          : Math.max(...s.points.map(([x, y]) => Math.hypot(x, y)));
+    return Math.hypot(e.x - 32, e.y - 40) - extent <= radius;
+  });
+}
+
 export function drawOrbitalArt(ctx: Context, stage: StageDef, layer: 1 | 2 = 1, cacheBackground = true) {
   const paint = layer === 2 ? paintOrbitalBridge : paintOrbitalArt;
   if (!cacheBackground || typeof OffscreenCanvas === 'undefined') {
@@ -26,12 +98,21 @@ export function drawOrbitalArt(ctx: Context, stage: StageDef, layer: 1 | 2 = 1, 
   const resolution = Math.min(24, Math.max(8, Math.ceil(Math.hypot(transform.a, transform.b) / 8) * 8));
   const width = (stage.width ?? 64) + 4,
     height = stage.goalY + 36;
+  let bounds = { x: -2, y: -32, width, height };
+  if (layer === 2 && stage.exitBridge) {
+    const points = stage.exitBridge.deck;
+    const left = Math.max(-2, Math.min(24, Math.min(...points.map(([x]) => x)) - 3)),
+      top = Math.max(-32, Math.min(...points.map(([, y]) => y)) - 3);
+    const right = Math.min((stage.width ?? 64) + 2, Math.max(56, Math.max(...points.map(([x]) => x)) + 3));
+    if (right > left && top < stage.goalY + 4)
+      bounds = { x: left, y: top, width: right - left, height: stage.goalY + 4 - top };
+  }
   // Two main layers and the minimap bridge must fit together in the shared 24M pixel budget.
   backgroundCache.draw(
     ctx,
     stage,
     'orbital/' + layer,
-    { x: -2, y: -32, width, height, density: resolution, maxPixels: 8 * 1024 * 1024 },
+    { ...bounds, density: resolution, maxPixels: 8 * 1024 * 1024 },
     (target) => paint(target, stage)
   );
 }

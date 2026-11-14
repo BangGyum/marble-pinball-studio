@@ -64,7 +64,14 @@ async function connect(port, host = false) {
     const host = await connect(app.port, true),
       guest = await connect(app.port);
     clients.push(host, guest);
-    const dolphins = { enabled: true, rows: [12, 22, 32], interval: 5, size: 150, speed: 0.5 };
+    const dolphins = {
+      enabled: true,
+      rows: [12, 22, 32],
+      interval: 5,
+      size: 150,
+      speed: 0.5,
+      manta: { enabled: false, rows: [15, 25], interval: 7, size: 80, speed: 1.3 },
+    };
     const settings = { names: 'a,b,c,d', mapId: 0, order: 'asc', picks: 1, dolphins };
     assert.equal(
       (await guest.command({ type: 'configure', settings })).ok,
@@ -98,8 +105,29 @@ async function connect(port, host = false) {
       preparedId,
       'explicit reconfigure with identical options still shuffles a new round'
     );
-    const raceId = host.scene.raceId;
+    const raceId = host.scene.raceId,
+      roster = JSON.stringify(app.race.balls);
+    for (const [dolphinEnabled, mantaEnabled] of [
+      [false, true],
+      [true, false],
+      [false, false],
+      [false, true],
+    ]) {
+      dolphins.enabled = dolphinEnabled;
+      dolphins.manta.enabled = mantaEnabled;
+      assert.equal((await host.command({ type: 'configure', settings })).ok, true);
+      await guest.until(
+        () =>
+          guest.scene.settings.dolphins?.enabled === dolphinEnabled &&
+          guest.scene.settings.dolphins?.manta?.enabled === mantaEnabled
+      );
+      assert.deepEqual(app.race.dolphins, dolphins, 'server runs only the selected effect');
+      assert.deepEqual(guest.scene.settings.dolphins, dolphins, 'viewers receive the same selection and saved options');
+      assert.equal(host.scene.raceId, raceId, 'switching effects preserves the prepared race');
+      assert.equal(JSON.stringify(app.race.balls), roster, 'switching effects does not reshuffle the marbles');
+    }
     for (const invalid of [
+      { ...dolphins, enabled: true },
       { ...dolphins, interval: 4.99 },
       { ...dolphins, rows: [12, 12] },
       { ...dolphins, rows: [999] },
@@ -111,13 +139,21 @@ async function connect(port, host = false) {
       { ...dolphins, speed: 1.51 },
       { ...dolphins, speed: '1' },
       { ...dolphins, speed: null },
+      { ...dolphins, manta: null },
+      { ...dolphins, manta: { ...dolphins.manta, rows: [999] } },
+      { ...dolphins, manta: { ...dolphins.manta, speed: 2 } },
+      { ...dolphins, manta: { ...dolphins.manta, unexpected: true } },
+      { ...dolphins, manta: { ...dolphins.manta, manta: {} } },
     ]) {
-      assert.equal((await host.command({ type: 'configure', settings: { ...settings, dolphins: invalid } })).ok, false);
+      const result = await host.command({ type: 'configure', settings: { ...settings, dolphins: invalid } });
+      assert.equal(result.ok, false);
+      if (invalid.enabled && invalid.manta?.enabled) assert.match(result.error, /하나만/);
       assert.equal(host.scene.raceId, raceId, 'invalid settings preserve the prepared race');
+      assert.deepEqual(app.race.dolphins, dolphins, 'rejected settings preserve the active effect');
     }
     assert.equal((await host.command({ type: 'start' })).ok, true);
     assert.equal((await host.command({ type: 'configure', settings })).ok, false, 'settings are locked during a race');
-    for (let i = 0; i < 510 && app.race.state === 'running'; i++) app.race.advance();
+    for (let i = 0; i < 660 && app.race.state === 'running'; i++) app.race.advance();
     const late = await connect(app.port);
     clients.push(late);
     assert.deepEqual(late.scene.settings.dolphins, dolphins, 'late join receives row positions and interval');
@@ -133,7 +169,7 @@ async function connect(port, host = false) {
     assert.deepEqual(app.race.dolphins, dolphins);
     assert.equal(app.race.elapsed, 0, 'reset restarts the effect clock');
     console.log(
-      'PASS LAN dolphin settings, viewer restrictions, invalid input, running/pause locks, late join and reset'
+      'PASS LAN exclusive animal settings, both-enabled rejection, viewer restrictions, running/pause locks, late join and reset'
     );
   } finally {
     for (const c of clients) c.ws.terminate();

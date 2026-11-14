@@ -36,6 +36,7 @@ async function simulate(physics, stage, count, initial, limit = 120) {
     physics,
     springControls: { reset() {} },
     springCooldowns: { reset() {} },
+    dolphinRenderer: { kind: 'dolphin' },
     recorder: { stop() {} },
     onZoomChange() {},
     render() {},

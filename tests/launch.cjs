@@ -23,6 +23,7 @@ async function run() {
     springControls: { reset() {} },
     springCooldowns: { reset() {} },
     recorder: { stop() {} },
+    dolphinRenderer: { kind: 'dolphin' },
     onZoomChange() {},
     render() {},
   });

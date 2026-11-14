@@ -180,6 +180,90 @@ console.log(
   'PASS dolphin toggle, row count, spacing/size/speed slider and input, limits, map changes and locked settings'
 );
 
+{
+  const { SeaAnimalSettingsPanel } = require('../src/sea-animal-settings.ts');
+  const { validateDolphins } = require('../src/dolphin.ts');
+  const createElement = () => ({
+    classList: { add() {} },
+    dataset: {},
+    children: [],
+    fields: Object.fromEntries(Object.keys(fields).map((name) => [name, { checked: false }])),
+    append(child) {
+      this.children.push(child);
+    },
+    querySelector(selector) {
+      return this.fields[/"(.*?)"/.exec(selector)[1]];
+    },
+    querySelectorAll() {
+      return this.children.filter((child) => child.dataset.animal).map((child) => child.fields.preview);
+    },
+  });
+  const previousDocument = global.document;
+  global.document = { createElement };
+  const root = createElement(),
+    changes = [],
+    overviews = [],
+    animals = new SeaAnimalSettingsPanel(
+      root,
+      (value, commit) => changes.push({ value, commit }),
+      () => {},
+      (kind) => overviews.push(kind)
+    );
+  global.document = previousDocument;
+  const options = {
+    enabled: true,
+    rows: [14, 45, 77],
+    interval: 13,
+    size: 150,
+    speed: 0.5,
+    manta: { enabled: false, rows: [18, 42], interval: 11, size: 80, speed: 1.3 },
+  };
+  animals.setStage(stage, options);
+  const controls = Object.fromEntries(
+    root.children.filter((child) => child.dataset.animal).map((child) => [child.dataset.animal, child.fields])
+  );
+  const toggle = (kind, checked) => {
+    controls[kind].enabled.checked = checked;
+    controls[kind].enabled.onchange();
+  };
+  for (const kind of ['manta', 'dolphin', 'manta', 'dolphin']) {
+    const count = changes.length;
+    toggle(kind, true);
+    assert.equal(animals.value.enabled, kind === 'dolphin', 'enabling manta turns dolphin off');
+    assert.equal(animals.value.manta.enabled, kind === 'manta', 'enabling dolphin turns manta off');
+    for (const other of ['dolphin', 'manta']) {
+      assert.equal(controls[other].enabled.checked, other === kind, 'both switches reflect the selection');
+      assert.equal(controls[other].fields.hidden, other !== kind, 'only the enabled effect shows its options');
+    }
+    assert.equal(changes.length, count + 1, 'switching effects sends one coherent settings update');
+    assert.equal(changes.at(-1).commit, true);
+    assert.equal(overviews.at(-1), kind, 'the preview follows the newly enabled effect');
+    assert.deepEqual(validateDolphins(changes.at(-1).value, stage), animals.value);
+    assert.deepEqual(animals.value.rows, options.rows, 'switching preserves dolphin row positions');
+    assert.equal(animals.value.size, options.size);
+    assert.equal(animals.value.speed, options.speed);
+    assert.deepEqual(animals.value.manta, { ...options.manta, enabled: kind === 'manta' });
+  }
+  toggle('dolphin', false);
+  assert.equal(animals.value.enabled || animals.value.manta.enabled, false, 'both effects can be off');
+  animals.setStage({ ...stage, goalY: 200 });
+  assert.equal(animals.value.enabled || animals.value.manta.enabled, false, 'map changes preserve the off state');
+  toggle('manta', true);
+  animals.setLocked(true);
+  const locked = JSON.stringify(animals.value),
+    count = changes.length;
+  toggle('dolphin', true);
+  toggle('manta', false);
+  assert.equal(JSON.stringify(animals.value), locked, 'race/viewer locks prevent switching effects');
+  assert.equal(changes.length, count);
+  animals.setLocked(false);
+  assert.equal(controls.dolphin.enabled.checked, false);
+  assert.equal(controls.manta.enabled.checked, true);
+  console.log(
+    'PASS mutually exclusive animal switches, preserved options, preview, all-off state and race/viewer locks'
+  );
+}
+
 global.window = { addEventListener() {} };
 for (const scale of [0.5, 3, 70]) {
   const listeners = {},
@@ -249,6 +333,7 @@ for (const scale of [0.5, 3, 70]) {
 console.log('PASS draggable rows at 3 zoom levels, page offsets, minimap, bounds, pointer ownership and edit lock');
 const { Game } = require('../src/game.ts'),
   { LanView } = require('../src/lan/view.ts');
+const { RenderResolution } = require('../src/render-resolution.ts');
 for (const width of [400, 1000])
   for (const height of [300, 600])
     for (const goal of [20, 300]) {
@@ -262,6 +347,7 @@ for (const width of [400, 1000])
           stage: map,
           balls: [],
           zoom: 3,
+          dolphinRenderer: { kind: 'dolphin' },
           onZoomChange() {},
           render() {},
         });
@@ -281,6 +367,7 @@ for (const width of [400, 1000])
 console.log('PASS full-map fit for short/tall maps and narrow/wide standalone/LAN canvases');
 
 global.requestAnimationFrame = () => 1;
+global.devicePixelRatio = 1;
 global.document = { hidden: false };
 for (const View of [Game, LanView])
   for (const hz of [60, 120, 144]) {
@@ -290,6 +377,8 @@ for (const View of [Game, LanView])
     Object.assign(view, {
       state: 'ready',
       visible: true,
+      renderResolution: new RenderResolution(),
+      resolutionAt: 0,
       dolphinPreview: true,
       dolphinPreviewElapsed: 2.9,
       dolphinPreviewLast: 0,

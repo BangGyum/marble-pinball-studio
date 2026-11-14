@@ -16,10 +16,11 @@ pre { white-space: pre-wrap; }
   <label>진단 목표 <select name="target" id="target"><option value="60">60FPS</option><option value="120" selected>120FPS</option></select></label>
   <label>테마 <select name="theme" id="theme"><option value="dark">다크</option><option value="beige">베이지</option></select></label>
   <label>배율 <select name="zoom" id="zoom"><option value="1">100%</option><option value="0.35">35%</option></select></label>
-  <button type="submit" name="start" value="1">14초 측정</button>
+  <button type="submit" name="start" value="1">16초 측정</button>
 </form>
 <p id="status">준비 중</p>
 <p>진단 목표는 결과 판정 기준입니다. 실제 화면 갱신은 모니터·브라우저 주사율을 따릅니다.</p>
+<p>FPS는 RAF 호출 기준입니다. 준비 상태의 baselineFps와 경기 FPS를 함께 비교하세요.</p>
 <canvas id="game"></canvas>
 <pre id="result"></pre>
 <script type="module" src="./performance.ts"></script>

@@ -129,3 +129,36 @@
     grid-column: auto;
   }
 }
+.control-panel:has(.sea-animal-settings) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.panel-clip:has(.sea-animal-settings [role="switch"]:checked) {
+  max-height: min(55dvh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.sea-animal-settings {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  min-width: 0;
+}
+.sea-animal-order {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin: 0;
+}
+.sea-animal-settings > .dolphin-settings {
+  grid-column: auto;
+}
+.sea-animal-settings fieldset:not([hidden]) {
+  display: block;
+}
+@media (max-width: 620px) {
+  .control-panel:has(.sea-animal-settings),
+  .sea-animal-settings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

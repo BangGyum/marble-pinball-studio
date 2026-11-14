@@ -10,7 +10,7 @@ require.extensions['.ts'] = (m, f) =>
   );
 const { GalleryIntro } = require('../src/gallery-intro.ts');
 
-function fixture({ hidden = false, reduced = false, width = 400 } = {}) {
+function fixture({ hidden = false, reduced = false, width = 400, cardTops = [-200, 350, 830] } = {}) {
   const animations = [],
     timers = new Map(),
     documentEvents = {},
@@ -93,7 +93,7 @@ function fixture({ hidden = false, reduced = false, width = 400 } = {}) {
       querySelector: () => element(),
     })
   );
-  const cards = [-200, 350, 830].map((top) => element({ getBoundingClientRect: () => ({ top, bottom: top + 100 }) }));
+  const cards = cardTops.map((top) => element({ getBoundingClientRect: () => ({ top, bottom: top + 100 }) }));
   const nodes = {
     '.gallery-impact-layer': effects,
     '.gallery-intro': { clientWidth: width * 2 },
@@ -130,6 +130,27 @@ for (const width of [160, 400]) {
     'only visible cards enter'
   );
   assert.equal(f.effects.children.length, 21);
+  const deformations = f.animations.filter(
+    (animation) => animation.frames[0].offset === 0 && animation.frames[0].transform.startsWith('scale(')
+  );
+  assert.equal(deformations.length, 3, 'each marble body deforms independently of its shadow and rolling pattern');
+  for (const animation of deformations) {
+    const scales = animation.frames.map((frame) =>
+      frame.transform
+        .match(/scale\(([\d.]+), ([\d.]+)\)/)
+        .slice(1)
+        .map(Number)
+    );
+    assert.ok(
+      scales.some(([, y]) => y < 0.98),
+      'impact creates a visible squash'
+    );
+    assert.ok(
+      scales.every(([x, y]) => x >= 1 && x <= 1.12 && y >= 0.8 && y <= 1),
+      'deformation stays subtle and finite'
+    );
+    assert.deepEqual(scales.at(-1), [1, 1], 'marbles finish perfectly round');
+  }
   for (const animation of f.animations) {
     assert.ok(
       animation.timing.duration + animation.timing.delay < 2000,
@@ -167,6 +188,20 @@ for (const width of [160, 400]) {
 console.log(
   'PASS finite gallery entry, visible cards, natural resting positions and complete cleanup at desktop/mobile widths'
 );
+
+{
+  const f = fixture({ cardTops: Array.from({ length: 12 }, (_, i) => 100 + i * 40) });
+  f.intro.play();
+  const delays = f.cards.map((card) => parseFloat(card.style['--entry-delay']));
+  assert.ok(
+    delays.every((delay, index) => !index || delay >= delays[index - 1]),
+    'visible cards enter in order'
+  );
+  assert.ok(Math.max(...delays) + 110 + 900 < 2000, 'even a large visible grid finishes before the intro cleanup');
+  f.intro.stop();
+  assert.ok(f.cards.every((card) => !card.classList.contains('map-card-entering')));
+}
+console.log('PASS contact squash settles round and staggered cards finish within the existing two-second entrance');
 
 for (const action of ['stop', 'hidden', 'pagehide', 'resize', 'reduced']) {
   const f = fixture();

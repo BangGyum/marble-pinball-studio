@@ -18,15 +18,16 @@
         <div class="gallery-copy"><p class="gallery-eyebrow">맵 고르기</p><h1 id="gallery-title" tabindex="-1">어디서 굴려볼까요<span>?</span></h1><p class="gallery-description">코스를 고르고, 이름을 넣어 경주를 시작하세요.</p></div>
         <div class="gallery-neon-art" aria-hidden="true">
           <div class="gallery-rail"></div><div class="gallery-impact-layer"></div>
-          <i class="gallery-marble"><b class="gallery-marble-core"></b><b class="gallery-marble-shadow"></b><b class="gallery-marble-trail"></b></i>
-          <i class="gallery-marble gold"><b class="gallery-marble-core"></b><b class="gallery-marble-shadow"></b><b class="gallery-marble-trail"></b></i>
-          <i class="gallery-marble violet"><b class="gallery-marble-core"></b><b class="gallery-marble-shadow"></b><b class="gallery-marble-trail"></b></i>
+          <i class="gallery-marble"><b class="gallery-marble-body"><b class="gallery-marble-core"></b></b><b class="gallery-marble-shadow"></b><b class="gallery-marble-trail"></b></i>
+          <i class="gallery-marble gold"><b class="gallery-marble-body"><b class="gallery-marble-core"></b></b><b class="gallery-marble-shadow"></b><b class="gallery-marble-trail"></b></i>
+          <i class="gallery-marble violet"><b class="gallery-marble-body"><b class="gallery-marble-core"></b></b><b class="gallery-marble-shadow"></b><b class="gallery-marble-trail"></b></i>
         </div>
         <div class="gallery-energy" aria-hidden="true"></div><div class="gallery-energy-dot" aria-hidden="true"></div>
       </section>
-      <div class="gallery-list-heading"><h2>전체 맵 <span id="gallery-count"></span></h2><p>출발부터 결승선까지, 한눈에 살펴보세요.</p></div>
+      <div class="gallery-list-heading"><div><h2><span id="gallery-list-title">원래 맵</span> <span id="gallery-count"></span></h2><p id="gallery-list-description">출발부터 결승선까지, 한눈에 살펴보세요.</p></div><div class="gallery-filters" role="group" aria-label="맵 목록 선택"><button id="gallery-filter-builtin" type="button" aria-pressed="true">원래 맵</button><button id="gallery-filter-custom" type="button" aria-pressed="false">내 맵</button></div></div>
       <div id="map-grid" class="map-grid" aria-label="선택할 수 있는 맵"></div>
-      <p class="gallery-storage-note">직접 만든 맵도 이 목록에서 고를 수 있어요. 내 맵은 현재 브라우저에 저장됩니다.</p>
+      <p id="gallery-empty" class="gallery-empty" hidden>저장한 맵이 없어요. 오른쪽 위의 ‘맵 만들기’로 첫 맵을 만들어 보세요.</p>
+      <p id="gallery-storage-note" class="gallery-storage-note" hidden>내 맵은 현재 브라우저에 저장됩니다.</p>
     </div>
     <footer class="gallery-footer"><span>PAUL PINBALL · 골라서 굴리는 재미</span><div><a href="https://github.com/lazygyu/roulette" target="_blank" rel="noopener noreferrer">Original by lazygyu · MIT</a><a href="./licenses.html" target="_blank" rel="noopener noreferrer">오픈소스 라이선스</a></div></footer>
   </main>
@@ -49,7 +50,7 @@
         <div class="setting"><label for="record">녹화</label><label class="check"><input id="record" type="checkbox" /> 경기 종료 후 영상 저장</label></div>
         <div class="play-actions"><button type="button" id="reset">다시 준비</button><button type="button" id="start" class="primary" disabled>▶ 시작</button></div>
       </div>
-      <section id="dolphin-settings" aria-label="돌고래 효과 설정"></section>
+      <section id="dolphin-settings" aria-label="돌고래·만타가오리 효과 설정"></section>
     </section>
       </div></div>
     </div>
@@ -64,6 +65,7 @@
   </dialog>
   <img id="canyon-rock-texture" src="./src/assets/canyon-basalt.png" alt="" hidden />
   <img id="dolphin-sprite" src="./src/assets/effects/dolphin-v1/dolphin-tail-fixed.png" alt="" hidden loading="lazy" />
+  <img id="manta-sprite" src="./src/assets/effects/manta-v1/manta.png" alt="" hidden loading="lazy" />
   <img id="dolphin-splash" src="./src/assets/effects/dolphin-v1/splash.png" alt="" hidden loading="lazy" />
   <div id="toast" role="status" hidden></div><script type="module" src="./src/index.ts"></script>
 </body></html>

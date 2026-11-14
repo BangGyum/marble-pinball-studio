@@ -486,6 +486,14 @@ export class Editor {
     else if (id === 'prop-color') e.shape.color = input.value;
     else if (id === 'prop-bounce') e.props.restitution = v;
     else if (id === 'prop-spin') {
+      if (v && e.shape.type === 'polyline' && !e.shape.solid && !e.shape.rotation && !e.props.angularVelocity) {
+        const xs = e.shape.points.map(([x]) => x),
+          ys = e.shape.points.map(([, y]) => y);
+        const x = (Math.min(...xs) + Math.max(...xs)) / 2,
+          y = (Math.min(...ys) + Math.max(...ys)) / 2;
+        e.position = { x: e.position.x + x, y: e.position.y + y };
+        e.shape.points = e.shape.points.map(([px, py]) => [px - x, py - y]);
+      }
       e.props.angularVelocity = (v * Math.PI) / 180;
       e.type =
         v ||

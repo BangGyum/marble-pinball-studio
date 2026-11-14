@@ -120,7 +120,7 @@ hover.accumulator = 0;
 steps = 0;
 hover.frame(1100);
 assert.equal(steps, 2, 'a 100ms stall at 1x must not trigger six physics updates');
-assert.ok(hover.accumulator < 1 / 60, 'overdue time must not accumulate across frames');
+assert.ok(hover.accumulator < 2 / 60, 'overdue time retains at most one pending physics step');
 hover.speed = 4;
 hover.last = 1000;
 hover.accumulator = 0;
@@ -131,7 +131,13 @@ hover.advance = () => {
 };
 hover.frame(1100);
 assert.equal(steps, 1, 'an expensive physics update must yield to rendering before starting another');
-assert.ok(hover.accumulator < 1 / 60);
+assert.ok(hover.accumulator < 2 / 60);
+for (let i = 1; i <= 10; i++) {
+  const beforeSteps = steps;
+  hover.frame(1100 + i * 100);
+  assert.equal(steps - beforeSteps, 1, 'repeated stalls never trigger a physics catch-up burst');
+  assert.ok(hover.accumulator < 2 / 60, 'repeated stalls cannot build an unbounded backlog');
+}
 global.performance = realPerformance;
 hover.render = savedRender;
 hover.advance = savedAdvance;

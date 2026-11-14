@@ -10,12 +10,14 @@ import { drawCelebration } from './celebration';
 import { Recorder } from './recorder';
 import { toast } from './ui';
 import { RenderCache } from './render-cache';
+import { RenderResolution } from './render-resolution';
 import { drawMarble } from './marble-art';
 import { MarbleElasticity } from './marble-elasticity';
 import { getSceneTheme, sceneColor } from './scene-theme';
 import { drawFunnelEntryCue } from './funnel-art';
 import { DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from './dolphin';
-import { DolphinRenderer } from './dolphin-render';
+import { SeaAnimalRenderer as DolphinRenderer } from './sea-animal-render';
+import type { AnimalKind } from './sea-animals';
 import { DolphinDrag } from './dolphin-drag';
 import type { MapEntityState } from './types/map-entity';
 export type { Ball } from './race';
@@ -53,6 +55,7 @@ export class Game extends Race {
   private height = 600;
   private minimap = { x: 18, y: 20, w: 115, h: 400, scale: 4 };
   private renderCache = new RenderCache();
+  private renderResolution = new RenderResolution();
   private marbleElasticity = new MarbleElasticity();
   private springControls: SpringControls;
   private dolphinRenderer = new DolphinRenderer();
@@ -68,12 +71,14 @@ export class Game extends Race {
     this.dolphinDrag = new DolphinDrag(
       canvas,
       () => this.state === 'ready' && this.dolphinPreview,
-      () => this.dolphins,
+      () => (this.dolphinRenderer.kind === 'manta' ? this.dolphins.manta! : this.dolphins),
       () => this.stage,
       (index, y, commit) => {
-        const rows = [...this.dolphins.rows];
+        const manta = this.dolphinRenderer.kind === 'manta';
+        const options = manta ? this.dolphins.manta! : this.dolphins;
+        const rows = [...options.rows];
         rows[index] = y;
-        this.setDolphins({ ...this.dolphins, rows });
+        this.setDolphins(manta ? { ...this.dolphins, manta: { ...options, rows } } : { ...this.dolphins, rows });
         this.onDolphinChange(this.dolphins, commit);
       }
     );
@@ -82,13 +87,21 @@ export class Game extends Race {
       (index) => this.activateSpring(index),
       () => this.state === 'running'
     );
-    this.ctx = canvas.getContext('2d', { alpha: false })!;
+    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })!;
     window.addEventListener('pinball-theme-change', () => {
       this.renderDirty = true;
     });
     window.addEventListener('pinball-marble-design-change', () => {
       this.renderDirty = true;
     });
+    // Late image loads must refresh a ready screen even when its frame loop is idle.
+    window.addEventListener(
+      'load',
+      () => {
+        this.renderDirty = true;
+      },
+      true
+    );
     new ResizeObserver(() => this.resize()).observe(canvas);
     const followMinimap = (e: PointerEvent) => {
       this.renderDirty = true;
@@ -165,6 +178,7 @@ export class Game extends Race {
     this.manual = null;
     this.springControls.reset();
     super.prepare(stage, names, dolphins);
+    this.dolphinRenderer.kind = this.dolphins.manta?.enabled ? 'manta' : 'dolphin';
     const rows = Math.ceil(names.length / 10);
     const spawnOffset = (stage.spawnX ?? 12.85) - 12.85;
     this.camera = {
@@ -177,11 +191,13 @@ export class Game extends Race {
   setDolphins(settings: DolphinSettings) {
     if (this.state !== 'ready') return;
     this.dolphins = validateDolphins(settings, this.stage);
-    if (!settings.enabled && this.dolphinOverview) {
+    if (!(this.dolphinRenderer.kind === 'manta' ? settings.manta?.enabled : settings.enabled) && this.dolphinOverview) {
       this.dolphinOverview = false;
       this.camera = { ...this.readyCamera };
       this.manual = null;
     }
+    if (!(this.dolphinRenderer.kind === 'manta' ? settings.manta?.enabled : settings.enabled))
+      this.dolphinRenderer.kind = settings.enabled ? 'dolphin' : settings.manta?.enabled ? 'manta' : 'dolphin';
     this.renderDirty = true;
     this.render();
   }
@@ -190,8 +206,13 @@ export class Game extends Race {
     this.dolphinPreviewLast = 0;
     this.renderDirty = true;
   }
-  showDolphinLayout() {
-    if (this.state !== 'ready' || !this.dolphins.enabled) return;
+  showDolphinLayout(kind?: AnimalKind) {
+    if (kind) this.dolphinRenderer.kind = kind;
+    if (
+      this.state !== 'ready' ||
+      !(this.dolphinRenderer.kind === 'manta' ? this.dolphins.manta?.enabled : this.dolphins.enabled)
+    )
+      return;
     this.dolphinOverview = true;
     this.manual = null;
     this.zoom = 1;
@@ -284,7 +305,8 @@ export class Game extends Race {
     // ResizeObserver runs after RAF. Keep the previous bitmap until the next render.
   }
   private frame(now: number) {
-    const delta = this.last ? Math.min((now - this.last) / 1000, 0.1) : 0;
+    const interval = this.last ? now - this.last : 0;
+    const delta = Math.min(interval / 1000, 0.1);
     this.last = now;
     if (!this.visible) {
       this.dolphinPreviewLast = 0;
@@ -295,7 +317,7 @@ export class Game extends Race {
     const previewing =
       this.state === 'ready' &&
       this.dolphinPreview &&
-      this.dolphins?.enabled &&
+      (this.dolphins?.enabled || this.dolphins?.manta?.enabled) &&
       !this.reducedMotion?.matches &&
       (typeof document === 'undefined' || !document.hidden);
     if (previewing) {
@@ -303,6 +325,23 @@ export class Game extends Race {
       if (this.dolphinPreviewLast && gap < 250) this.dolphinPreviewElapsed += Math.max(0, Math.min(0.1, gap / 1000));
       this.dolphinPreviewLast = now;
     } else this.dolphinPreviewLast = 0;
+    if (
+      this.renderResolution.sample(
+        interval,
+        !this.recording &&
+          (this.state === 'running' || !!previewing) &&
+          (typeof document === 'undefined' || !document.hidden),
+        devicePixelRatio,
+        this.state === 'ready' &&
+          !previewing &&
+          !this.recording &&
+          !this.renderDirty &&
+          !this.cameraMoving &&
+          !this.renderCache?.warming &&
+          (typeof document === 'undefined' || !document.hidden)
+      )
+    )
+      this.renderDirty = true;
     if (this.state === 'running') {
       this.accumulator += delta * this.speed * (this.fastForward ? 2 : 1) * this.finishSlowdown();
       const physicsStart = performance.now();
@@ -314,15 +353,14 @@ export class Game extends Race {
         this.accumulator >= 1 / 60 &&
         this.state === 'running' &&
         steps < maxSteps &&
-        (steps === 0 || performance.now() - physicsStart < physicsBudget)
+        (steps === 0 || ((performance.now() - physicsStart) * (steps + 1)) / steps < physicsBudget)
       ) {
         this.advance();
         this.accumulator -= 1 / 60;
         steps++;
       }
-      // Drop overdue wall-clock time, never physics steps: collisions still advance at 1/60.
-      // Under load the race slows down instead of creating a catch-up workload next frame.
-      if (this.accumulator >= 1 / 60) this.accumulator %= 1 / 60;
+      // Retain one pending step for frame jitter; discard larger backlogs to avoid catch-up spikes.
+      if (this.accumulator >= 2 / 60) this.accumulator = 1 / 60 + (this.accumulator % (1 / 60));
     }
     if (
       this.state === 'running' ||
@@ -333,7 +371,7 @@ export class Game extends Race {
       this.renderCache?.warming ||
       (this.winners.length && now - this.winnerAt < 1400) ||
       (this.drainCueAt && now - this.drainCueAt < 450) ||
-      now - this.lastFrameDraw >= 100
+      (this.state !== 'ready' && now - this.lastFrameDraw >= 100)
     ) {
       this.lastFrameDraw = now;
       this.renderDirty = false;
@@ -366,7 +404,7 @@ export class Game extends Race {
     const ctx = this.ctx,
       w = this.width,
       h = this.height,
-      d = Math.min(devicePixelRatio, 2);
+      d = this.renderResolution.ratio(devicePixelRatio);
     const pixelWidth = Math.max(1, Math.round(w * d)),
       pixelHeight = Math.max(1, Math.round(h * d));
     // Changing either dimension clears the canvas; resize and paint in the same callback.
@@ -452,7 +490,11 @@ export class Game extends Race {
           ctx,
           this.stage,
           this.dolphins,
-          this.reducedMotion?.matches ? DOLPHIN_DURATION / 2 : this.dolphinPreviewElapsed,
+          this.dolphinRenderer.previewTime(
+            this.dolphins,
+            this.dolphinPreviewElapsed,
+            this.reducedMotion?.matches ?? false
+          ),
           view,
           true
         );

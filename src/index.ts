@@ -10,7 +10,7 @@ import { MapGallery } from './map-gallery';
 import { initTheme } from './theme';
 import { initMarbleDesign } from './marble-design';
 import { ViewHistory } from './view-history';
-import { DolphinSettingsPanel } from './dolphin-settings';
+import { SeaAnimalSettingsPanel } from './sea-animal-settings';
 import './dolphin.css';
 
 initTheme();
@@ -24,6 +24,8 @@ try {
   toast('저장된 맵을 읽지 못했어요. 브라우저의 저장소 설정을 확인해 주세요.');
 }
 const allMaps = () => library.list();
+let previewStage: StageDef | undefined;
+const selectableMaps = () => library.list(previewStage);
 const game = new Game(el<HTMLCanvasElement>('game'));
 game.setVisible(false);
 const rankings = new Rankings();
@@ -62,7 +64,8 @@ winnerCount.addEventListener('change', () => (preferredWinnerCount = Number(winn
 const initialMapIndex = DEFAULT_MAP_INDEX;
 let currentStage: StageDef = stages[initialMapIndex];
 let initialized = false;
-const dolphinPanel = new DolphinSettingsPanel(
+let preparedNames: string | undefined;
+const dolphinPanel = new SeaAnimalSettingsPanel(
   el('dolphin-settings'),
   (settings) => {
     if (!initialized) return;
@@ -70,7 +73,7 @@ const dolphinPanel = new DolphinSettingsPanel(
     game.setDolphins(settings);
   },
   (show) => game.setDolphinPreview(show),
-  () => game.showDolphinLayout()
+  (kind) => game.showDolphinLayout(kind)
 );
 game.onDolphinChange = (settings) => dolphinPanel.moved(settings);
 const gameView = el('game-view'),
@@ -79,14 +82,16 @@ const gameView = el('game-view'),
 const galleryView = el('map-gallery');
 let galleryScroll = 0,
   resumeAfterGallery = false;
-const gallery = new MapGallery((id) => {
-  const selected = allMaps().find((map) => map.id === id);
-  if (!selected) return;
-  currentStage = selected.stage;
-  mapSelect.value = id;
-  prepare();
-  showGame(true);
-});
+const gallery = new MapGallery(
+  (id) => {
+    const selected = allMaps().find((map) => map.id === id);
+    if (!selected) return;
+    currentStage = selected.stage;
+    mapSelect.value = id;
+    prepare();
+  },
+  () => showGame(true)
+);
 const viewHistory = new ViewHistory((view) => {
   if (view === 'game') resumeGame();
   else showGallery();
@@ -146,11 +151,14 @@ el('zoom-in').addEventListener('click', () => game.setZoom(game.zoom * 1.2));
 el('zoom-reset').addEventListener('click', () => game.setZoom(1));
 function refreshMaps(selected = mapSelect.value) {
   mapSelect.replaceChildren();
-  for (const m of allMaps()) {
-    const o = new Option(`${m.id.startsWith('builtin-') ? '' : '내 맵 · '}${m.stage.title}`, m.id);
+  for (const m of selectableMaps()) {
+    const o = new Option(
+      `${m.id.startsWith('builtin-') ? '' : m.id === 'preview' ? '미리보기 · ' : '내 맵 · '}${m.stage.title}`,
+      m.id
+    );
     mapSelect.add(o);
   }
-  if (allMaps().some((m) => m.id === selected)) mapSelect.value = selected;
+  if (selectableMaps().some((m) => m.id === selected)) mapSelect.value = selected;
   el('map-caption').textContent = currentStage.title;
   gallery.refresh(allMaps(), mapSelect.value);
 }
@@ -183,11 +191,14 @@ function lockControls(locked: boolean) {
   el('pause').textContent = '일시정지';
 }
 function prepare() {
+  el('editor-open').firstChild!.textContent = mapSelect.value === 'preview' ? '맵 편집으로 돌아가기 ' : '맵 만들기 ';
   if (!initialized) return;
+  preparedNames = undefined;
   try {
     const list = parseNames(names.value);
     dolphinPanel.setStage(currentStage);
     game.prepare(currentStage, list, dolphinPanel.value);
+    preparedNames = names.value;
     updateWinnerCount(list.length);
     updateStandings();
     el('count').textContent = `${list.length}개의 구슬`;
@@ -212,7 +223,7 @@ el('shuffle').addEventListener('click', () => {
 });
 el('reset').addEventListener('click', prepare);
 mapSelect.addEventListener('change', () => {
-  currentStage = allMaps().find((m) => m.id === mapSelect.value)!.stage;
+  currentStage = selectableMaps().find((m) => m.id === mapSelect.value)!.stage;
   prepare();
 });
 el('speed').addEventListener('change', () => (game.speed = Number(el<HTMLSelectElement>('speed').value)));
@@ -230,8 +241,11 @@ function startRace() {
   updateWinnerCount(list.length);
   const order = mode.value as WinnerOrder;
   const range = winningRange(order, list.length, Number(winnerCount.value));
-  dolphinPanel.setStage(currentStage);
-  game.prepare(currentStage, list, dolphinPanel.value);
+  if (game.state !== 'ready' || game.stage !== currentStage || preparedNames !== names.value) {
+    dolphinPanel.setStage(currentStage);
+    game.prepare(currentStage, list, dolphinPanel.value);
+    preparedNames = names.value;
+  }
   game.start(range, record.checked, order);
   updateStandings();
   setPanelCollapsed(true);
@@ -286,6 +300,7 @@ const editor = new Editor({
   },
   save(stage, id) {
     const nextId = library.save(localStorage, stage, id);
+    previewStage = undefined;
     currentStage = stage;
     refreshMaps(nextId);
     showGame();
@@ -301,13 +316,11 @@ const editor = new Editor({
     } else refreshMaps();
   },
   play(stage) {
+    previewStage = stage;
     currentStage = stage;
-    refreshMaps();
-    mapSelect.add(new Option(`미리보기 · ${stage.title}`, 'preview'));
-    mapSelect.value = 'preview';
+    refreshMaps('preview');
     showGame();
     prepare();
-    el('editor-open').textContent = '맵 편집으로 돌아가기 ↗';
   },
 });
 el('gallery-create').addEventListener('click', () => editor.open());

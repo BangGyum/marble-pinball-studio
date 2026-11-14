@@ -45,6 +45,7 @@ const renderTimes: number[] = [],
   intervals: number[] = [],
   frameWork: number[] = [];
 const activeIntervals: number[] = [];
+const baselineIntervals: number[] = [];
 const renderer = game as unknown as { render(): void; frame(now: number): void };
 const frame = renderer.frame.bind(game);
 renderer.frame = (now) => {
@@ -79,15 +80,26 @@ game
   )
   .then(() => {
     game.setZoom(zoom);
-    status.textContent = 'Game 캔버스 진단 · 고정 시드 · 워밍업 2초 + 측정 12초 · 순위 DOM/녹화 제외';
+    status.textContent = 'Game 캔버스 진단 · 준비 기준 2초 + 워밍업 2초 + 측정 12초 · 순위 DOM/녹화 제외';
     if (params.has('start')) {
-      game.speed = speed;
-      if (mode !== 'idle') game.start([1, 1], false, 'asc');
-      const started = performance.now();
-      let previous = started,
+      const baselineAt = performance.now();
+      let started = 0,
+        previous = baselineAt,
         elapsedAtWarmup = 0;
       let wasRunning = game.state === 'running';
       const tick = (now: number) => {
+        if (!started) {
+          if (now - baselineAt < 2000) {
+            if (now - baselineAt >= 1000) baselineIntervals.push(now - previous);
+            previous = now;
+            requestAnimationFrame(tick);
+            return;
+          }
+          game.speed = speed;
+          if (mode !== 'idle') game.start([1, 1], false, 'asc');
+          started = previous = now;
+          wasRunning = game.state === 'running';
+        }
         if (mode === 'zoom') game.setZoom(1.5 + Math.sin((now - started) / 900) * 0.8);
         if (now - started >= 2000 && !measuring) {
           measuring = true;
@@ -126,6 +138,8 @@ game
           dpr: devicePixelRatio,
           seconds: duration,
           fps: intervals.length / duration,
+          baselineFps: 1000 / stats(baselineIntervals).mean,
+          baselineFrame: stats(baselineIntervals),
           frame: stats(intervals),
           slowFrames: intervals.filter((t) => t > 25).length,
           renders: renderTimes.length,

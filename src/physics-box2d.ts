@@ -5,7 +5,7 @@ import { windPower } from './wind-power';
 import { timedGateAngle } from './timed-gate';
 import { rotorPower } from './rotor-cycle';
 import type { IPhysics } from './i-physics';
-import type { MapEntity, MapEntityState } from './types/map-entity';
+import type { EntityBoxShape, MapEntity, MapEntityState } from './types/map-entity';
 
 type PhysicsEntity = {
   body: Box2D.b2Body;
@@ -16,7 +16,22 @@ type PhysicsEntity = {
   timedGate?: MapEntity['props']['timedGate'];
   spinCycle?: MapEntity['props']['spinCycle'];
   spin: number;
+  sweepPose?: {
+    x: number;
+    y: number;
+    cos: number;
+    sin: number;
+    nextX: number;
+    nextY: number;
+    nextCos: number;
+    nextSin: number;
+  };
+  sweepRadius?: number;
 } & MapEntityState;
+
+type SweepHit = { entity: PhysicsEntity; fraction: number; nx: number; ny: number };
+// The marble radius is 0.25; leave a small margin when recovering onto a hit face.
+const SWEEP_CLEARANCE = 0.255;
 
 const inBridgeArea = (x: number, y: number, area: NonNullable<StageDef['exitBridge']>['entry']) =>
   Math.abs(x - area.x) <= area.width / 2 && Math.abs(y - area.y) <= area.height / 2;
@@ -30,12 +45,21 @@ export class Box2dPhysics implements IPhysics {
   private marbleMap: Record<number, Box2D.b2Body> = {};
   private marbleBodies: Box2D.b2Body[] = [];
   private entities: PhysicsEntity[] = [];
+  private entityBodies = new Map<number, PhysicsEntity>();
+  private movingEntities: PhysicsEntity[] = [];
+  private sweepPositions = new Float64Array(0);
+  private sweepCallback?: Box2D.JSRayCastCallback;
+  private sweepEnd?: Box2D.b2Vec2;
+  private sweepBody = 0;
+  private sweepLayer = 1;
+  private sweepHit?: SweepHit;
   private springs: PhysicsEntity[] = [];
   private sliders: PhysicsEntity[] = [];
   private rotators: PhysicsEntity[] = [];
   private boosters: PhysicsEntity[] = [];
   private breakables: PhysicsEntity[] = [];
   private broken = new Set<PhysicsEntity>();
+  private breakableContacts = new Map<PhysicsEntity, Set<number>>();
   private motionTime = 0;
   private randomizeStart = false;
   private vortex: StageDef['vortex'];
@@ -63,6 +87,8 @@ export class Box2dPhysics implements IPhysics {
     if (!this.world || this.disposed) return;
     this.clearMarbles();
     this.clear();
+    if (this.sweepCallback) this.Box2D.destroy(this.sweepCallback);
+    this.sweepCallback = undefined;
     this.Box2D.destroy(this.world);
     this.Box2D.destroy(this.vector);
     this.disposed = true;
@@ -81,12 +107,18 @@ export class Box2dPhysics implements IPhysics {
     for (const entity of this.entities) this.world.DestroyBody(entity.body);
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
     this.entities = [];
+    this.entityBodies.clear();
+    this.movingEntities = [];
+    this.sweepHit = undefined;
+    if (this.sweepEnd) this.Box2D.destroy(this.sweepEnd);
+    this.sweepEnd = undefined;
     this.springs = [];
     this.sliders = [];
     this.rotators = [];
     this.boosters = [];
     this.breakables = [];
     this.broken.clear();
+    this.breakableContacts.clear();
     this.deleteCandidates = [];
     this.previousCount = -1;
     this.releaseWrappers();
@@ -236,6 +268,16 @@ export class Box2dPhysics implements IPhysics {
         life: entity.props.life ?? -1,
       };
       this.entities.push(state);
+      this.entityBodies.set(B.getPointer(body), state);
+      if (state.moving) {
+        state.sweepRadius =
+          s.type === 'box'
+            ? Math.hypot(s.width, s.height)
+            : s.type === 'circle'
+              ? s.radius
+              : Math.max(...s.points.map(([x, y]) => Math.hypot(x, y))) + Math.abs(s.backing ?? 0);
+        this.movingEntities.push(state);
+      }
       if (state.moving) this.leaks.recordLeak(body.GetPosition());
       if (s.type === 'box' && s.spring) this.springs.push(state);
       if (state.sliding) this.sliders.push(state);
@@ -348,9 +390,144 @@ export class Box2dPhysics implements IPhysics {
     });
     this.previousCount = this.entities.length;
   }
+  private recordSweep() {
+    if (this.sweepPositions.length < this.marbleBodies.length * 2)
+      this.sweepPositions = new Float64Array(this.marbleBodies.length * 2);
+    this.marbleBodies.forEach((body, i) => {
+      const p = body.GetPosition();
+      this.sweepPositions[i * 2] = p.x;
+      this.sweepPositions[i * 2 + 1] = p.y;
+    });
+    for (const entity of this.movingEntities) {
+      const p = entity.body.GetPosition();
+      entity.sweepPose ??= { x: 0, y: 0, cos: 1, sin: 0, nextX: 0, nextY: 0, nextCos: 1, nextSin: 0 };
+      const pose = entity.sweepPose,
+        angle = entity.body.GetAngle();
+      pose.x = p.x;
+      pose.y = p.y;
+      pose.cos = Math.cos(angle);
+      pose.sin = Math.sin(angle);
+    }
+  }
+  private castMapRay(x: number, y: number, end: Box2D.b2Vec2, body: number, layer: number): SweepHit | undefined {
+    const B = this.Box2D;
+    if (!this.sweepCallback) {
+      this.sweepCallback = new B.JSRayCastCallback();
+      this.sweepCallback.ReportFixture = (fixture, _point, normal, fraction) => {
+        const f = typeof fixture === 'number' ? B.wrapPointer(fixture, B.b2Fixture) : fixture;
+        const pointer = B.getPointer(f.GetBody()),
+          entity = this.entityBodies.get(pointer);
+        if (
+          !entity ||
+          (this.sweepBody ? pointer !== this.sweepBody : entity.moving) ||
+          (entity.shape.collisionLayer ?? 1) !== this.sweepLayer ||
+          f.IsSensor()
+        )
+          return -1;
+        const n = typeof normal === 'number' ? B.wrapPointer(normal, B.b2Vec2) : normal;
+        this.sweepHit = { entity, fraction, nx: n.x, ny: n.y };
+        // Ray normals are borrowed from the callback's native stack.
+        B.LeakMitigator.freeFromCache(n);
+        return fraction;
+      };
+    }
+    this.sweepHit = undefined;
+    this.sweepBody = body;
+    this.sweepLayer = layer;
+    this.vector.Set(x, y);
+    this.world.RayCast(this.sweepCallback, this.vector, end);
+    return this.sweepHit;
+  }
+  private guardMapCrossings() {
+    for (const entity of this.movingEntities) {
+      const p = entity.body.GetPosition(),
+        pose = entity.sweepPose!;
+      pose.nextX = p.x;
+      pose.nextY = p.y;
+      const angle = entity.body.GetAngle();
+      pose.nextCos = Math.cos(angle);
+      pose.nextSin = Math.sin(angle);
+    }
+    this.marbleBodies.forEach((body, i) => {
+      const p = body.GetPosition(),
+        x = p.x,
+        y = p.y,
+        oldX = this.sweepPositions[i * 2],
+        oldY = this.sweepPositions[i * 2 + 1],
+        layer = this.bridgeBodies.has(body) ? 2 : 1;
+      let hit: SweepHit | undefined,
+        safeX = oldX,
+        safeY = oldY;
+      if (Math.abs(x - oldX) + Math.abs(y - oldY) > 1e-8) {
+        hit = this.castMapRay(oldX, oldY, p, 0, layer);
+        if (hit) {
+          safeX = oldX + (x - oldX) * hit.fraction + hit.nx * SWEEP_CLEARANCE;
+          safeY = oldY + (y - oldY) * hit.fraction + hit.ny * SWEEP_CLEARANCE;
+        }
+      }
+      for (const entity of this.movingEntities) {
+        const previous = entity.sweepPose!,
+          dx = oldX - previous.x,
+          dy = oldY - previous.y,
+          lx = dx * previous.cos + dy * previous.sin,
+          ly = -dx * previous.sin + dy * previous.cos,
+          fromX = previous.nextX + previous.nextCos * lx - previous.nextSin * ly,
+          fromY = previous.nextY + previous.nextSin * lx + previous.nextCos * ly,
+          moveX = x - fromX,
+          moveY = y - fromY,
+          length2 = moveX * moveX + moveY * moveY;
+        if (length2 < 1e-16) continue;
+        const t = Math.max(
+          0,
+          Math.min(1, ((previous.nextX - fromX) * moveX + (previous.nextY - fromY) * moveY) / length2)
+        );
+        const closestX = fromX + moveX * t - previous.nextX,
+          closestY = fromY + moveY * t - previous.nextY;
+        if (closestX * closestX + closestY * closestY > entity.sweepRadius! * entity.sweepRadius!) continue;
+        if (Math.abs(x - fromX) + Math.abs(y - fromY) > 1e-8) {
+          const candidate = this.castMapRay(fromX, fromY, p, this.Box2D.getPointer(entity.body), layer);
+          if (candidate && (!hit || candidate.fraction < hit.fraction)) {
+            hit = candidate;
+            safeX = fromX;
+            safeY = fromY;
+          }
+        }
+      }
+      if (!hit) return;
+      // Carrying a point with a moving obstacle must not take it through a fixed wall.
+      if (hit.entity.moving && Math.abs(safeX - oldX) + Math.abs(safeY - oldY) > 1e-8) {
+        this.sweepEnd ??= new this.Box2D.b2Vec2(0, 0);
+        this.sweepEnd.Set(safeX, safeY);
+        const fixed = this.castMapRay(oldX, oldY, this.sweepEnd, 0, layer);
+        if (fixed) {
+          hit = fixed;
+          safeX = oldX + (safeX - oldX) * fixed.fraction + fixed.nx * SWEEP_CLEARANCE;
+          safeY = oldY + (safeY - oldY) * fixed.fraction + fixed.ny * SWEEP_CLEARANCE;
+        }
+      }
+      // Restore the last safe side; a moving surface carries that point with it.
+      this.vector.Set(safeX, safeY);
+      body.SetTransform(this.vector, body.GetAngle());
+      const velocity = body.GetLinearVelocity(),
+        surface = this.leaks.recordLeak(hit.entity.body.GetLinearVelocityFromWorldPoint(this.vector)),
+        inward = Math.min(0, (velocity.x - surface.x) * hit.nx + (velocity.y - surface.y) * hit.ny);
+      this.vector.Set(velocity.x - inward * hit.nx, velocity.y - inward * hit.ny);
+      body.SetLinearVelocity(this.vector);
+    });
+  }
   isSpringBusy(index: number) {
     const e = this.entities[index];
     return !!e && e.springAt !== undefined && this.motionTime - e.springAt < 1;
+  }
+  removeSpring(shape: EntityBoxShape) {
+    const spring = this.springs.find((entity) => entity.shape === shape);
+    if (!spring) return;
+    this.entityBodies.delete(this.Box2D.getPointer(spring.body));
+    this.world.DestroyBody(spring.body);
+    this.entities = this.entities.filter((entity) => entity !== spring);
+    this.movingEntities = this.movingEntities.filter((entity) => entity !== spring);
+    this.springs = this.springs.filter((entity) => entity !== spring);
+    this.previousCount = -1;
   }
   activateSpring(index: number) {
     const e = this.entities[index];
@@ -476,7 +653,11 @@ export class Box2dPhysics implements IPhysics {
           );
         }
       beforeSubstep?.(dt, i * dt);
+      // Check the short solver path: a full-frame chord can skip a thin wall under pressure.
+      const guard = !!beforeSubstep && this.entities.length > 0;
+      if (guard) this.recordSweep();
       this.world.Step(dt, 8, this.collisionSubsteps === 4 ? 4 : 8);
+      if (guard) this.guardMapCrossings();
       if (this.exitBridge) {
         for (const body of bodies) {
           const elevated = this.bridgeBodies.has(body);
@@ -520,31 +701,43 @@ export class Box2dPhysics implements IPhysics {
             edge = this.leaks.recordLeak(edge.next);
           }
         }
-      // A brief bounce can end before the last substep; remember every touching obstacle.
+      // A brief bounce can end before the last substep; count each new marble contact once.
       for (const e of this.breakables) {
         if (this.broken.has(e)) continue;
+        const previous = this.breakableContacts.get(e),
+          touching = new Set<number>();
         let edge = this.leaks.recordLeak(e.body.GetContactList());
         while (this.Box2D.getPointer(edge)) {
-          if (this.leaks.recordLeak(edge.contact).IsTouching()) {
-            this.broken.add(e);
-            break;
+          if (edge.other.GetType() === this.Box2D.b2_dynamicBody && this.leaks.recordLeak(edge.contact).IsTouching()) {
+            const pointer = this.Box2D.getPointer(edge.other);
+            if (!touching.has(pointer)) {
+              touching.add(pointer);
+              if (!previous?.has(pointer) && --e.life <= 0) {
+                this.broken.add(e);
+                break;
+              }
+            }
           }
           edge = this.leaks.recordLeak(edge.next);
         }
+        this.breakableContacts.set(e, touching);
       }
     }
     if (this.broken.size) {
       for (let i = this.entities.length - 1; i >= 0; i--) {
         const e = this.entities[i];
         if (!this.broken.has(e)) continue;
+        this.entityBodies.delete(this.Box2D.getPointer(e.body));
         this.deleteCandidates.push(e.body);
         this.entities.splice(i, 1);
       }
       this.springs = this.springs.filter((e) => !this.broken.has(e));
+      this.movingEntities = this.movingEntities.filter((e) => !this.broken.has(e));
       this.sliders = this.sliders.filter((e) => !this.broken.has(e));
       this.rotators = this.rotators.filter((e) => !this.broken.has(e));
       this.boosters = this.boosters.filter((e) => !this.broken.has(e));
       this.breakables = this.breakables.filter((e) => !this.broken.has(e));
+      for (const e of this.broken) this.breakableContacts.delete(e);
       this.broken.clear();
     }
   }

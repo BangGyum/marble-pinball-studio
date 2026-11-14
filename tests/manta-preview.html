@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>만타가오리 · 디자인과 히트박스</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #101820; color: #eaf4f5; font: 15px/1.65 system-ui, sans-serif; }
+      main { max-width: 1240px; margin: auto; padding: 32px 24px; }
+      h1 { margin: 0; font-size: clamp(25px, 5vw, 36px); word-break: keep-all; }
+      p { margin: 10px 0 20px; color: #a6bec9; }
+      .eyebrow { color: #8edbd0; letter-spacing: .18em; font-size: 12px; margin-bottom: 8px; }
+      .controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+      button, select { border: 1px solid #4b6471; color: inherit; background: #22343f; border-radius: 8px; padding: 9px 15px; font: inherit; cursor: pointer; }
+      input { accent-color: #86dbca; }
+      label { display: inline-flex; align-items: center; gap: 7px; }
+      article { border: 1px solid #415561; border-radius: 16px; overflow: hidden; margin-top: 20px; }
+      h2 { font-size: 14px; font-weight: 500; margin: 0; padding: 12px 18px; background: #1b2b35; }
+      .beige h2 { color: #435653; background: #e6ddc9; }
+      canvas { display: block; width: 100%; aspect-ratio: 2.65; touch-action: none; }
+      .note { margin-top: 20px; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">PAUL PINBALL / MANTA RAY</div>
+      <h1>만타가오리 · 디자인과 히트박스</h1>
+      <p>돌고래와 같은 그림체, 실제 이미지 외곽선 판정. 포인터를 올리면 공과 닿는 면을 확인할 수 있습니다.</p>
+      <div class="controls">
+        <button id="direction" type="button">진행 방향: 오른쪽 →</button>
+        <button id="pause" type="button">일시정지</button>
+        <label>크기 <select id="size"><option value="1.5">50%</option><option value="3" selected>100%</option><option value="6">200%</option></select></label>
+        <label><input id="outline" type="checkbox" checked />히트박스 표시</label>
+        <label><input id="mouth" type="checkbox" checked />입 안 공 크기 비교</label>
+        <span id="status" role="status">이미지 불러오는 중</span>
+      </div>
+      <article><h2>다크 테마 · 민트색 선이 실제 접촉 외곽선</h2><canvas id="dark" aria-label="다크 배경 만타 미리보기"></canvas></article>
+      <article class="beige"><h2>베이지 테마 · 같은 이미지와 같은 판정</h2><canvas id="beige" aria-label="베이지 배경 만타 미리보기"></canvas></article>
+      <p class="note">실제 경기·LAN과 같은 이미지와 충돌 외곽선을 사용합니다. 입 안의 공은 크기 비교용 표시이며, 공 지름은 크기 설정과 관계없이 0.5칸입니다.</p>
+    </main>
+    <script type="module" src="./manta-preview.ts"></script>
+  </body>
+</html>
