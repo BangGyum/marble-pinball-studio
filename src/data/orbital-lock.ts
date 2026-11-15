@@ -16,10 +16,11 @@ const gap = (r: number, half: number) => [polar(r, -63 - half), polar(r, -63 + h
 const outerIn = gap(23, 8),
   middleOut = gap(18, 10),
   middleIn = gap(13, 12),
-  coreOut = gap(8, 20);
+  // A shorter, offset core mouth keeps its blade clear of the middle gate's sweep.
+  coreOut = [polar(8, -60), polar(8, -40)];
 export const orbitalTransfers = [
   [...arc(32, 40, 23, -71, -55), ...arc(32, 40, 18, -53, -73)],
-  [...arc(32, 40, 13, -75, -51), ...arc(32, 40, 8, -43, -83)],
+  [...arc(32, 40, 13, -75, -51), ...arc(32, 40, 8, -40, -60)],
 ];
 const left: Point[] = [
   [30, 46.7],
@@ -165,12 +166,12 @@ export const orbitalLock: StageDef = {
     wall([outerIn[1], middleOut[1]], -0.8),
     coreRail(middleIn[0], coreOut[0], 0.8),
     coreRail(middleIn[1], coreOut[1], -0.8),
-    wall(arc(32, 40, 8, -43, 75.52)),
-    wall(arc(32, 40, 8, 104.48, 277)),
+    wall(arc(32, 40, 8, -40, 75.52)),
+    wall(arc(32, 40, 8, 104.48, 300)),
     ...gate(outerIn[0], outerIn[1], 9.2, 6.2, 1.4, 6, 24),
     ...gate(middleIn[0], middleIn[1], 6.4, 5.1, 1.4, 4.9, 30),
-    // Fold away from the core so an upward rebound cannot wedge at the released hinge.
-    ...gate(coreOut[0], coreOut[1], 5.8, 4.9, -1.3, 4.8, 34),
+    // Fold the shorter leaf back along the inner rim, clear of the other gate.
+    ...gate(coreOut[0], coreOut[1], 5.8, 4.9, 2.8, 4.8, 34),
     ...paddle(7, 39, 1.8, -2.4),
     ...paddle(40.2, 26.8, 1.2, 2),
     ...paddle(32, 40, 2.9, -3.4),

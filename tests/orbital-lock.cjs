@@ -124,6 +124,14 @@ const near = (ball, points, margin = 0.3) =>
   );
   const gateEntity = stage.entities.find((e) => e.props.timedGate),
     gate = gateEntity.props.timedGate;
+  const withAngle = (angle) => ({
+    ...stage,
+    entities: [{ ...gateEntity, props: { ...gateEntity.props, timedGate: { ...gate, angle } } }],
+  });
+  for (const angle of [-Math.PI, -2.8, 2.8, Math.PI])
+    assert.equal(validateStage(withAngle(angle)).entities[0].props.timedGate.angle, angle);
+  for (const angle of [-Math.PI - 0.001, Math.PI + 0.001, 0, Infinity, '2.8'])
+    assert.throws(() => validateStage(withAngle(angle)));
   for (const releaseAfter of [0, 181, Infinity, null, '20'])
     assert.throws(() =>
       validateStage({

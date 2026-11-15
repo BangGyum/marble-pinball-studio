@@ -32,6 +32,10 @@ type PhysicsEntity = {
 type SweepHit = { entity: PhysicsEntity; fraction: number; nx: number; ny: number };
 // The marble radius is 0.25; leave a small margin when recovering onto a hit face.
 const SWEEP_CLEARANCE = 0.255;
+const RECOVERY_DIRECTIONS = Array.from({ length: 128 }, (_, i) => [
+  Math.cos((i * Math.PI) / 64),
+  Math.sin((i * Math.PI) / 64),
+]);
 
 const inBridgeArea = (x: number, y: number, area: NonNullable<StageDef['exitBridge']>['entry']) =>
   Math.abs(x - area.x) <= area.width / 2 && Math.abs(y - area.y) <= area.height / 2;
@@ -438,6 +442,29 @@ export class Box2dPhysics implements IPhysics {
     this.world.RayCast(this.sweepCallback, this.vector, end);
     return this.sweepHit;
   }
+  private recoveryClear(oldX: number, oldY: number, x: number, y: number, layer: number) {
+    this.sweepEnd ??= new this.Box2D.b2Vec2(0, 0);
+    this.sweepEnd.Set(x, y);
+    if (Math.abs(x - oldX) + Math.abs(y - oldY) > 1e-8 && this.castMapRay(oldX, oldY, this.sweepEnd, 0, layer))
+      return false;
+    for (const entity of this.movingEntities) {
+      const pose = entity.sweepPose!,
+        dx = oldX - pose.x,
+        dy = oldY - pose.y,
+        lx = dx * pose.cos + dy * pose.sin,
+        ly = -dx * pose.sin + dy * pose.cos,
+        fromX = pose.nextX + pose.nextCos * lx - pose.nextSin * ly,
+        fromY = pose.nextY + pose.nextSin * lx + pose.nextCos * ly,
+        mx = x - fromX,
+        my = y - fromY,
+        length2 = mx * mx + my * my;
+      if (length2 < 1e-16) continue;
+      const t = Math.max(0, Math.min(1, ((pose.nextX - fromX) * mx + (pose.nextY - fromY) * my) / length2));
+      if (Math.hypot(fromX + mx * t - pose.nextX, fromY + my * t - pose.nextY) > entity.sweepRadius!) continue;
+      if (this.castMapRay(fromX, fromY, this.sweepEnd, this.Box2D.getPointer(entity.body), layer)) return false;
+    }
+    return true;
+  }
   private guardMapCrossings() {
     for (const entity of this.movingEntities) {
       const p = entity.body.GetPosition(),
@@ -503,6 +530,27 @@ export class Box2dPhysics implements IPhysics {
           hit = fixed;
           safeX = oldX + (safeX - oldX) * fixed.fraction + fixed.nx * SWEEP_CLEARANCE;
           safeY = oldY + (safeY - oldY) * fixed.fraction + fixed.ny * SWEEP_CLEARANCE;
+        }
+      }
+      // Recovery must not cross a different obstacle. Keep the old point when
+      // possible, otherwise use a clear path within one marble diameter.
+      if (!this.recoveryClear(oldX, oldY, safeX, safeY, layer)) {
+        let found = this.recoveryClear(oldX, oldY, oldX, oldY, layer);
+        if (found) {
+          safeX = oldX;
+          safeY = oldY;
+        }
+        for (const distance of [0.01, 0.025, 0.05, 0.1, 0.2, 0.35, 0.5]) {
+          if (found) break;
+          for (const [dx, dy] of RECOVERY_DIRECTIONS) {
+            const candidateX = oldX + dx * distance,
+              candidateY = oldY + dy * distance;
+            if (!this.recoveryClear(oldX, oldY, candidateX, candidateY, layer)) continue;
+            safeX = candidateX;
+            safeY = candidateY;
+            found = true;
+            break;
+          }
         }
       }
       // Restore the last safe side; a moving surface carries that point with it.

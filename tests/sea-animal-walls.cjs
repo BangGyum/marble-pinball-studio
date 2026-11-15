@@ -35,6 +35,45 @@ const open = (entities) => ({ title: 'Animal wall regression', width: 40, goalY:
     B = physics.Box2D,
     random = Math.random;
   try {
+    for (const direction of [-1, 1]) {
+      physics.clearMarbles();
+      physics.clear();
+      physics.createStage(
+        open([
+          {
+            position: { x: 0, y: 0 },
+            type: 'static',
+            shape: edge([
+              [-4, 0],
+              [4, 0],
+            ]),
+            props,
+          },
+          {
+            position: { x: 0, y: direction * 0.25 },
+            type: 'kinematic',
+            shape: { type: 'box', width: 2, height: 0.1, rotation: 0 },
+            props,
+          },
+        ])
+      );
+      physics.createMarble(0, 0, direction * 0.01);
+      physics.start();
+      physics.recordSweep();
+      physics.placeMarble(0, 0, -direction * 0.01);
+      physics.guardMapCrossings();
+      const point = physics.getMarblePosition(0);
+      assert.ok(point.y * direction > 0, 'recovery keeps the original side of the fixed wall');
+      physics.vector.Set(point.x, point.y);
+      assert.equal(
+        physics.entities[1].body.GetFixtureList().TestPoint(physics.vector),
+        false,
+        'wall recovery must not put the marble inside the adjacent moving blade'
+      );
+    }
+    console.log('PASS fixed-wall recovery cannot cross an adjacent moving blade on either side');
+    physics.clearMarbles();
+    physics.clear();
     physics.createStage({ ...orbitingGate, windZones: [] });
     physics.createMarble(0, 32, -31.5);
     physics.start();

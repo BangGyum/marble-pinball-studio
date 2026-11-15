@@ -320,7 +320,7 @@ export function validateStage(value: unknown): StageDef {
         !finite(gate.openFor, 0.5, gate.period - 0.5) ||
         (gate.releaseAfter !== undefined && !finite(gate.releaseAfter, 5, 180)) ||
         !finite(gate.phase, -60, 60) ||
-        !finite(gate.angle, -1.5, 1.5) ||
+        !finite(gate.angle, -Math.PI, Math.PI) ||
         Math.abs(gate.angle) < 0.1)
     )
       throw new Error('타이밍 게이트의 열림 각도와 주기를 확인해 주세요.');
