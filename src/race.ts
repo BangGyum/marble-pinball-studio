@@ -7,7 +7,8 @@ import { WallGuard, WALL_GUARD_MAX_SPEED } from './wall-guard';
 import { finishFraction, raceProgress } from './finish';
 import { dolphinBounce, dolphinContact, validateDolphins, type DolphinSettings } from './dolphin';
 import { animalPoses, animalsEnabled } from './sea-animals';
-import { mantaContact } from './manta-hitbox';
+import { mantaContact, mantaMouthContains } from './manta-hitbox';
+import { MANTA_HOLD_SECONDS, MANTA_PENALTY_SECONDS } from './manta-penalty';
 
 export type Ball = {
   id: number;
@@ -19,6 +20,7 @@ export type Ball = {
   stuck: number;
   rank?: number;
   onBridge?: boolean;
+  mantaCaughtAt?: number;
   // Position one physics step earlier, for drawing between steps.
   px?: number;
   py?: number;
@@ -90,6 +92,7 @@ export class Race {
   dolphins: DolphinSettings = { enabled: false, rows: [], interval: 5 };
   private dolphinContacts = new Set<string>();
   private dolphinNextContacts = new Set<string>();
+  private mantaCaughtWaves = new Map<number, string>();
   onFinish: (winners: Ball[]) => void = () => {};
   private walls?: WallGuard;
   private progressAt = 0;
@@ -106,6 +109,7 @@ export class Race {
     this.dolphins = effect;
     this.dolphinContacts = new Set();
     this.dolphinNextContacts = new Set();
+    this.mantaCaughtWaves = new Map();
     this.arrivals = [];
     this.winners = [];
     this.winnerAt = 0;
@@ -266,6 +270,7 @@ export class Race {
   }
 
   private arrive(ball: Ball) {
+    ball.mantaCaughtAt = undefined;
     ball.rank = this.arrivals.length + 1;
     this.arrivals.push(ball);
     this.physics.removeMarble(ball.id);
@@ -276,19 +281,40 @@ export class Race {
     const poses = animalPoses(this.dolphins, this.stage, elapsed, dt);
     if (!poses.length) {
       this.dolphinContacts.clear();
-      return;
+      if (!this.balls.some((ball) => ball.mantaCaughtAt !== undefined)) return;
     }
     for (const ball of this.balls) {
       if (ball.rank) continue;
       const pos = this.physics.getMarblePosition(ball.id);
+      const age = ball.mantaCaughtAt === undefined ? Infinity : elapsed - ball.mantaCaughtAt;
+      if (age < MANTA_PENALTY_SECONDS) {
+        const velocity = this.physics.getMarbleVelocity(ball.id),
+          damping = age < MANTA_HOLD_SECONDS ? 0 : Math.exp(-1.5 * dt);
+        // Leave the dynamic body and its collisions active; never carry or teleport it.
+        this.physics.setMarbleVelocity(ball.id, velocity.vx * damping, velocity.vy * damping);
+      } else {
+        ball.mantaCaughtAt = undefined;
+      }
       for (const { kind, p, motion, wave, index, halfWidth, halfHeight } of poses) {
         if (Math.abs(pos.x - p.x) > halfWidth || Math.abs(pos.y - p.y) > halfHeight || pos.y > p.waterY + 0.25)
           continue;
+        if (kind === 'manta' && age < MANTA_HOLD_SECONDS) continue;
+        const key = `${kind === 'manta' ? 'manta:' : ''}${wave}:${index}:${ball.id}`;
+        if (
+          kind === 'manta' &&
+          age >= MANTA_PENALTY_SECONDS &&
+          this.mantaCaughtWaves.get(ball.id) !== key &&
+          mantaMouthContains(pos, p)
+        ) {
+          ball.mantaCaughtAt = elapsed;
+          this.mantaCaughtWaves.set(ball.id, key);
+          this.physics.setMarbleVelocity(ball.id, 0, 0);
+          break;
+        }
         // Only real outline contacts need WASM velocities and restitution tracking.
         const surface = kind === 'manta' ? mantaContact(pos, p) : dolphinContact(pos, p);
         if (!surface) continue;
-        const key = `${kind === 'manta' ? 'manta:' : ''}${wave}:${index}:${ball.id}`,
-          alreadyHit = this.dolphinContacts.has(key);
+        const alreadyHit = this.dolphinContacts.has(key);
         const contact = dolphinBounce(
           { ...pos, ...this.physics.getMarbleVelocity(ball.id) },
           p,

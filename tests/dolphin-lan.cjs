@@ -168,6 +168,57 @@ async function connect(port, host = false) {
     assert.equal((await host.command({ type: 'reset' })).ok, true);
     assert.deepEqual(app.race.dolphins, dolphins);
     assert.equal(app.race.elapsed, 0, 'reset restarts the effect clock');
+    // The preceding rejection cases deliberately approach the production command limit.
+    await wait(1100);
+    const captureOptions = {
+      enabled: false,
+      rows: [20],
+      interval: 5,
+      manta: { enabled: true, rows: [20], interval: 5 },
+    };
+    assert.equal(
+      (
+        await host.command({
+          type: 'configure',
+          settings: {
+            ...settings,
+            names: 'capture',
+            stage: { title: 'LAN capture', width: 40, goalY: 200, entities: [] },
+            dolphins: captureOptions,
+          },
+        })
+      ).ok,
+      true
+    );
+    assert.equal((await host.command({ type: 'start' })).ok, true);
+    app.race.elapsed = 1.2;
+    const { animalPoses } = require('../.lan-build/sea-animals.js');
+    const p = animalPoses(captureOptions, app.race.stage, 1.2, 1 / 240)[0].p,
+      lx = ((1560 - 105 - 1569 / 2) * 4) / 1569,
+      ly = ((455 - 33 - 834 / 2) * 4) / 1569;
+    app.race.physics.placeMarble(
+      0,
+      p.x + p.direction * p.scale * (Math.cos(p.angle) * lx - Math.sin(p.angle) * ly),
+      p.y + p.scale * (Math.sin(p.angle) * lx + Math.cos(p.angle) * ly)
+    );
+    app.race.stepDolphins(1 / 240, 1.2);
+    assert.equal(app.race.balls[0].mantaCaughtAt, 1.2, 'native mouth entry triggers authoritative capture');
+    assert.equal((await host.command({ type: 'pause' })).ok, true);
+    await guest.until(() => guest.frame.mantaCaptures?.length === 1);
+    assert.deepEqual(guest.frame.mantaCaptures, [[0, 1.2]]);
+    const caughtLate = await connect(app.port);
+    clients.push(caughtLate);
+    assert.deepEqual(
+      caughtLate.frame.mantaCaptures,
+      [[0, 1.2]],
+      'late joins reconstruct hold/stun from the same timestamp'
+    );
+    await wait(100);
+    assert.equal(app.race.elapsed, 1.2, 'pause freezes capture time');
+    assert.equal((await host.command({ type: 'reset' })).ok, true);
+    await guest.until(() => guest.frame.state === 'ready');
+    assert.equal(guest.frame.mantaCaptures, undefined, 'reset removes stale capture effects');
+    console.log('PASS LAN native mouth capture, paused timestamp, late-join effect and reset cleanup');
     console.log(
       'PASS LAN exclusive animal settings, both-enabled rejection, viewer restrictions, running/pause locks, late join and reset'
     );

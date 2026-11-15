@@ -9,6 +9,7 @@ import { RenderCache } from '../render-cache';
 import { RenderResolution } from '../render-resolution';
 import { drawMarble } from '../marble-art';
 import { MarbleElasticity } from '../marble-elasticity';
+import { drawMantaPenalty } from '../manta-penalty';
 import { Recorder } from '../recorder';
 import { toast } from '../ui';
 import { SnapshotPlayback } from './playback';
@@ -550,7 +551,12 @@ export class LanView {
       ball.angle = mix(a[3], b[3]);
       ball.rank = (t >= 1 ? b[4] : a[4]) || undefined;
       ball.onBridge = bridgeIds.has(a[0]);
+      ball.mantaCaughtAt = undefined;
     });
+    for (const [id, caughtAt] of shown.mantaCaptures ?? []) {
+      const ball = this.balls[id];
+      if (ball) ball.mantaCaughtAt = caughtAt;
+    }
     const { balls } = this;
     const selected = balls.find((b) => b.id === this.focusedBallId);
     const active = balls
@@ -702,7 +708,16 @@ export class LanView {
         ctx.stroke();
       }
       ctx.globalAlpha = bridgeBallOpacity(scene.stage, ball);
-      const squash = this.marbleElasticity.effect(ball.id, now, this.reducedMotion?.matches ?? false);
+      const squash =
+        drawMantaPenalty(
+          ctx,
+          ball.x,
+          ball.y,
+          ball.mantaCaughtAt,
+          elapsed,
+          scale,
+          this.reducedMotion?.matches ?? false
+        ) ?? this.marbleElasticity.effect(ball.id, now, this.reducedMotion?.matches ?? false);
       if (!this.cache.drawBall(ctx, ball, scale, dpr, ball.x, ball.y, squash)) {
         drawMarble(ctx, ball.x, ball.y, 0.25, ball.color, squash);
         ctx.fillStyle = ball.color;

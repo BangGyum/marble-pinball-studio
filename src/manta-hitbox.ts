@@ -10,6 +10,18 @@ export const MANTA_OUTLINE = MANTA_PIXEL_OUTLINE.map(([x, y]): [number, number] 
 export const mantaSurface = createOutlineSurface(MANTA_OUTLINE);
 export type MantaPose = { x: number; y: number; angle: number; direction: 1 | -1; scale: number };
 
+// The transparent pocket inside the lips, in the same source pixels as the outline.
+export function mantaMouthContains(ball: { x: number; y: number }, pose: MantaPose) {
+  const c = Math.cos(pose.angle),
+    s = Math.sin(pose.angle),
+    dx = (ball.x - pose.x) * pose.direction,
+    dy = ball.y - pose.y,
+    pixelScale = MANTA_SPRITE_RECT[2] / MANTA_SPRITE_WIDTH,
+    x = ((dx * c + dy * s) / pose.scale) * pixelScale + MANTA_SPRITE_RECT[0] + MANTA_SPRITE_RECT[2] / 2,
+    y = ((-dx * s + dy * c) / pose.scale) * pixelScale + MANTA_SPRITE_RECT[1] + MANTA_SPRITE_RECT[3] / 2;
+  return ((x - 1560) / 75) ** 2 + ((y - 455) / 45) ** 2 <= 1 && !mantaContact(ball, pose);
+}
+
 // Image and contact share the same center, scale, rotation and horizontal mirror.
 export function mantaContact(ball: { x: number; y: number }, pose: MantaPose) {
   const c = Math.cos(pose.angle),

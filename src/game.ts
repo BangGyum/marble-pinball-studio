@@ -13,6 +13,7 @@ import { RenderCache } from './render-cache';
 import { RenderResolution } from './render-resolution';
 import { drawMarble } from './marble-art';
 import { MarbleElasticity } from './marble-elasticity';
+import { drawMantaPenalty } from './manta-penalty';
 import { getSceneTheme, sceneColor } from './scene-theme';
 import { drawFunnelEntryCue } from './funnel-art';
 import { DOLPHIN_DURATION, validateDolphins, type DolphinSettings } from './dolphin';
@@ -523,7 +524,9 @@ export class Game extends Race {
       if (y < view.top - 1 || y > view.bottom + 1 || x < view.left - labelMargin || x > view.right + labelMargin)
         continue;
       ctx.globalAlpha = bridgeBallOpacity(this.stage, { x, y, onBridge: b.onBridge });
-      const squash = this.marbleElasticity?.effect(b.id, now, this.reducedMotion?.matches ?? false);
+      const squash =
+        drawMantaPenalty(ctx, x, y, b.mantaCaughtAt, this.elapsed, scale, this.reducedMotion?.matches ?? false) ??
+        this.marbleElasticity?.effect(b.id, now, this.reducedMotion?.matches ?? false);
       if (this.renderCache.drawBall(ctx, b, scale, d, x, y, squash)) {
         ctx.globalAlpha = 1;
         continue;

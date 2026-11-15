@@ -73,6 +73,8 @@ export type Frame = {
   playbackRate: number;
   positions?: [entityIndex: number, x: number, y: number][];
   bridgeIds?: number[];
+  // Simulation-time capture onset, for matching hold/stun cues and late joins.
+  mantaCaptures?: [id: number, caughtAt: number][];
   // Per-recipient real-time cooldown remaining in milliseconds, and physical return lock.
   springs?: [index: number, remainingMs: number, busy: boolean][];
   personalSpring?: { state: 'available' | 'placed' | 'used'; id?: string };

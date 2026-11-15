@@ -76,7 +76,8 @@ const report = {
           recoveries = 0,
           inGuard = false,
           substepTime = 0;
-        const violations = [];
+        const violations = [],
+          captures = new Set();
         for (const body of phys.marbleBodies) {
           const transform = body.SetTransform.bind(body);
           body.SetTransform = (...args) => {
@@ -94,6 +95,7 @@ const report = {
         phys.world.Step = (...args) => {
           for (const ball of race.balls) {
             if (ball.rank) continue;
+            if (ball.mantaCaughtAt !== undefined) captures.add(`${ball.id}/${ball.mantaCaughtAt}`);
             const p = phys.getMarblePosition(ball.id);
             old[ball.id * 2] = p.x;
             old[ball.id * 2 + 1] = p.y;
@@ -202,6 +204,7 @@ const report = {
           impacts,
           checks,
           recoveries,
+          captures: captures.size,
           violations,
         };
         report.runs.push(run);
@@ -210,7 +213,9 @@ const report = {
           `${stage.title} ${size}%/${speed}x: ${violations.length} violations, ${recoveries} recovered substeps, ${impacts} impulses`
         );
       }
-    report.passed = report.runs.every((r) => !r.violations.length && r.reason === 'arrived' && r.arrivals === 100);
+    report.passed = report.runs.every(
+      (r) => !r.violations.length && r.reason === 'arrived' && r.arrivals === 100 && r.captures > 0
+    );
     fs.writeFileSync(out, JSON.stringify(report, null, 2));
     if (!report.passed) throw Error('Real-map crossing/interior violations or incomplete arrival observed');
     console.log(`PASS ${report.runs.length} natural real-map collision audits`);

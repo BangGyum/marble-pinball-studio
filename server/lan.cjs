@@ -149,6 +149,10 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     const positions = entities.flatMap((e, i) =>
       e.x !== scene.entities[i].x || e.y !== scene.entities[i].y ? [[i, round(e.x), round(e.y)]] : []
     );
+    /** @type {NonNullable<Frame['mantaCaptures']>} */
+    const mantaCaptures = race.balls.flatMap((b) =>
+      !b.rank && b.mantaCaughtAt !== undefined ? [[b.id, b.mantaCaughtAt]] : []
+    );
     return {
       type: 'frame',
       raceId,
@@ -161,6 +165,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       speed,
       playbackRate: playbackRate(),
       balls: race.balls.map((b) => [b.id, round(b.x), round(b.y), round(b.angle), b.rank ?? 0]),
+      ...(mantaCaptures.length ? { mantaCaptures } : {}),
       ...(race.stage.exitBridge ? { bridgeIds: race.balls.filter((b) => b.onBridge).map((b) => b.id) } : {}),
       ...(race.finishReason === 'stalled' ? { stalled: true } : {}),
       angles: entities.map((e) => round(e.angle)),

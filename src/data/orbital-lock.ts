@@ -117,6 +117,17 @@ const gate = (
   ];
 };
 
+// Open tangentially along the rim instead of folding a blade across the core.
+// A stopped marble can then never be pinched between this gate and the circular wall.
+const coreGate = gate(coreOut[0], coreOut[1], 5.8, 4.9, 2.8, 4.8, 34);
+coreGate[0].position = { x: 32, y: 40 };
+coreGate[0].shape = {
+  type: 'polyline',
+  rotation: 0,
+  color: '#bc6eff',
+  points: arc(0, 0, 8, -60, -40),
+};
+
 export const orbitalLock: StageDef = {
   title: '오비탈 락',
   width: 64,
@@ -170,8 +181,7 @@ export const orbitalLock: StageDef = {
     wall(arc(32, 40, 8, 104.48, 300)),
     ...gate(outerIn[0], outerIn[1], 9.2, 6.2, 1.4, 6, 24),
     ...gate(middleIn[0], middleIn[1], 6.4, 5.1, 1.4, 4.9, 30),
-    // Fold the shorter leaf back along the inner rim, clear of the other gate.
-    ...gate(coreOut[0], coreOut[1], 5.8, 4.9, 2.8, 4.8, 34),
+    ...coreGate,
     ...paddle(7, 39, 1.8, -2.4),
     ...paddle(40.2, 26.8, 1.2, 2),
     ...paddle(32, 40, 2.9, -3.4),
