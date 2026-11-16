@@ -55,6 +55,7 @@ export class PersonalSpringPlacement {
     }
     // Invalid positions remain visible so the player can correct the direction.
     const shape = personalSpringShape(placement.direction);
+    shape.spring!.personal = origin;
     ctx.save();
     ctx.globalAlpha = 0.65;
     shape.color = valid ? '#ffcf7c' : '#ff777d';

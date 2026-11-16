@@ -281,6 +281,10 @@ export function validateStage(value: unknown): StageDef {
         e.props.spinCycle ||
         (e.props.life !== undefined && e.props.life !== -1) ||
         !finite(sh.spring.distance, 0.2, 5) ||
+        (sh.spring.personal !== undefined &&
+          (!sh.spring.personal ||
+            !finite(sh.spring.personal.x, 0, s.width ?? 26) ||
+            !finite(sh.spring.personal.y, 0, s.goalY))) ||
         !finite(sh.spring.direction, -Math.PI * 2, Math.PI * 2))
     )
       throw new Error('스프링은 이동 거리 0.2~5의 조작 가능한 네모 장치여야 해요.');

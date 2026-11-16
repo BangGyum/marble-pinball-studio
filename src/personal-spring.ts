@@ -4,6 +4,15 @@ import type { EntityBoxShape, MapEntity } from './types/map-entity';
 export type SpringPlacement = { x: number; y: number; direction: number };
 export type PlacedSpring = SpringPlacement & { id: string };
 
+export const PERSONAL_SPRING_DURATION = 0.65;
+export function personalSpringExtension(seconds: number) {
+  if (seconds <= 0) return 0;
+  if (seconds < 0.08) return 1 - (1 - seconds / 0.08) ** 3;
+  if (seconds < 0.14) return 1;
+  const t = Math.min(1, (seconds - 0.14) / 0.36);
+  return 1 - t * t * (3 - 2 * t);
+}
+
 export function personalSpringShape(direction: number): EntityBoxShape {
   return {
     type: 'box',
@@ -30,12 +39,13 @@ export function personalSpringEntity(
     rx = Math.abs(dy) * width + Math.abs(dx) * height,
     ry = Math.abs(dx) * width + Math.abs(dy) * height;
   if (
-    Math.min(x, x + dx * distance) < rx ||
-    Math.max(x, x + dx * distance) > (stage.width ?? 26) - rx ||
-    Math.min(y, y + dy * distance) < ry ||
-    Math.max(y, y + dy * distance) > stage.goalY - ry
+    Math.min(x - dx * 0.7, x + dx * distance) < rx ||
+    Math.max(x - dx * 0.7, x + dx * distance) > (stage.width ?? 26) - rx ||
+    Math.min(y - dy * 0.7, y + dy * distance) < ry ||
+    Math.max(y - dy * 0.7, y + dy * distance) > stage.goalY - ry
   )
     throw new Error('스프링과 발사 방향이 맵 안에 들어오도록 골라 주세요.');
+  shape.spring!.personal = { x, y };
   return {
     position: { x, y },
     type: 'kinematic',

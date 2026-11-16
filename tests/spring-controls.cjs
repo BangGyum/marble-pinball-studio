@@ -89,4 +89,11 @@ assert.equal(click(plate.x, plate.y), true, 'ordinary spring controls still work
 assert.equal(controls.selected, lab);
 assert.equal(click(plate.x, plate.y, 15, 2), false, 'secondary click is ignored');
 assert.ok(blurred > 0);
+controls.reset();
+const temporary = structuredClone(plate);
+temporary.shape.spring.personal = { x: temporary.x, y: temporary.y };
+labels.length = 0;
+controls.draw(ctx, [temporary], 25, -70, 15, 900);
+assert.equal(click(temporary.x, temporary.y), false, 'spent participant spring cannot become a reusable Space target');
+assert.equal(labels.length, 0, 'one-use animation has no misleading reusable-device instructions');
 console.log('PASS spring body/plate selection, zoom, touch, moving piston, cooldown and other maps');

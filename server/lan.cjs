@@ -11,7 +11,7 @@ const { stages, hiddenStages, DEFAULT_MAP_INDEX } = require('../.lan-build/data/
 const { parseNames, winningRange, validateStage } = require('../.lan-build/model.js');
 const { LAN_PORT, MAX_LAN_MESSAGE_BYTES, encodeScene } = require('../.lan-build/lan/protocol.js');
 const { validateDolphins } = require('../.lan-build/dolphin.js');
-const { personalSpringEntity } = require('../.lan-build/personal-spring.js');
+const { personalSpringEntity, PERSONAL_SPRING_DURATION } = require('../.lan-build/personal-spring.js');
 const MAX_LAN_BUFFERED_BYTES = 2 * MAX_LAN_MESSAGE_BYTES;
 /** @typedef {import('../src/lan/protocol').Settings} Settings */
 /** @typedef {import('../src/lan/protocol').Scene} Scene */
@@ -241,7 +241,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       }
       spring.used = true;
       spring.shape = entity.shape;
-      spring.removeAt = race.elapsed + 1;
+      spring.removeAt = race.elapsed + PERSONAL_SPRING_DURATION;
       makeScene();
       return;
     }

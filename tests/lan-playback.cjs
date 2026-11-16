@@ -403,18 +403,48 @@ const springPointer = (x, y, pointerType = 'mouse') => ({
   pointerType,
   preventDefault() {},
 });
-pointerHandlers.pointerdown(springPointer(13, 40, 'touch'));
-assert.deepEqual(interactive.springPlacement.origin, { x: 13, y: 40 });
-pointerHandlers.pointerdown({ ...springPointer(16, 40, 'touch'), isPrimary: false });
+interactive.setZoom(2);
+pointerHandlers.pointermove({ ...pointer, clientY: 20 + interactive.minimap.y + interactive.minimap.scale * 75 });
+interactive.draw(1005);
+assert.equal(interactive.manual.y, 75, 'placement minimap hover reaches the bottom of a tall map');
+pointerHandlers.pointermove(springPointer(13, 75));
+interactive.draw(1006);
+assert.equal(interactive.camera.y, 75, 'leaving the minimap keeps the chosen camera instead of jumping to marbles');
+const panStart = springPointer(13, 75, 'touch'),
+  cameraBeforePan = { ...interactive.camera },
+  panScale = interactive.springView.scale;
+pointerHandlers.pointerdown(panStart);
+pointerHandlers.pointermove({ ...panStart, clientX: panStart.clientX + 60, clientY: panStart.clientY + 90 });
+pointerHandlers.pointerup({ ...panStart, clientX: panStart.clientX + 60, clientY: panStart.clientY + 90 });
+interactive.draw(1007);
+assert.equal(interactive.springPlacement.origin, undefined, 'dragging pans without placing a spring');
+assert.ok(Math.abs(interactive.camera.y - (cameraBeforePan.y - 90 / panScale)) < 1e-10);
+assert.equal(boosts.at(-1), false, 'placement panning never accelerates the shared race');
+interactive.follow();
+interactive.draw(1008);
+assert.equal(
+  interactive.camera.y,
+  interactive.balls[0].y,
+  'follow returns to the marbles without cancelling placement'
+);
+pointerHandlers.pointermove({ ...pointer, clientY: 20 + interactive.minimap.y + interactive.minimap.scale * 75 });
+interactive.draw(1009);
+const tapSpring = (point) => {
+  pointerHandlers.pointerdown(point);
+  pointerHandlers.pointerup(point);
+};
+tapSpring(springPointer(13, 75, 'touch'));
+assert.deepEqual(interactive.springPlacement.origin, { x: 13, y: 75 });
+pointerHandlers.pointerdown({ ...springPointer(16, 75, 'touch'), isPrimary: false });
 assert.equal(placed.length, 0, 'a second finger cannot accidentally confirm the placement');
 pointerHandlers.pointermove({ ...springPointer(1, 1, 'touch'), isPrimary: false });
-assert.deepEqual(interactive.springPlacement.pointer, { x: 13, y: 38 }, 'a second finger cannot rotate the preview');
+assert.deepEqual(interactive.springPlacement.pointer, { x: 13, y: 73 }, 'a second finger cannot rotate the preview');
 const overviewScale = interactive.springView.scale;
 interactive.draw(1010);
-assert.ok(interactive.springView.scale > overviewScale, 'direction step magnifies the selected location on long maps');
-pointerHandlers.pointerdown(springPointer(16, 40, 'touch'));
+assert.equal(interactive.springView.scale, overviewScale, 'choosing the origin keeps the user zoom and camera');
+tapSpring(springPointer(16, 75, 'touch'));
 assert.equal(placed.length, 1);
-assert.deepEqual(placed[0], { x: 13, y: 40, direction: 0 }, 'two touch taps select position then direction');
+assert.deepEqual(placed[0], { x: 13, y: 75, direction: 0 }, 'two touch taps select position then direction');
 assert.equal(interactive.springPlacement.active, false);
 interactive.beginSpringPlacement();
 windowHandlers.keydown({ key: 'Escape', preventDefault() {}, stopImmediatePropagation() {} });
@@ -657,3 +687,116 @@ assert.equal(rulesUI.preferredPicks, 1);
 console.log(
   'PASS actual LAN client synchronizes changed winner rules and retains edits during unrelated scene updates'
 );
+
+// Placement keeps the inspected region after confirmation and ignores interrupted gestures.
+interactive.setScene({ ...scene, raceId: 'placement-edge-cases', revision: 1 });
+interactive.state = 'ready';
+interactive.springConnected = true;
+interactive.personalSpring = { state: 'available' };
+interactive.playback.push({ ...frame(0, 1, 'ready'), raceId: 'placement-edge-cases' }, 2000);
+const edgePlacements = [];
+interactive.onPlaceSpring = (value) => edgePlacements.push(value);
+interactive.beginSpringPlacement();
+interactive.draw(2000);
+pointerHandlers.pointermove({ ...pointer, clientY: 20 + interactive.minimap.y + interactive.minimap.scale * 75 });
+interactive.draw(2010);
+const inspectedCamera = { ...interactive.camera },
+  inspectedScale = interactive.springView.scale;
+tapSpring(springPointer(13, 75));
+tapSpring(springPointer(13, 72));
+interactive.draw(2020);
+assert.equal(edgePlacements.length, 1);
+assert.deepEqual(interactive.camera, inspectedCamera, 'confirmation keeps the inspected lower-map camera');
+assert.equal(interactive.springView.scale, inspectedScale, 'confirmation does not change the visible zoom scale');
+
+interactive.beginSpringPlacement();
+interactive.draw(2030);
+const interrupted = springPointer(13, 75);
+pointerHandlers.pointerdown(interrupted);
+windowHandlers.blur();
+pointerHandlers.pointerup(interrupted);
+assert.equal(interactive.springPlacement.origin, undefined, 'window blur cancels a pending tap');
+pointerHandlers.pointerdown(interrupted);
+pointerHandlers.pointerup({ ...interrupted, clientY: interrupted.clientY + 90 });
+assert.equal(interactive.springPlacement.origin, undefined, 'a fast drag with no move event cannot place on release');
+const cameraBeforeCancel = { ...interactive.camera };
+pointerHandlers.pointerdown(interrupted);
+pointerHandlers.pointercancel(interrupted);
+interactive.draw(2040);
+assert.deepEqual(interactive.camera, cameraBeforeCancel, 'touch cancellation keeps the inspected camera');
+assert.equal(interactive.springPlacement.origin, undefined);
+console.log('PASS confirmed placement camera/scale and interrupted or coalesced gesture safety');
+pointerHandlers.pointerdown(interrupted);
+interactive.setZoom(1.44);
+pointerHandlers.pointerup(interrupted);
+assert.equal(
+  interactive.springPlacement.origin,
+  undefined,
+  'zooming during a pending tap cannot confirm stale coordinates'
+);
+pointerHandlers.pointerdown(interrupted);
+pointerHandlers.pointerup({ ...interrupted, button: 2 });
+assert.equal(interactive.springPlacement.origin, undefined, 'secondary-button release cannot confirm a primary tap');
+
+let cameraCases = 0;
+for (const [mapWidth, goalY] of [
+  [26, 60],
+  [66, 176],
+  [200, 300],
+]) {
+  for (const width of [360, 1000])
+    for (const zoom of [0.35, 1.44, 3])
+      for (const state of ['ready', 'running', 'paused']) {
+        const cameraScene = {
+          ...scene,
+          raceId: 'camera-case-' + cameraCases,
+          stage: { title: 'Camera bounds', width: mapWidth, goalY, entities: [] },
+        };
+        interactive.setScene(cameraScene);
+        interactive.width = width;
+        interactive.height = 600;
+        interactive.state = state;
+        interactive.personalSpring = { state: 'available' };
+        interactive.playback.push({ ...frame(0, 1, state), raceId: cameraScene.raceId }, 3000);
+        interactive.setZoom(zoom);
+        interactive.beginSpringPlacement();
+        interactive.draw(3000);
+        const target = { x: mapWidth / 2, y: goalY * 0.8 };
+        pointerHandlers.pointermove({
+          ...pointer,
+          clientX: 10 + interactive.minimap.x + target.x * interactive.minimap.scale,
+          clientY: 20 + interactive.minimap.y + target.y * interactive.minimap.scale,
+        });
+        interactive.draw(3010);
+        tapSpring(springPointer(target.x, target.y, 'touch'));
+        interactive.draw(3020);
+        const beforeUpdate = { ...interactive.camera };
+        interactive.setScene({
+          ...cameraScene,
+          revision: 2,
+          placedSprings: [{ id: 'another-player', x: mapWidth / 2, y: goalY / 2, direction: 0 }],
+        });
+        interactive.setZoom(Math.min(3, zoom * 1.2));
+        interactive.draw(3030);
+        const scaleBeforeConfirm = interactive.springView.scale;
+        tapSpring(springPointer(target.x, target.y - 2, 'touch'));
+        interactive.draw(3040);
+        assert.deepEqual(interactive.camera, beforeUpdate, 'peer placement and confirmation keep the chosen camera');
+        assert.equal(interactive.springView.scale, scaleBeforeConfirm);
+        pointerHandlers.pointermove(springPointer(target.x + 1, target.y));
+        pointerHandlers.pointerleave(pointer);
+        interactive.draw(3050);
+        assert.deepEqual(interactive.camera, beforeUpdate, 'moving to the use button keeps the spring in view');
+        interactive.push({
+          ...frame(0, 2, 'finished'),
+          raceId: cameraScene.raceId,
+          revision: 2,
+          personalSpring: { state: 'used' },
+        });
+        assert.equal(interactive.springInspect, false, 'finish restores the result camera');
+        assert.equal(interactive.manual, null);
+        cameraCases++;
+      }
+}
+assert.equal(cameraCases, 54);
+console.log('PASS 54 tall/wide map, desktop/mobile, zoom, ready/running/paused, peer-update and finish camera cases');

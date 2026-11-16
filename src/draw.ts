@@ -34,7 +34,15 @@ export function drawEntities(
         localY = -sin * x + cos * y;
       bounds = { left: localX - extentX, right: localX + extentX, top: localY - extentY, bottom: localY + extentY };
       if (shape.type !== 'polyline') {
-        const radius = shape.type === 'circle' ? shape.radius : Math.hypot(shape.width, shape.height);
+        const radius =
+          shape.type === 'circle'
+            ? shape.radius
+            : Math.hypot(
+                shape.width,
+                shape.spring?.personal
+                  ? Math.hypot(e.x - shape.spring.personal.x, e.y - shape.spring.personal.y) + 0.7
+                  : shape.height
+              );
         if (bounds.left > radius || bounds.right < -radius || bounds.top > radius || bounds.bottom < -radius) return;
       }
     }
@@ -51,6 +59,33 @@ export function drawEntities(
       ctx.rotate(shape.rotation);
       if (shape.spring) {
         ctx.shadowBlur = sceneGlow(glow ? 8 : 0);
+        if (shape.spring.personal) {
+          const base = shape.spring.personal,
+            extension = Math.max(
+              0,
+              (e.x - base.x) * Math.cos(shape.spring.direction) + (e.y - base.y) * Math.sin(shape.spring.direction)
+            ),
+            bottom = extension + 0.55;
+          ctx.shadowBlur = 0;
+          ctx.strokeStyle = sceneColor('#8c846d');
+          ctx.lineWidth = 0.05 + 0.5 / scale;
+          ctx.beginPath();
+          for (const x of [-0.6, 0.6]) {
+            ctx.moveTo(x, shape.height);
+            ctx.lineTo(x, bottom);
+          }
+          ctx.stroke();
+          ctx.strokeStyle = sceneColor(color);
+          ctx.lineWidth = 0.03 + 0.3 / scale;
+          ctx.beginPath();
+          ctx.moveTo(0, shape.height + 0.04);
+          for (let n = 1; n < 6; n++)
+            ctx.lineTo(n % 2 ? -0.23 : 0.23, shape.height + ((bottom - shape.height) * n) / 6);
+          ctx.lineTo(0, bottom);
+          ctx.stroke();
+          ctx.fillStyle = sceneColor('#448596');
+          ctx.fillRect(-0.73, bottom, 1.46, 0.12);
+        }
         const springMetal = ctx.createLinearGradient(0, -shape.height, 0, shape.height);
         springMetal.addColorStop(0, sceneColor('#448596'));
         springMetal.addColorStop(0.4, sceneColor('#17313c'));
@@ -64,7 +99,7 @@ export function drawEntities(
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = '600 ' + Math.max(0.28, 10 / scale) + 'px sans-serif';
-        ctx.fillText('SPACE', 0, 0);
+        ctx.fillText(shape.spring.personal ? '1×' : 'SPACE', 0, 0);
         ctx.rotate(shape.spring.direction - e.angle - shape.rotation);
         ctx.beginPath();
         ctx.moveTo(0.9, -0.24);

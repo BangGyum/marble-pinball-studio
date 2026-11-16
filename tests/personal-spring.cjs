@@ -9,7 +9,11 @@ require.extensions['.ts'] = (module, file) =>
     file
   );
 global.fetch = undefined;
-const { personalSpringEntity } = require('../src/personal-spring.ts');
+const {
+  personalSpringEntity,
+  personalSpringExtension,
+  PERSONAL_SPRING_DURATION,
+} = require('../src/personal-spring.ts');
 const { PersonalSpringPlacement } = require('../src/lan/spring-placement.ts');
 const { Race } = require('../src/race.ts');
 const { stages, hiddenStages } = require('../src/data/maps.ts');
@@ -28,6 +32,12 @@ for (const invalid of [
 ])
   assert.throws(() => personalSpringEntity(stage, invalid));
 assert.equal(personalSpringEntity(stage, valid).shape.spring.distance, 1.5);
+assert.equal(personalSpringExtension(0), 0);
+assert.ok(personalSpringExtension(0.04) > 0.8, 'snappy outward stroke reaches most of its travel in 40ms');
+assert.equal(personalSpringExtension(0.1), 1, 'brief extended hold remains visible between LAN snapshots');
+assert.ok(personalSpringExtension(0.3) < 0.7 && personalSpringExtension(0.3) > 0.4);
+assert.equal(personalSpringExtension(0.5), 0);
+assert.equal(personalSpringExtension(PERSONAL_SPRING_DURATION), 0);
 const placement = new PersonalSpringPlacement();
 placement.begin(stage);
 assert.throws(() => placement.choose({ x: -1, y: 20 }));
@@ -55,10 +65,18 @@ console.log('PASS two-step placement, invalid coordinates, stroke bounds, cancel
       race.physics.setMarbleVelocity(0, 0, 0);
       assert.equal(race.activateSpring(0), true);
       for (let i = 0; i < 8; i++) race.advance();
+      const peak = race.physics.getEntities()[0];
+      assert.ok((peak.x - valid.x) * dx + (peak.y - valid.y) * dy > 1.4, 'real piston extends fully before retracting');
       const velocity = race.physics.getMarbleVelocity(0);
       assert.ok(
-        velocity.vx * dx + velocity.vy * dy > 3,
+        velocity.vx * dx + velocity.vy * dy > 10,
         'actual Box2D spring launches the marble in its chosen direction'
+      );
+      for (let i = 0; i < 25; i++) race.advance();
+      const returned = race.physics.getEntities()[0];
+      assert.ok(
+        Math.hypot(returned.x - valid.x, returned.y - valid.y) < 1e-4,
+        'piston physically returns before removal'
       );
       race.physics.removeSpring(entity.shape);
       assert.equal(race.physics.getEntities(0.5).length, 0, 'removal invalidates old interpolation indices');
@@ -71,6 +89,39 @@ console.log('PASS two-step placement, invalid coordinates, stroke bounds, cancel
       assert.equal(stage.entities.length, 0, 'temporary spring never modifies the saved map');
     }
     console.log('PASS four-direction real collisions, runtime removal, continued simulation and map immutability');
+    race.prepare(
+      {
+        ...stage,
+        entities: [
+          {
+            type: 'static',
+            position: { x: 0, y: 0 },
+            shape: {
+              type: 'polyline',
+              rotation: 0,
+              points: [
+                [16, 0],
+                [16, 60],
+              ],
+            },
+            props: { density: 1, restitution: 0.8, angularVelocity: 0 },
+          },
+        ],
+      },
+      ['벽 충돌']
+    );
+    race.startRace([1, 1]);
+    const fastSpring = personalSpringEntity(stage, { ...valid, direction: 0 });
+    race.physics.createEntities([fastSpring]);
+    race.physics.placeMarble(0, 13.6, 20);
+    race.physics.setMarbleVelocity(0, 0, 0);
+    assert.equal(race.activateSpring(1), true);
+    for (let i = 0; i < 60; i++) {
+      race.advance();
+      assert.ok(race.physics.getMarblePosition(0).x <= 15.76, 'fast launch cannot cross a thin map wall');
+    }
+    race.physics.removeSpring(fastSpring.shape);
+    console.log('PASS fast participant spring impact remains on the safe side of a thin wall');
     for (const map of stages.filter((candidate) => !hiddenStages.includes(candidate))) {
       const original = JSON.stringify(map);
       race.prepare(

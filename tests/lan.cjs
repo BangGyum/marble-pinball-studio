@@ -813,7 +813,7 @@ async function connect(port, cookie, options = {}) {
     await personalReconnect.until(() =>
       personalReconnect.frame.positions?.some(([index, , y]) => index === 0 && y < 20)
     );
-    for (let i = 0; i < 60; i++) app.race.advance();
+    for (let i = 0; i < 35; i++) app.race.advance();
     await host.until(() => host.scene.entities.length === 0);
     assert.equal(app.race.physics.world.GetBodyCount(), 1, 'spring body disappears after the single return stroke');
     assert.equal(host.frame.personalSpring.state, 'placed', 'another participant retains their own use');
@@ -1059,6 +1059,38 @@ async function connect(port, cookie, options = {}) {
     assert.equal(late.frame.balls.length, 300);
     assert.ok(late.frame.elapsed >= simulated, 'mid-race arrival receives current snapshot');
     console.log('PASS mid-race join and full state synchronization');
+    await host.command({ type: 'reset' });
+    await host.command({
+      type: 'configure',
+      settings: { ...settings, names: '실시간 정지 검증', picks: 1, stage: personalStage },
+    });
+    await host.command({ type: 'speed', value: 1 });
+    const pauseSession = await request(port, '/api/session', { method: 'POST' });
+    const pausePeer = await connect(port, pauseSession.cookie);
+    clients.push(pausePeer);
+    assert.equal((await pausePeer.command(place)).ok, true);
+    await host.command({ type: 'start' });
+    assert.equal((await pausePeer.command({ type: 'use-spring' })).ok, true);
+    await delay(80);
+    await host.command({ type: 'pause' });
+    const pausedElapsed = app.race.elapsed,
+      pausedBody = app.race.physics.getEntities()[0];
+    assert.ok(pausedBody && pausedBody.y < 19.9, 'real-time test pauses an extended spring before cleanup');
+    assert.equal((await host.command({ type: 'place-spring', x: 20, y: 25, direction: 0 })).ok, true);
+    await delay(900);
+    assert.equal(app.race.elapsed, pausedElapsed, 'production timer does not advance while paused');
+    assert.deepEqual(
+      app.race.physics.getEntities()[0],
+      pausedBody,
+      'wall time and peer scene updates cannot move or remove a paused spring'
+    );
+    assert.equal(pausePeer.frame.personalSpring.state, 'used');
+    await host.command({ type: 'pause' });
+    await pausePeer.until(() => pausePeer.scene.entities.length === 0);
+    assert.equal(app.race.physics.getEntities().length, 0, 'resuming completes return and removes the physical body');
+    console.log(
+      'PASS real production clock: pause during extension, peer placement, wall-time hold and resumed cleanup'
+    );
   } finally {
     clients.forEach((c) => {
       c.ws.terminate();

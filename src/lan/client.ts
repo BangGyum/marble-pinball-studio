@@ -158,8 +158,8 @@ function updatePersonalSpring() {
           ? '경기가 끝났어요. 다음 경기에서 다시 1개를 받아요.'
           : placing
             ? view.springPlacement.origin
-              ? '② 밀어낼 방향을 한 번 더 눌러 확정 · Esc로 취소'
-              : '① 맵이나 미니맵에서 배치할 위치를 눌러 주세요.'
+              ? '② 밀어낼 방향을 눌러 확정 · 드래그로 이동 · Esc 취소'
+              : '① 드래그·미니맵으로 이동, 휠/±로 확대 후 위치를 눌러 주세요.'
             : state === 'placed'
               ? frame.state === 'running'
                 ? '내 스프링 준비 완료 · 버튼 또는 SPACE로 한 번 발동'

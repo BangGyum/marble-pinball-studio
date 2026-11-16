@@ -64,7 +64,7 @@ export class SpringControls {
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const e = this.entities[i],
         s = e.shape;
-      if (s.type !== 'box' || !s.spring) continue;
+      if (s.type !== 'box' || !s.spring || s.spring.personal) continue;
       const inside = (cx: number, cy: number, angle: number, width: number, height: number) => {
         const dx = x - cx,
           dy = y - cy,
@@ -106,14 +106,14 @@ export class SpringControls {
         if (e.shape.type === 'box' && e.shape.spring && definition)
           this.housings.set(i, ladderSpringHousing(definition.position, e.shape.spring.direction));
       });
-    if (!entities.some((e) => e.shape.type === 'box' && e.shape.spring)) return;
+    if (!entities.some((e) => e.shape.type === 'box' && e.shape.spring && !e.shape.spring.personal)) return;
     ctx.save();
     ctx.shadowBlur = 0;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.font = '600 12px sans-serif';
     entities.forEach((e, i) => {
-      if (e.shape.type !== 'box' || !e.shape.spring) return;
+      if (e.shape.type !== 'box' || !e.shape.spring || e.shape.spring.personal) return;
       const label = this.label(i),
         px = x + e.x * scale,
         py = y + (e.y - e.shape.height) * scale - 9;

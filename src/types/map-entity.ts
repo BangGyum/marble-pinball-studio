@@ -17,7 +17,13 @@ export interface EntityShapeBase {
 export interface EntityBoxShape extends EntityShapeBase {
   type: 'box';
   boostSpeed?: number;
-  spring?: { distance: number; direction: number; cooldown?: { scope: 'shared' | 'personal'; seconds: number } };
+  spring?: {
+    distance: number;
+    direction: number;
+    // Fixed base of a temporary participant spring; authored map devices omit this.
+    personal?: VectorLike;
+    cooldown?: { scope: 'shared' | 'personal'; seconds: number };
+  };
   width: number;
   height: number;
   rotation: number;

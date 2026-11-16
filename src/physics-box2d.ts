@@ -6,6 +6,7 @@ import { timedGateAngle } from './timed-gate';
 import { rotorPower } from './rotor-cycle';
 import type { IPhysics } from './i-physics';
 import type { EntityBoxShape, MapEntity, MapEntityState } from './types/map-entity';
+import { PERSONAL_SPRING_DURATION, personalSpringExtension } from './personal-spring';
 
 type PhysicsEntity = {
   body: Box2D.b2Body;
@@ -565,7 +566,8 @@ export class Box2dPhysics implements IPhysics {
   }
   isSpringBusy(index: number) {
     const e = this.entities[index];
-    return !!e && e.springAt !== undefined && this.motionTime - e.springAt < 1;
+    const duration = e?.shape.type === 'box' && e.shape.spring?.personal ? PERSONAL_SPRING_DURATION : 1;
+    return !!e && e.springAt !== undefined && this.motionTime - e.springAt < duration;
   }
   removeSpring(shape: EntityBoxShape) {
     const spring = this.springs.find((entity) => entity.shape === shape);
@@ -579,13 +581,7 @@ export class Box2dPhysics implements IPhysics {
   }
   activateSpring(index: number) {
     const e = this.entities[index];
-    if (
-      !e ||
-      e.shape.type !== 'box' ||
-      !e.shape.spring ||
-      (e.springAt !== undefined && this.motionTime - e.springAt < 1)
-    )
-      return false;
+    if (!e || e.shape.type !== 'box' || !e.shape.spring || this.isSpringBusy(index)) return false;
     e.springAt = this.motionTime;
     return true;
   }
@@ -666,8 +662,12 @@ export class Box2dPhysics implements IPhysics {
         if (e.shape.type === 'box' && e.shape.spring) {
           const spring = e.shape.spring;
           const t = e.springAt === undefined ? 1 : Math.min(1, this.motionTime - e.springAt);
-          // Fast 120ms stroke, eased return; move through Box2D so marbles receive the impact.
-          const fraction = t < 0.12 ? Math.sin(((t / 0.12) * Math.PI) / 2) : ((1 - t) / 0.88) ** 2;
+          // Move both stroke profiles through Box2D so marbles receive the impact.
+          const fraction = spring.personal
+            ? personalSpringExtension(t)
+            : t < 0.12
+              ? Math.sin(((t / 0.12) * Math.PI) / 2)
+              : ((1 - t) / 0.88) ** 2;
           const p = e.body.GetPosition(),
             amount = spring.distance * fraction;
           this.vector.Set(

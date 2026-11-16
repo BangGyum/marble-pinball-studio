@@ -42,6 +42,17 @@ export class LanView {
   personalSpring?: Frame['personalSpring'];
   springConnected = false;
   private springView = { x: 0, y: 0, scale: 1 };
+  private springInspect = false;
+  private placementDrag?: {
+    id: number;
+    startX: number;
+    startY: number;
+    x: number;
+    y: number;
+    scale: number;
+    minimap: boolean;
+    moved: boolean;
+  };
   private springControls: SpringControls;
   zoom = 1;
   celebrationRightInset = 18;
@@ -137,7 +148,9 @@ export class LanView {
       this.manual =
         x >= m.x && x <= m.x + m.w && y >= m.y && y <= m.y + m.h
           ? { x: (x - m.x) / m.scale, y: (y - m.y) / m.scale }
-          : null;
+          : this.springInspect
+            ? this.manual
+            : null;
     };
     const release = () => this.onBoost(false);
     canvas.addEventListener('pointerdown', (event) => {
@@ -145,16 +158,18 @@ export class LanView {
         if (event.isPrimary === false || (event.button !== 0 && event.pointerType !== 'touch') || !this.springConnected)
           return;
         event.preventDefault();
-        try {
-          const placement = this.springPlacement.choose(this.springPoint(event));
-          if (placement) {
-            this.cancelSpringPlacement();
-            this.onPlaceSpring(placement);
-          } else this.onPlacementChange();
-        } catch (error) {
-          toast(error instanceof Error ? error.message : String(error));
-        }
-        this.renderDirty = true;
+        const center = this.manual ?? this.camera;
+        this.placementDrag = {
+          id: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          x: center.x,
+          y: center.y,
+          scale: this.viewScale(),
+          minimap: !!this.springMinimapPoint(event),
+          moved: false,
+        };
+        canvas.setPointerCapture(event.pointerId);
         return;
       }
       if (this.springControls.select(event)) {
@@ -171,6 +186,19 @@ export class LanView {
     canvas.addEventListener('pointermove', (event) => {
       if (this.springPlacement.active) {
         if (event.isPrimary === false) return;
+        const drag = this.placementDrag,
+          point = this.springMinimapPoint(event);
+        if (drag && drag.id === event.pointerId) {
+          drag.moved ||= Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 6;
+          if (drag.moved) {
+            this.manual = drag.minimap
+              ? (point ?? this.manual)
+              : {
+                  x: drag.x - (event.clientX - drag.startX) / drag.scale,
+                  y: drag.y - (event.clientY - drag.startY) / drag.scale,
+                };
+          }
+        } else if (point) this.manual = point;
         this.springPlacement.move(this.springPoint(event));
         this.renderDirty = true;
         return;
@@ -179,15 +207,46 @@ export class LanView {
       if (event.pointerType !== 'touch') followMinimap(event);
     });
     canvas.addEventListener('pointerleave', (event) => {
-      if (event.pointerType !== 'touch') this.follow();
+      if (event.pointerType !== 'touch' && !this.springPlacement.active && !this.springInspect) this.follow();
     });
-    canvas.addEventListener('pointerup', release);
-    canvas.addEventListener('lostpointercapture', release);
-    canvas.addEventListener('pointercancel', () => {
+    canvas.addEventListener('pointerup', (event) => {
       release();
-      this.follow();
+      if (event.isPrimary === false) return;
+      const drag = this.placementDrag;
+      if (!drag || drag.id !== event.pointerId) return;
+      this.placementDrag = undefined;
+      if (
+        !this.springPlacement.active ||
+        !this.springConnected ||
+        drag.moved ||
+        Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 6 ||
+        (event.button !== 0 && event.pointerType !== 'touch')
+      )
+        return;
+      try {
+        const placement = this.springPlacement.choose(this.springPoint(event));
+        if (placement) {
+          this.cancelSpringPlacement(true);
+          this.onPlaceSpring(placement);
+        } else this.onPlacementChange();
+      } catch (error) {
+        toast(error instanceof Error ? error.message : String(error));
+      }
+      this.renderDirty = true;
     });
-    window.addEventListener('blur', release);
+    canvas.addEventListener('lostpointercapture', () => {
+      this.placementDrag = undefined;
+      release();
+    });
+    canvas.addEventListener('pointercancel', () => {
+      this.placementDrag = undefined;
+      release();
+      if (!this.springPlacement.active && !this.springInspect) this.follow();
+    });
+    window.addEventListener('blur', () => {
+      this.placementDrag = undefined;
+      release();
+    });
     window.addEventListener(
       'keydown',
       (event) => {
@@ -238,28 +297,44 @@ export class LanView {
     if (!this.scene || !this.springConnected || this.personalSpring?.state !== 'available' || this.state === 'finished')
       return;
     this.springPlacement.begin(this.scene.stage);
+    this.springInspect = true;
     this.springControls.selected = -1;
     this.dolphinOverview = false;
     this.onBoost(false);
-    this.manual = null;
-    this.setZoom(1);
+    this.placementDrag = undefined;
+    this.manual = { ...(this.manual ?? this.camera) };
     this.onPlacementChange();
   }
-  cancelSpringPlacement() {
+  cancelSpringPlacement(keepView = false) {
     this.springPlacement.cancel();
-    if (this.state === 'ready') this.camera = { ...this.readyCamera };
+    this.placementDrag = undefined;
+    this.springInspect = keepView;
+    if (keepView) this.manual = { ...(this.manual ?? this.camera) };
+    if (!keepView) {
+      this.manual = null;
+      if (this.state === 'ready') this.camera = { ...this.readyCamera };
+    }
     this.renderDirty = true;
     this.onPlacementChange();
   }
-  private springPoint(event: PointerEvent) {
+  private springMinimapPoint(event: PointerEvent) {
     const rect = this.canvas.getBoundingClientRect(),
       x = event.clientX - rect.left,
       y = event.clientY - rect.top,
-      m = this.minimap,
-      t = this.springView;
+      m = this.minimap;
     return x >= m.x && x <= m.x + m.w && y >= m.y && y <= m.y + m.h
       ? { x: (x - m.x) / m.scale, y: (y - m.y) / m.scale }
-      : { x: (x - t.x) / t.scale, y: (y - t.y) / t.scale };
+      : undefined;
+  }
+  private springPoint(event: PointerEvent) {
+    const rect = this.canvas.getBoundingClientRect(),
+      t = this.springView;
+    return (
+      this.springMinimapPoint(event) ?? {
+        x: (event.clientX - rect.left - t.x) / t.scale,
+        y: (event.clientY - rect.top - t.y) / t.scale,
+      }
+    );
   }
   setDolphins(settings: DolphinSettings) {
     if (this.state !== 'ready' || !this.scene || !this.canControl) return;
@@ -299,6 +374,7 @@ export class LanView {
     this.renderDirty = true;
   }
   follow(closeOverview = false) {
+    this.springInspect = false;
     if (closeOverview && this.state !== 'ready') this.goalFollow = true;
     if (closeOverview && this.state === 'ready' && this.dolphinOverview) {
       this.dolphinOverview = false;
@@ -309,6 +385,7 @@ export class LanView {
   }
   setZoom(value: number) {
     if (!Number.isFinite(value)) return;
+    this.placementDrag = undefined;
     this.zoom = Math.max(0.35, Math.min(3, value));
     this.renderDirty = true;
     this.onZoomChange(this.zoom);
@@ -349,6 +426,8 @@ export class LanView {
     }
     if (this.scene?.raceId !== scene.raceId) {
       this.springPlacement?.cancel();
+      this.springInspect = false;
+      this.placementDrag = undefined;
       this.personalSpring = undefined;
       if (this.scene && JSON.stringify(this.scene.stage) !== JSON.stringify(scene.stage)) this.setZoom(1);
       this.goalScale = 0;
@@ -406,6 +485,7 @@ export class LanView {
     this.personalSpring = frame.personalSpring;
     if (this.springPlacement?.active && (frame.personalSpring?.state !== 'available' || frame.state === 'finished'))
       this.cancelSpringPlacement();
+    if (frame.state === 'finished' && this.springInspect) this.follow();
     if (frame.state === 'running' && this.state === 'ready' && this.dolphinOverview) {
       this.camera = { ...this.readyCamera };
       this.manual = null;
@@ -415,15 +495,8 @@ export class LanView {
     this.playback.push(frame);
   }
   private viewScale() {
-    if (this.springPlacement?.active && this.springPlacement.origin)
+    if (this.springPlacement?.active || this.springInspect)
       return Math.min(this.width / 20, this.height / 13, 70) * this.zoom;
-    if (this.springPlacement?.active && this.scene)
-      return (
-        Math.min(
-          Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.scene.stage.width ?? 26) + 4),
-          Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)
-        ) * this.zoom
-      );
     if (this.scene?.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview)) {
       const fitted = Math.min(
         Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.scene.stage.width ?? 26) + 4),
@@ -580,11 +653,9 @@ export class LanView {
       this.cameraMoving = Math.abs(desired - this.goalScale) > 0.01;
     }
     const scale = this.viewScale();
-    if (this.springPlacement?.active) {
-      this.camera = this.springPlacement.origin ?? {
-        x: (scene.stage.width ?? 26) / 2,
-        y: scene.stage.goalY / 2 - (h * 0.07) / scale,
-      };
+    if (this.springPlacement?.active || this.springInspect) {
+      const center = this.state === 'ready' ? this.readyCamera : (target ?? this.camera);
+      this.camera = this.manual ?? { x: center.x, y: center.y };
     } else if (
       scene.stage.goalArea &&
       (this.state === 'ready' ? this.dolphinOverview : overview) &&
