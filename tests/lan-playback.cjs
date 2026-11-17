@@ -800,3 +800,36 @@ for (const [mapWidth, goalY] of [
 }
 assert.equal(cameraCases, 54);
 console.log('PASS 54 tall/wide map, desktop/mobile, zoom, ready/running/paused, peer-update and finish camera cases');
+
+interactive.setScene({ ...scene, raceId: 'stationary-wheel', revision: 1 });
+interactive.width = 1000;
+interactive.state = 'ready';
+interactive.personalSpring = { state: 'available' };
+interactive.playback.push({ ...frame(0, 1, 'ready'), raceId: 'stationary-wheel' }, 4000);
+interactive.setZoom(1);
+interactive.beginSpringPlacement();
+interactive.draw(4000);
+pointerHandlers.pointermove({ ...pointer, clientY: 20 + interactive.minimap.y + interactive.minimap.scale * 75 });
+interactive.draw(4010);
+tapSpring(springPointer(9, 77));
+const stationaryCursor = springPointer(9.5, 77.5);
+pointerHandlers.pointermove(stationaryCursor);
+for (const deltaY of [-150, 150, -90, 90]) {
+  pointerHandlers.wheel({ ...stationaryCursor, deltaY, deltaMode: 0, ctrlKey: false });
+  interactive.draw(4020);
+  const expectedPoint = interactive.springPoint(stationaryCursor),
+    shownPoint = interactive.springPlacement.pointer;
+  assert.ok(
+    Math.hypot(shownPoint.x - expectedPoint.x, shownPoint.y - expectedPoint.y) < 1e-10,
+    'wheel-only zoom keeps the direction preview under the stationary cursor'
+  );
+}
+const previewPoint = interactive.springPlacement.pointer,
+  previewOrigin = interactive.springPlacement.origin;
+const previewDirection = Math.atan2(previewPoint.y - previewOrigin.y, previewPoint.x - previewOrigin.x);
+tapSpring(stationaryCursor);
+assert.ok(
+  Math.abs(edgePlacements.at(-1).direction - previewDirection) < 1e-10,
+  'stationary click installs the direction shown before clicking'
+);
+console.log('PASS stationary-cursor wheel zoom preview matches the final installed direction');

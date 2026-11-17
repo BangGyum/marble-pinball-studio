@@ -281,6 +281,17 @@ export class LanView {
         event.preventDefault();
         const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? this.height : 1);
         this.setZoom(this.zoom * Math.exp(-Math.max(-150, Math.min(150, delta)) * 0.002));
+        if (this.springPlacement.active) {
+          const rect = canvas.getBoundingClientRect(),
+            center = this.manual ?? this.camera,
+            scale = this.viewScale();
+          this.springPlacement.move(
+            this.springMinimapPoint(event) ?? {
+              x: center.x + (event.clientX - rect.left - this.width * 0.56) / scale,
+              y: center.y + (event.clientY - rect.top - this.height * 0.43) / scale,
+            }
+          );
+        }
       },
       { passive: false }
     );
@@ -317,7 +328,7 @@ export class LanView {
     this.renderDirty = true;
     this.onPlacementChange();
   }
-  private springMinimapPoint(event: PointerEvent) {
+  private springMinimapPoint(event: Pick<MouseEvent, 'clientX' | 'clientY'>) {
     const rect = this.canvas.getBoundingClientRect(),
       x = event.clientX - rect.left,
       y = event.clientY - rect.top,
