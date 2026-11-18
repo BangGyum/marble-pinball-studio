@@ -81,7 +81,7 @@ export const desireJar: StageDef = {
         type: 'polyline',
         rotation: 0,
         points: [
-          [11, 77.4],
+          [10.3, 77.2],
           [12, 78.6],
           [12, 91.8],
         ],
@@ -95,7 +95,7 @@ export const desireJar: StageDef = {
         type: 'polyline',
         rotation: 0,
         points: [
-          [15, 77.4],
+          [15.7, 77.2],
           [14, 78.6],
           [14, 91.8],
         ],
@@ -177,8 +177,8 @@ export const desireJar: StageDef = {
       type: 'static',
       shape: {
         type: 'box',
-        width: 2,
-        height: 2,
+        width: 1.6,
+        height: 1.6,
         rotation: 0.7853981633974483,
       },
       props: { density: 1, angularVelocity: 0, restitution: 0 },
@@ -188,8 +188,8 @@ export const desireJar: StageDef = {
       type: 'static',
       shape: {
         type: 'box',
-        width: 2,
-        height: 2,
+        width: 1.6,
+        height: 1.6,
         rotation: 0.7853981633974483,
       },
       props: { density: 1, angularVelocity: 0, restitution: 0 },

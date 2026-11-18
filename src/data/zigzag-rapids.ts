@@ -30,23 +30,27 @@ const bank = (side: number): Point[] =>
   });
 const left = bank(1),
   right = bank(-1);
+const firstShortcutLeft = 23,
+  firstShortcutRight = 27;
 // Split the bank exactly at the bypass junctions; the opening and art share these coordinates.
-for (const x of [23.5, 26.5]) {
+for (const x of [firstShortcutLeft, firstShortcutRight, 23.5, 26.5]) {
   for (let i = right.length - 1; i > 0; i--) {
     const a = right[i - 1],
       b = right[i];
     if ((a[0] - x) * (b[0] - x) >= 0) continue;
     const t = (x - a[0]) / (b[0] - a[0]),
       y = a[1] + t * (b[1] - a[1]);
-    if ((y > 28 && y < 41) || (y > 50 && y < 63) || (y > 78 && y < 91) || (y > 102 && y < 115))
+    const first = x === firstShortcutLeft || x === firstShortcutRight;
+    if (first ? (y > 28 && y < 41) || (y > 50 && y < 63) : (y > 78 && y < 91) || (y > 102 && y < 115)) {
       right.splice(i, 0, [x, y]);
+    }
   }
 }
 const junction = (x: number, min: number, max: number) => right.findIndex(([px, y]) => px === x && y > min && y < max);
-const a = junction(26.5, 28, 41),
-  b = junction(23.5, 28, 41);
-const c = junction(23.5, 50, 63),
-  d = junction(26.5, 50, 63);
+const a = junction(firstShortcutRight, 28, 41),
+  b = junction(firstShortcutLeft, 28, 41);
+const c = junction(firstShortcutLeft, 50, 63),
+  d = junction(firstShortcutRight, 50, 63);
 const a2 = junction(26.5, 78, 91),
   b2 = junction(23.5, 78, 91);
 const c2 = junction(23.5, 102, 115),
@@ -140,7 +144,7 @@ const course = {
       props: { density: 1, restitution: 0.18, angularVelocity: 0, oscillation: { amplitude: 0.6, period: 3 } },
     },
     {
-      position: { x: 25, y: 45 },
+      position: { x: 25, y: 49 },
       type: 'static',
       shape: { type: 'circle', radius: 0.55, color: '#ffc76b' },
       props: { density: 1, restitution: 0.65, angularVelocity: 0 },

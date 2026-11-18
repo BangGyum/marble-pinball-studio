@@ -62,8 +62,8 @@ export const neonCrossway: StageDef = {
   entities: [
     rail(left, cyan, -0.9),
     rail(right, gold, 0.9),
-    rail(curve([31, 10], [25, 16], [13, 9], [10, 26]), cyan, 0.65),
-    rail(curve([33, 10], [39, 16], [51, 9], [54, 26]), gold),
+    rail(curve([31, 10], [25, 12], [15, 16], [10, 26]), cyan, 0.65),
+    rail(curve([33, 10], [39, 12], [49, 16], [54, 26]), gold),
     rail(curve([10, 26], [10, 32], [26, 32], [29, 38]), cyan),
     rail(curve([54, 26], [54, 32], [43, 33], [40, 38]), gold, 0.65),
     rail(
@@ -100,7 +100,7 @@ export const neonCrossway: StageDef = {
       gold,
       0.65
     ),
-    rail(curve([4, 64], [5, 75], [22, 73], [28, 82]), cyan),
+    rail(curve([4, 64], [5, 72], [18, 76], [27, 82]), cyan),
     rail(curve([60, 72], [57, 80], [42, 81], [37, 89]), gold, 0.65),
     rail(
       [
@@ -117,14 +117,14 @@ export const neonCrossway: StageDef = {
       gold,
       0.65
     ),
-    bumper(11.7, 16, 1.35, cyan),
-    bumper(52.3, 16, 1.35, gold),
-    bumper(6.3, 32, 1.35, cyan),
+    bumper(27.5, 7.8, 1.2, cyan),
+    bumper(36.5, 7.8, 1.2, gold),
+    bumper(7, 32, 1.35, cyan),
     bumper(57.3, 34, 1.35, gold),
     bumper(32, 39.8, 1.2, cyan),
     bumper(57.5, 38, 1.35, gold),
     bumper(14, 68, 1.35, cyan),
-    bumper(36.5, 69, 1.65, gold),
+    bumper(38.5, 70, 1.65, gold),
     triangle(32, 34, gold, 1.5),
     triangle(33, 62, cyan, -2.2),
     boost(5.3, 57, -0.95, cyan, 19),
