@@ -114,6 +114,32 @@ const inside = (ball, points) => {
   physics.createStage(stage);
   for (const e of physics.entities.filter((e) => e.timedGate))
     assert.ok(Math.abs(e.body.GetAngle() - timedGateAngle(e.timedGate, 0)) < 0.001, 'gate resets to its own phase');
+
+  const random = Math.random;
+  try {
+    // Place a stopped marble on either rim just above the chute while both gates are open.
+    Math.random = () => 0.5;
+    for (const x of [15.0562, 32.9438]) {
+      const y = 49.9168;
+      race.prepare(stage, ['출구 검증']);
+      race.startRace([1, 1]);
+      for (let i = 0; i < 36 * 60; i++) physics.step(1 / 60);
+      physics.placeMarble(0, x, y);
+      physics.setMarbleVelocity(0, 0, 0);
+      const ball = race.balls[0];
+      Object.assign(ball, { x, y, px: x, py: y });
+      while (race.state === 'running' && race.elapsed < 12) {
+        race.advance();
+        assert.ok(inside(ball, stage.art.contours[0]), 'a marble cannot cross the outside wall beside either gate');
+        assert.ok(ball.y <= 54 || !inside(ball, stage.art.contours[1]), 'a marble stays out of the divider');
+      }
+      assert.equal(race.finishReason, 'arrived', `marble beside the gate at x=${x} must finish naturally`);
+      assert.ok(ball.y >= stage.goalY, 'the marble reaches the real finish');
+      console.log(`PASS jackpot exit at x=${x}: naturally finished in ${race.elapsed.toFixed(2)}s`);
+    }
+  } finally {
+    Math.random = random;
+  }
   const results = [];
   for (const count of process.argv[2] ? [Number(process.argv[2])] : [1, 9, 20, 28, 49]) {
     for (const initial of process.argv[3] ? [Number(process.argv[3])] : [123456, 271828, 314159]) {
@@ -177,6 +203,7 @@ const inside = (ball, points) => {
         first: +first.toFixed(2),
         finish: +race.elapsed.toFixed(2),
         arrived: race.arrivals.length,
+        reason: race.finishReason,
         left: left.size,
         right: right.size,
         launch: launch.size,
@@ -197,6 +224,7 @@ const inside = (ball, points) => {
   }
   for (const result of results) {
     assert.equal(result.arrived, result.count, 'every marble must reach the finish');
+    assert.equal(result.reason, 'arrived', 'the jackpot must finish without timeout ranking');
     assert.equal(result.escaped, 0, 'marbles must stay inside the actual course');
     assert.ok(result.first >= 6 && result.finish < 80, 'race must have time to mix, then fully drain');
   }

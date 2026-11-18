@@ -23,16 +23,17 @@ const leftTop: Point[] = [
   ...leftRim.slice(1),
 ];
 const rightTop: Point[] = leftTop.map(([x, y]) => [48 - x, y]);
+// Follow the rim downward first so the slide's solid backing stays out of the mixer.
 const leftSlide: Point[] = [
   leftExit,
-  ...curve(leftExit, [8, 52], [9, 56], [11, 59]).slice(1),
+  ...curve(leftExit, [leftExit[0] + 1.2, leftExit[1] + 0.7], [9, 56], [11, 59]).slice(1),
   ...curve([11, 59], [13, 62], [14, 64], [17, 69]).slice(1),
   ...curve([17, 69], [19, 71], [21.5, 73], [21.5, 77]).slice(1),
   [21.5, 82],
 ];
 const rightSlide: Point[] = [
   rightExit,
-  ...curve(rightExit, [42, 51], [42, 57], [36, 61]).slice(1),
+  ...curve(rightExit, [rightExit[0] - 1.2, rightExit[1] + 0.7], [42, 57], [36, 61]).slice(1),
   ...curve([36, 61], [31, 64], [30, 68], [28, 72]).slice(1),
   ...curve([28, 72], [27, 74], [26.5, 75], [26.5, 77]).slice(1),
   [26.5, 82],
