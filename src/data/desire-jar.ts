@@ -73,6 +73,7 @@ export const desireJar: StageDef = {
         ],
       },
     },
+    // The upper guides catch direct drops and leave room below for the side returns.
     {
       type: 'static',
       position: { x: 0, y: 0 },
@@ -81,9 +82,8 @@ export const desireJar: StageDef = {
         type: 'polyline',
         rotation: 0,
         points: [
-          [10.3, 77.2],
-          [12, 78.6],
-          [12, 91.8],
+          [10.3, 79.2],
+          [12, 83],
         ],
       },
     },
@@ -95,9 +95,8 @@ export const desireJar: StageDef = {
         type: 'polyline',
         rotation: 0,
         points: [
-          [15.7, 77.2],
-          [14, 78.6],
-          [14, 91.8],
+          [15.7, 79.2],
+          [14, 83],
         ],
       },
     },
@@ -255,11 +254,12 @@ export const desireJar: StageDef = {
       shape: { type: 'box', width: 1.2, height: 0.1, rotation: 0 },
       props: { density: 1, angularVelocity: -10, restitution: 0 },
     },
+    // A slower top paddle reduces relaunches across the bowl.
     {
       position: { x: 2, y: 66.6 },
       type: 'kinematic',
       shape: { type: 'box', width: 1.2, height: 0.1, rotation: 0 },
-      props: { density: 1, angularVelocity: -10, restitution: 0 },
+      props: { density: 1, angularVelocity: -7.5, restitution: 0 },
     },
     {
       position: { x: 18, y: 87 },
@@ -313,9 +313,9 @@ export const desireJar: StageDef = {
       position: { x: 24, y: 66.6 },
       type: 'kinematic',
       shape: { type: 'box', width: 1.2, height: 0.1, rotation: 0 },
-      props: { density: 1, angularVelocity: 10, restitution: 0 },
+      props: { density: 1, angularVelocity: 7.5, restitution: 0 },
     },
-    // Keep the outlet lips unbacked: their outward normals point into the narrow exit.
+    // The unbacked ramps lead from the return rims down into the narrow outlet.
     {
       type: 'static',
       position: { x: 0, y: 0 },
@@ -324,7 +324,8 @@ export const desireJar: StageDef = {
         type: 'polyline',
         rotation: 0,
         points: [
-          [12, 85.8],
+          [12, 91.8],
+          [12, 88.6],
           [11, 86.4],
         ],
       },
@@ -337,7 +338,8 @@ export const desireJar: StageDef = {
         type: 'polyline',
         rotation: 0,
         points: [
-          [14, 85.8],
+          [14, 91.8],
+          [14, 88.6],
           [15, 86.4],
         ],
       },

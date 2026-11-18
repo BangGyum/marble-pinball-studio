@@ -16,7 +16,8 @@ const { desireJar } = require('../src/data/desire-jar.ts');
 
 (async () => {
   const race = new Race();
-  await race.physics.init();
+  const physics = race.physics;
+  await physics.init();
   try {
     // Reproduce the map-switching order that let paddles squeeze marbles through the lower rim.
     for (const stage of [stages[0], desireJar])
@@ -35,6 +36,7 @@ const { desireJar } = require('../src/data/desire-jar.ts');
         assert.equal(race.finishReason, 'arrived', `${stage.title}, seed ${initial}: no forced finish`);
         assert.equal(race.arrivals.length, 100);
         if (stage === desireJar) {
+          assert.ok(race.elapsed < 120, `seed ${initial}: the return lanes must drain within two minutes`);
           const escaped = race.arrivals.filter((b) => b.y < stage.goalY || b.x < 12 || b.x > 14);
           assert.deepEqual(
             escaped.map((b) => ({ id: b.id, x: b.x, y: b.y })),
@@ -47,8 +49,20 @@ const { desireJar } = require('../src/data/desire-jar.ts');
           );
         }
       }
+    for (const side of [-1, 1]) {
+      physics.clearMarbles();
+      physics.clear();
+      physics.createStage(desireJar);
+      physics.createMarble(0, 13 + side * 1.6, 85);
+      physics.start();
+      physics.setMarbleVelocity(0, -side * 2.5, 0);
+      for (let i = 0; i < 90 && physics.getMarblePosition(0).y < desireJar.goalY; i++) physics.step(1 / 60);
+      const { x, y } = physics.getMarblePosition(0);
+      assert.ok(y >= desireJar.goalY && x > 12 && x < 14, `side ${side}: a return can join the central chute`);
+    }
+    console.log('PASS both side returns feed the same central chute');
   } finally {
-    race.physics.dispose();
+    physics.dispose();
   }
 })().catch((error) => {
   console.error(error);

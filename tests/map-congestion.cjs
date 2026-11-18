@@ -63,7 +63,7 @@ async function verifyPipelineRoller() {
   await verifyPack(zigzagRapids, 123456, 70);
   await verifyPack(neonCrossway, 123456, 65);
   await verifyPack(neonCrossway, 271828, 65);
-  await verifyPack(desireJar, 123456, 270);
+  await verifyPack(desireJar, 123456, 125);
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
