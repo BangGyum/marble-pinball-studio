@@ -446,6 +446,7 @@ tapSpring(springPointer(16, 75, 'touch'));
 assert.equal(placed.length, 1);
 assert.deepEqual(placed[0], { x: 13, y: 75, direction: 0 }, 'two touch taps select position then direction');
 assert.equal(interactive.springPlacement.active, false);
+assert.equal(interactive.manual, null, 'a viewer resumes automatic tracking after confirming the spring direction');
 interactive.beginSpringPlacement();
 windowHandlers.keydown({ key: 'Escape', preventDefault() {}, stopImmediatePropagation() {} });
 assert.equal(interactive.springPlacement.active, false, 'Escape cancels without spending a spring');
@@ -688,7 +689,7 @@ console.log(
   'PASS actual LAN client synchronizes changed winner rules and retains edits during unrelated scene updates'
 );
 
-// Placement keeps the inspected region after confirmation and ignores interrupted gestures.
+// Confirmation returns to the race view. Interrupted gestures leave the placement view in place.
 interactive.setScene({ ...scene, raceId: 'placement-edge-cases', revision: 1 });
 interactive.state = 'ready';
 interactive.springConnected = true;
@@ -700,17 +701,18 @@ interactive.beginSpringPlacement();
 interactive.draw(2000);
 pointerHandlers.pointermove({ ...pointer, clientY: 20 + interactive.minimap.y + interactive.minimap.scale * 75 });
 interactive.draw(2010);
-const inspectedCamera = { ...interactive.camera },
-  inspectedScale = interactive.springView.scale;
+const inspectedZoom = interactive.zoom;
 tapSpring(springPointer(13, 75));
 tapSpring(springPointer(13, 72));
 interactive.draw(2020);
 assert.equal(edgePlacements.length, 1);
-assert.deepEqual(interactive.camera, inspectedCamera, 'confirmation keeps the inspected lower-map camera');
-assert.equal(interactive.springView.scale, inspectedScale, 'confirmation does not change the visible zoom scale');
+assert.deepEqual(interactive.camera, interactive.readyCamera, 'confirmation in ready returns to the start view');
+assert.equal(interactive.zoom, inspectedZoom, 'confirmation keeps the chosen zoom');
 
 interactive.beginSpringPlacement();
 interactive.draw(2030);
+pointerHandlers.pointermove({ ...pointer, clientY: 20 + interactive.minimap.y + interactive.minimap.scale * 75 });
+interactive.draw(2031);
 const interrupted = springPointer(13, 75);
 pointerHandlers.pointerdown(interrupted);
 windowHandlers.blur();
@@ -739,10 +741,11 @@ pointerHandlers.pointerup({ ...interrupted, button: 2 });
 assert.equal(interactive.springPlacement.origin, undefined, 'secondary-button release cannot confirm a primary tap');
 
 let cameraCases = 0;
-for (const [mapWidth, goalY] of [
+for (const [mapWidth, goalY, circular] of [
   [26, 60],
   [66, 176],
   [200, 300],
+  [48, 128, true],
 ]) {
   for (const width of [360, 1000])
     for (const zoom of [0.35, 1.44, 3])
@@ -750,14 +753,31 @@ for (const [mapWidth, goalY] of [
         const cameraScene = {
           ...scene,
           raceId: 'camera-case-' + cameraCases,
-          stage: { title: 'Camera bounds', width: mapWidth, goalY, entities: [] },
+          stage: {
+            title: 'Camera bounds',
+            width: mapWidth,
+            goalY,
+            entities: [],
+            ...(circular ? { goalArea: { x: mapWidth / 2, y: goalY - 3, radius: 1 } } : {}),
+          },
+          settings: { ...scene.settings, names: 'A, B' },
+          balls: [...scene.balls, { id: 1, name: 'B', color: '#ddd' }],
+        };
+        const rearY = goalY * 0.2;
+        const cameraFrame = {
+          ...frame(0, 1, state),
+          raceId: cameraScene.raceId,
+          balls: [
+            [0, mapWidth / 2, goalY * 0.55, 0, 0],
+            [1, mapWidth / 2, rearY, 0, 0],
+          ],
         };
         interactive.setScene(cameraScene);
         interactive.width = width;
         interactive.height = 600;
         interactive.state = state;
         interactive.personalSpring = { state: 'available' };
-        interactive.playback.push({ ...frame(0, 1, state), raceId: cameraScene.raceId }, 3000);
+        interactive.playback.push(cameraFrame, 3000);
         interactive.setZoom(zoom);
         interactive.beginSpringPlacement();
         interactive.draw(3000);
@@ -778,28 +798,36 @@ for (const [mapWidth, goalY] of [
         });
         interactive.setZoom(Math.min(3, zoom * 1.2));
         interactive.draw(3030);
-        const scaleBeforeConfirm = interactive.springView.scale;
+        const zoomBeforeConfirm = interactive.zoom;
+        assert.deepEqual(interactive.camera, beforeUpdate, 'peer placement keeps the chosen view during the draft');
         tapSpring(springPointer(target.x, target.y - 2, 'touch'));
         interactive.draw(3040);
-        assert.deepEqual(interactive.camera, beforeUpdate, 'peer placement and confirmation keep the chosen camera');
-        assert.equal(interactive.springView.scale, scaleBeforeConfirm);
-        pointerHandlers.pointermove(springPointer(target.x + 1, target.y));
-        pointerHandlers.pointerleave(pointer);
-        interactive.draw(3050);
-        assert.deepEqual(interactive.camera, beforeUpdate, 'moving to the use button keeps the spring in view');
+        assert.equal(interactive.manual, null, 'direction confirmation clears the placement view');
+        assert.equal(interactive.zoom, zoomBeforeConfirm);
         interactive.push({
-          ...frame(0, 2, 'finished'),
-          raceId: cameraScene.raceId,
+          ...cameraFrame,
+          seq: 2,
           revision: 2,
-          personalSpring: { state: 'used' },
+          personalSpring: { state: 'placed', id: 'own-spring' },
         });
-        assert.equal(interactive.springInspect, false, 'finish restores the result camera');
+        for (let i = 1; i <= 100; i++) interactive.draw(3040 + (i * 1000) / 60);
+        if (state === 'ready') assert.deepEqual(interactive.camera, interactive.readyCamera);
+        else assert.ok(Math.abs(interactive.camera.y - rearY) < 0.001, 'the camera follows the last marble');
+        const minimap = interactive.minimap;
+        const inspect = {
+          ...pointer,
+          clientX: 10 + minimap.x + target.x * minimap.scale,
+          clientY: 20 + minimap.y + target.y * minimap.scale,
+        };
+        pointerHandlers.pointermove(inspect);
+        assert.ok(Math.abs(interactive.manual.y - target.y) < 1e-10, 'minimap navigation is available after placement');
+        pointerHandlers.pointerleave(pointer);
         assert.equal(interactive.manual, null);
         cameraCases++;
       }
 }
-assert.equal(cameraCases, 54);
-console.log('PASS 54 tall/wide map, desktop/mobile, zoom, ready/running/paused, peer-update and finish camera cases');
+assert.equal(cameraCases, 72);
+console.log('PASS 72 spring-placement camera cases across tall, wide, and circular maps');
 
 interactive.setScene({ ...scene, raceId: 'stationary-wheel', revision: 1 });
 interactive.width = 1000;
