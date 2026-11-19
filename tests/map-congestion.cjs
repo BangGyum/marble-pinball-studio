@@ -42,24 +42,30 @@ async function verifyPack(stage, initial, limit) {
   }
 }
 
-async function verifyPipelineRoller() {
+async function verifyPipelineBumper() {
   const race = new Race();
   await race.physics.init();
   const physics = race.physics;
   try {
-    physics.createStage(pipelineRun);
-    physics.createMarble(0, 5.25, 140.68);
-    physics.start();
-    for (let i = 0; i < 180; i++) physics.step(1 / 60);
-    assert.ok(physics.getMarblePosition(0).y > 146, 'a resting marble must clear the pipeline bend');
-    console.log('PASS pipeline roller releases a resting marble');
+    for (const phaseSteps of [0, 36, 72]) {
+      physics.clearMarbles();
+      physics.clear();
+      physics.createStage(pipelineRun);
+      for (let i = 0; i < phaseSteps; i++) physics.step(1 / 60);
+      physics.createMarble(0, 5.25, 140.68);
+      physics.start();
+      physics.setMarbleVelocity(0, 0, 0);
+      for (let i = 0; i < 240 && physics.getMarblePosition(0).y <= 146; i++) physics.step(1 / 60);
+      assert.ok(physics.getMarblePosition(0).y > 146, 'a resting marble must clear the bend at each tested phase');
+    }
+    console.log('PASS pipeline bumper releases a resting marble at three phases');
   } finally {
     physics.dispose();
   }
 }
 
 (async () => {
-  await verifyPipelineRoller();
+  await verifyPipelineBumper();
   await verifyPack(zigzagRapids, 123456, 70);
   await verifyPack(neonCrossway, 123456, 65);
   await verifyPack(neonCrossway, 271828, 65);

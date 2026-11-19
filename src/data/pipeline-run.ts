@@ -13,11 +13,17 @@ const wall = (points: [number, number][], color: string, backing?: number): MapE
   props: { density: 1, restitution: 0.08, angularVelocity: 0 },
 });
 
-const bumper = (x: number, y: number, radius: number, color: string, spin = 0): MapEntity => ({
+const bumper = (
+  x: number,
+  y: number,
+  radius: number,
+  color: string,
+  sliding?: MapEntity['props']['sliding']
+): MapEntity => ({
   position: { x, y },
-  type: spin ? 'kinematic' : 'static',
+  type: sliding ? 'kinematic' : 'static',
   shape: { type: 'circle', radius, color },
-  props: { density: 1, restitution: 0.9, angularVelocity: spin },
+  props: { density: 1, restitution: 0.9, angularVelocity: 0, ...(sliding ? { sliding } : {}) },
 });
 
 const rotor = (x: number, y: number, spin: number, color: string): MapEntity => ({
@@ -105,7 +111,7 @@ export const pipelineRun: StageDef = {
     bumper(centreAt(91) - halfWidth, 91, 1.1, gold),
     bumper(centreAt(116) + halfWidth, 116, 1.1, blue),
     rotor(centreAt(123), 123, 1.5, pink),
-    // The roller feeds a resting marble out of the contact with the bend.
-    bumper(centreAt(142) - halfWidth, 142, 1.1, gold, 12),
+    // A short sideways sweep releases marbles wedged between the bumper and the bend.
+    bumper(centreAt(142) - halfWidth, 142, 1.1, gold, { amplitude: 0.48, period: 2.2, phase: 0 }),
   ],
 };
