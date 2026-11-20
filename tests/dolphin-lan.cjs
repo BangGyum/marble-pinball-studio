@@ -12,7 +12,7 @@ const session = (port, host) =>
         port,
         path: host ? '/api/host-session' : '/api/session',
         method: 'POST',
-        headers: { Origin: `http://127.0.0.1:${port}` },
+        headers: { Origin: `http://127.0.0.1:${port}`, ...(!host ? { 'X-Participant-Name': 'viewer' } : {}) },
       },
       (res) => {
         res.resume();
@@ -153,7 +153,7 @@ async function connect(port, host = false) {
     }
     assert.equal((await host.command({ type: 'start' })).ok, true);
     assert.equal((await host.command({ type: 'configure', settings })).ok, false, 'settings are locked during a race');
-    for (let i = 0; i < 660 && app.race.state === 'running'; i++) app.race.advance();
+    for (let i = 0; i < 660 && app.race.state === 'running'; i++) app.advance();
     const late = await connect(app.port);
     clients.push(late);
     assert.deepEqual(late.scene.settings.dolphins, dolphins, 'late join receives row positions and interval');

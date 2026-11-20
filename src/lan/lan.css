@@ -64,6 +64,25 @@
 body[data-role="viewer"] #game-view {
   min-height: 360px;
 }
+#participant-join {
+  width: min(360px, calc(100% - 32px));
+}
+#participant-form {
+  display: grid;
+  gap: 10px;
+  padding: 22px;
+}
+#participant-form h1,
+#participant-form p {
+  margin: 0;
+}
+#participant-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+#participant-error {
+  color: #ffc388;
+}
 .personal-spring {
   display: flex;
   flex-wrap: wrap;

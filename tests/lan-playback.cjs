@@ -179,12 +179,15 @@ const ctx = Object.fromEntries(
     'beginPath',
     'moveTo',
     'lineTo',
+    'quadraticCurveTo',
+    'closePath',
     'stroke',
     'setLineDash',
     'arc',
     'ellipse',
     'fill',
     'fillText',
+    'strokeText',
     'rect',
     'clip',
     'strokeRect',
@@ -243,26 +246,45 @@ metadataView.push(frame(0, 1, 'running', 0));
 metadataView.push(frame(0.2, 2, 'running', 200));
 metadataView.playback.sample(200);
 const timelineBeforePlacement = metadataView.playback.sample(250).elapsed;
-metadataView.setScene({
-  ...structuredClone(scene),
-  revision: 2,
-  placedSprings: [{ id: 'other-player', x: 13, y: 20, direction: 0 }],
-});
-const timelineAfterPlacement = metadataView.playback.sample(250);
-assert.ok(timelineAfterPlacement, 'another player placing a spring cannot clear the visible race');
-assert.equal(
-  timelineAfterPlacement.elapsed,
-  timelineBeforePlacement,
-  'placement-only updates preserve the interpolation cursor'
-);
-metadataView.push({ ...frame(0.3, 3, 'running', 300), revision: 2 });
+const peerSpring = { id: 'other-player', ownerName: '데일', x: 13, y: 20, direction: 0 };
+for (const springs of [[peerSpring], [{ ...peerSpring, activatedAt: 0.2 }], []]) {
+  metadataView.setSpringLayout({ type: 'spring-layout', raceId: scene.raceId, springs });
+  assert.equal(
+    metadataView.playback.sample(250)?.elapsed,
+    timelineBeforePlacement,
+    'placement, activation and removal all preserve the interpolation cursor'
+  );
+}
+metadataView.push(frame(0.3, 3, 'running', 300));
 assert.ok(
   metadataView.playback.sample(300).elapsed >= timelineBeforePlacement,
-  'new-revision frames continue on the same timeline'
+  'frames continue on the same timeline after personal spring changes'
 );
 metadataView.setScene({ ...structuredClone(scene), raceId: 'next-race', revision: 3 });
 assert.equal(metadataView.playback.sample(300), undefined, 'a genuinely new race still clears old frames');
 console.log('PASS spring placement metadata preserves playback while a new race resets it');
+
+const strokeView = new LanView(canvas);
+strokeView.setScene(scene);
+strokeView.setSpringLayout({
+  type: 'spring-layout',
+  raceId: scene.raceId,
+  springs: [{ ...peerSpring, x: 8, y: 5, activatedAt: 0 }],
+});
+strokeView.push(frame(0, 1, 'running', 0, 4));
+strokeView.push(frame(0.8, 2, 'running', 200, 4));
+const springLabels = [];
+ctx.strokeText = (label) => springLabels.push(label);
+strokeView.draw(200);
+assert.deepEqual(springLabels.splice(0), [peerSpring.ownerName], 'stroke is still visible on the buffered 4x timeline');
+const replacement = { ...peerSpring, id: 'replacement', ownerName: '연두', x: 8, y: 5, placedAt: 0.8 };
+strokeView.setSpringLayout({ type: 'spring-layout', raceId: scene.raceId, springs: [replacement] });
+strokeView.draw(210);
+assert.deepEqual(springLabels.splice(0), [peerSpring.ownerName], 'a newer layout must not cut off the return stroke');
+strokeView.draw(400);
+assert.deepEqual(springLabels, [replacement.ownerName], 'only the new owner is drawn after the position is reused');
+ctx.strokeText = noop;
+console.log('PASS a peer layout update at 4x preserves the return stroke until its displayed expiry');
 
 // Translations use the same buffered samples as marbles, including returning to the scene origin.
 ctx.rotate = noop;
@@ -295,10 +317,10 @@ bufferedSlide.playback.push({ ...frame(0, 1), positions: [[0, 12, 30]] }, 0);
 bufferedSlide.playback.push({ ...frame(0.2, 2), positions: [[0, 16, 30]] }, 200);
 bufferedSlide.draw(200);
 const priorX = renderedX;
-bufferedSlide.setScene({
-  ...structuredClone(slideScene),
-  revision: 2,
-  placedSprings: [{ id: 'other', x: 13, y: 40, direction: 0 }],
+bufferedSlide.setSpringLayout({
+  type: 'spring-layout',
+  raceId: slideScene.raceId,
+  springs: [{ ...peerSpring, y: 40 }],
 });
 bufferedSlide.draw(200);
 assert.equal(renderedX, priorX, 'metadata updates preserve moving-device coordinates and buffered origins');
@@ -480,11 +502,7 @@ interactive.springConnected = true;
 interactive.personalSpring = { state: 'available' };
 interactive.beginSpringPlacement();
 interactive.springPlacement.choose({ x: 13, y: 40 });
-interactive.setScene({
-  ...structuredClone(scene),
-  revision: 2,
-  placedSprings: [{ id: 'another', x: 13, y: 20, direction: 0 }],
-});
+interactive.setSpringLayout({ type: 'spring-layout', raceId: scene.raceId, springs: [peerSpring] });
 assert.deepEqual(
   interactive.springPlacement.origin,
   { x: 13, y: 40 },
@@ -567,7 +585,6 @@ const springScene = {
   },
   entities: [{ x: 13, y: 20, angle: 0, life: -1, shape: mapSpringShape }],
   fixed: [false],
-  placedSprings: [],
 };
 const receiveScene = (value) => interactive.setScene(decodeScene(JSON.parse(JSON.stringify(encodeScene(value)))));
 ctx.measureText = (text) => ({ width: text.length * 7 });
@@ -609,12 +626,13 @@ assert.equal(used.length, personalUsesBefore);
 interactive.springControls.setStatuses([[0, 4900, false]]);
 const selectedShape = interactive.entities[0].shape;
 for (let revision = 2; revision <= 4; revision++) {
-  receiveScene({
-    ...springScene,
-    revision,
-    placedSprings: [{ id: 'another-player', x: 18, y: 25, direction: 0 }],
-  });
+  receiveScene({ ...springScene, revision });
   assert.notEqual(interactive.entities[0].shape, selectedShape, 'wire decoding replaces shape references');
+  interactive.setSpringLayout({
+    type: 'spring-layout',
+    raceId: springScene.raceId,
+    springs: [{ ...peerSpring, x: 18, y: 25, activatedAt: 1 }],
+  });
   assert.equal(interactive.springControls.selected, 0, 'placement updates retain the selected map spring immediately');
   dispatchSpace();
   assert.equal(mapUses.length, 1, 'placement updates cannot clear the selected spring cooldown');
@@ -682,7 +700,7 @@ assert.equal(rulesUI.order.value, 'desc', 'all clients display winner-direction 
 assert.equal(rulesUI.displayedPicks, 3, 'all clients display winner-count changes without a new race');
 rulesUI.order.value = 'asc';
 rulesUI.preferredPicks = 1;
-receiveRules({ data: JSON.stringify(encodeScene({ ...rulesUpdate, revision: 3, placedSprings: [] })) });
+receiveRules({ data: JSON.stringify(encodeScene({ ...rulesUpdate, revision: 3 })) });
 assert.equal(rulesUI.order.value, 'asc', 'unrelated placement updates do not overwrite a pending winner-rule edit');
 assert.equal(rulesUI.preferredPicks, 1);
 console.log(
@@ -791,10 +809,10 @@ for (const [mapWidth, goalY, circular] of [
         tapSpring(springPointer(target.x, target.y, 'touch'));
         interactive.draw(3020);
         const beforeUpdate = { ...interactive.camera };
-        interactive.setScene({
-          ...cameraScene,
-          revision: 2,
-          placedSprings: [{ id: 'another-player', x: mapWidth / 2, y: goalY / 2, direction: 0 }],
+        interactive.setSpringLayout({
+          type: 'spring-layout',
+          raceId: cameraScene.raceId,
+          springs: [{ ...peerSpring, x: mapWidth / 2, y: goalY / 2 }],
         });
         interactive.setZoom(Math.min(3, zoom * 1.2));
         interactive.draw(3030);

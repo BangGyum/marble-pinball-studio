@@ -22,8 +22,8 @@ export type Scene = {
   entities: MapEntityState[];
   fixed: boolean[];
   balls: { id: number; name: string; color: string }[];
-  placedSprings?: PlacedSpring[];
 };
+export type SpringLayout = { type: 'spring-layout'; raceId: string; springs: PlacedSpring[] };
 type WireEntity = Omit<MapEntityState, 'shape'> & { shapeIndex?: number; shape?: EntityShape };
 export type WireScene = Omit<Scene, 'settings' | 'entities'> & {
   settings: Omit<Settings, 'stage'>;
@@ -81,7 +81,7 @@ export type Frame = {
   // Remaining marbles were trapped and ranked by depth.
   stalled?: boolean;
 };
-export type Identity = { type: 'identity'; role: 'host' | 'viewer' };
+export type Identity = { type: 'identity'; role: 'host' | 'viewer'; name: string };
 export type Info = { maps: { id: number; title: string }[]; addresses: { name: string; url: string }[] };
 export type Command = { requestId: string; raceId: string } & (
   | { type: 'configure'; settings: Settings }
@@ -93,7 +93,7 @@ export type Command = { requestId: string; raceId: string } & (
   | { type: 'use-spring' }
 );
 export type CommandResult = { type: 'result'; requestId: string; ok: boolean; error?: string };
-export type ServerMessage = WireScene | Frame | Identity | CommandResult;
+export type ServerMessage = WireScene | Frame | Identity | SpringLayout | CommandResult;
 
 export function serializeCommand(command: Command): string {
   const data = JSON.stringify(command);

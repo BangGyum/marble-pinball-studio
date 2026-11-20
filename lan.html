@@ -36,6 +36,16 @@
     </div>
     <footer><span id="map-caption"></span><span id="focus-status" role="status" class="sr-only"></span><span class="lan-connection"><span id="connection">연결 중</span><details data-host hidden><summary>관람 주소</summary><label for="address">접속할 네트워크</label><select id="address"></select><a id="join-url" target="_blank" rel="noopener" aria-label="선택한 관람 주소 열기"></a><p>같은 네트워크에서 접속 · 입장 코드 없음 · 표시된 스프링 조작 가능</p></details></span><a href="https://github.com/lazygyu/roulette" target="_blank" rel="noopener noreferrer">Original by lazygyu · MIT</a><a href="./licenses.html" target="_blank" rel="noopener noreferrer">오픈소스 라이선스</a></footer>
   </main>
+  <dialog id="participant-join" aria-labelledby="participant-join-title">
+    <form id="participant-form">
+      <h1 id="participant-join-title">핀볼 참가하기</h1>
+      <label for="participant-name">이름</label>
+      <input id="participant-name" type="text" maxlength="24" required autofocus aria-describedby="participant-hint" />
+      <p id="participant-hint">입장 후 이 브라우저에 이름이 저장되며, 설치한 스프링에 표시돼요.</p>
+      <p id="participant-error" role="status" hidden></p>
+      <button type="submit" class="primary">입장</button>
+    </form>
+  </dialog>
   <dialog id="editor-dialog" aria-labelledby="editor-title">
     <header class="editor-header"><div><span class="eyebrow">MAP STUDIO</span><h1 id="editor-title">맵 만들기</h1></div><div class="inline"><button type="button" id="editor-close">닫기</button><button type="button" id="editor-test">미리 플레이</button><button type="button" id="editor-save" class="primary">저장하고 적용</button></div></header>
     <div class="editor-layout"><aside class="editor-tools"><label for="map-name">맵 이름</label><input id="map-name" maxlength="60" placeholder="나만의 맵" /><label for="map-height">결승선 높이</label><input id="map-height" type="number" min="20" max="300" value="70" /><p class="tool-heading">배치 도구</p><div id="tools" class="tool-list"><button type="button" data-tool="select" class="selected">↖ 선택 · 이동</button><button type="button" data-tool="wall">╱ 벽 그리기</button><button type="button" data-tool="freehand">✎ 자유 그리기</button><button type="button" data-tool="pin">● 원형 핀</button><button type="button" data-tool="bumper">◉ 범퍼</button><button type="button" data-tool="ramp">━ 반사판</button><button type="button" data-tool="rotor">✣ 회전 장애물</button><button type="button" data-tool="boost">» 부스터 발판</button><button type="button" data-tool="spring">⇧ 스프링 장치</button></div><label class="check"><input id="snap" type="checkbox" checked /> 격자에 맞추기</label><div class="inline"><button type="button" id="undo">↶ 되돌리기</button><button type="button" id="redo">↷</button></div><p id="tool-help" class="muted">장애물을 선택하고 드래그해서 옮기세요.</p><div class="library"><p class="tool-heading">맵 보관함</p><select id="editor-library" aria-label="불러올 맵"></select><div class="inline"><button type="button" id="editor-load">불러오기</button><button type="button" id="editor-new">새 맵</button></div><button type="button" id="editor-delete-map">저장된 맵 삭제</button><hr /><div class="inline"><button type="button" id="editor-export">파일 내보내기</button><button type="button" id="editor-import">가져오기</button></div><input id="map-file" type="file" accept="application/json,.json" hidden /><p class="muted">이 브라우저에 저장됩니다. 파일로 내보내면 다른 기기에서도 불러올 수 있어요.</p></div></aside>

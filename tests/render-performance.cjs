@@ -59,6 +59,45 @@ const { setSceneTheme } = require('../src/scene-theme.ts');
 const { visibleArt } = require('../src/art-visibility.ts');
 const { Game } = require('../src/game.ts');
 const { LanView } = require('../src/lan/view.ts');
+const { drawPlacedSprings } = require('../src/lan/spring-placement.ts');
+
+{
+  const springs = Array.from({ length: 8 }, (_, i) => ({
+    id: String(i),
+    ownerName: `참가자${i}`,
+    x: 4 + i * 2,
+    y: 12,
+    direction: (i * Math.PI) / 4,
+    activatedAt: 0,
+  }));
+  const paint = (elapsed) => {
+    calls.length = 0;
+    drawPlacedSprings(ctx, springs, '0', 42, elapsed, false, { left: 0, right: 30, top: 0, bottom: 20 }, 2);
+    return calls.filter(([method]) => method === 'drawImage');
+  };
+  const start = bitmaps.length;
+  assert.equal(paint(0).length, 8);
+  assert.equal(bitmaps.length - start, 1, 'eight directions share the same bitmap');
+  const returning = paint(0.31);
+  assert.equal(returning.length, 3 * springs.length);
+  const [face, coil, foot] = returning;
+  assert.equal(face[9], face[5] / (face[4] / face[8]), 'the contact surface keeps its height');
+  assert.equal(foot[9], foot[5] / (foot[4] / foot[8]), 'the mounting foot keeps its height');
+  assert.equal(face[7] + face[9], coil[7]);
+  assert.ok(Math.abs(coil[7] + coil[9] - foot[7]) < 1e-9, 'the winding meets both ends');
+  for (let tick = 0; tick < 39; tick++) paint(tick / 60);
+  const warm = bitmaps.length;
+  for (let tick = 0; tick < 39; tick++) paint(tick / 60);
+  assert.equal(bitmaps.length, warm, 'a second run allocates no new bitmaps');
+  assert.equal(paint(0.65).length, 0, 'expired springs never draw a cached sprite');
+  assert.equal(calls.length, 0, 'after all springs expire the renderer makes no canvas calls');
+  const { drawPersonalSpring } = require('../src/personal-spring-art.ts');
+  for (let i = 0; i < 16; i++) drawPersonalSpring(ctx, 0.9, 0.18, 0, 160, `rgb(${i},100,120)`, 2);
+  const allocated = bitmaps.slice(start).filter((canvas) => canvas.width > 1);
+  assert.ok(allocated.length <= 12);
+  assert.ok(allocated.reduce((sum, canvas) => sum + canvas.width * canvas.height, 0) <= 3 * 1024 * 1024);
+  console.log('PASS eight LAN springs share artwork through the exact return stroke and expiry');
+}
 
 // Starting a goal-area map zooms out; a sharper ready bitmap is still valid.
 {

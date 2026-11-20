@@ -11,14 +11,14 @@ const { stages, hiddenStages, DEFAULT_MAP_INDEX } = require('../.lan-build/data/
 const { parseNames, winningRange, validateStage } = require('../.lan-build/model.js');
 const { LAN_PORT, MAX_LAN_MESSAGE_BYTES, encodeScene } = require('../.lan-build/lan/protocol.js');
 const { validateDolphins } = require('../.lan-build/dolphin.js');
-const { personalSpringEntity, PERSONAL_SPRING_DURATION } = require('../.lan-build/personal-spring.js');
+const { personalSpringEntity, validatePersonalSpring, springHasExpired } = require('../.lan-build/personal-spring.js');
 const MAX_LAN_BUFFERED_BYTES = 2 * MAX_LAN_MESSAGE_BYTES;
 /** @typedef {import('../src/lan/protocol').Settings} Settings */
 /** @typedef {import('../src/lan/protocol').Scene} Scene */
 /** @typedef {import('../src/lan/protocol').Frame} Frame */
 /** @typedef {import('../src/lan/protocol').Command} Command */
 /** @typedef {import('../src/lan/protocol').CommandResult} CommandResult */
-/** @typedef {{ token: string, role: 'host' | 'viewer', touched: number, results: Map<string, CommandResult> }} Session */
+/** @typedef {{ token: string, role: 'host' | 'viewer', name: string, touched: number, results: Map<string, CommandResult> }} Session */
 /** @typedef {import('../src/types/map-entity').MapEntityState} MapEntityState */
 const loopback = (ip) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip);
 const round = (n) => Math.round(n * 1000) / 1000;
@@ -27,6 +27,14 @@ const allowedKeys = (value, keys) =>
 const requireThat = (condition, message) => {
   if (!condition) throw new Error(message);
 };
+function readParticipantName(value) {
+  if (typeof value !== 'string') return '';
+  try {
+    const name = decodeURIComponent(value).trim();
+    if (name.length <= 24 && !/[\p{Cc}\u2028-\u202e\u2066-\u2069]/u.test(name)) return name;
+  } catch {}
+  return '';
+}
 
 async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNow = () => performance.now() } = {}) {
   const race = new Race();
@@ -48,8 +56,10 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
   let boostOwner = null;
   /** @type {Map<string, Session>} */
   const sessions = new Map();
-  /** @type {Map<Session, import('../src/personal-spring').PlacedSpring & { used: boolean, shape?: import('../src/types/map-entity').EntityBoxShape, removeAt?: number }>} */
+  /** @type {Map<Session, import('../src/personal-spring').PlacedSpring>} */
   const personalSprings = new Map();
+  /** @type {Map<import('../src/types/map-entity').EntityBoxShape, import('../src/personal-spring').PlacedSpring>} */
+  const activeSprings = new Map();
   /** @type {Map<import('ws').WebSocket, { session: Session, alive: boolean, count: number, window: number }>} */
   const clients = new Map();
   const attempts = new Map();
@@ -106,8 +116,30 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     ws.send(typeof value === 'string' ? value : JSON.stringify(value));
   };
   /** @param {Session} session @returns {import('../src/lan/protocol').Identity} */
-  const identity = (session) => ({ type: 'identity', role: session.role });
-  function makeScene(entities = race.physics.getEntities()) {
+  const identity = (session) => ({ type: 'identity', role: session.role, name: session.name });
+  function mapEntities() {
+    // Personal bodies are appended, so filtering them preserves map device indices.
+    const entities = race.physics.getEntities();
+    return activeSprings.size
+      ? entities.filter(({ shape }) => shape.type !== 'box' || !activeSprings.has(shape))
+      : entities;
+  }
+  const currentSprings = () =>
+    [...personalSprings.values()].filter(
+      (spring) =>
+        spring.activatedAt === undefined || (race.state !== 'finished' && !springHasExpired(spring, race.elapsed))
+    );
+  /** @returns {import('../src/lan/protocol').SpringLayout} */
+  const springLayout = () => ({
+    type: 'spring-layout',
+    raceId,
+    springs: currentSprings(),
+  });
+  function publishSprings() {
+    const data = JSON.stringify(springLayout());
+    for (const ws of clients.keys()) send(ws, data);
+  }
+  function makeScene(entities = mapEntities()) {
     const fixed = new Set(
       (race.stage.entities ?? []).filter((e) => e.type === 'static' && (e.props.life ?? -1) <= 0).map((e) => e.shape)
     );
@@ -120,9 +152,6 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       entities,
       fixed: entities.map((e) => fixed.has(e.shape)),
       balls: race.balls.map(({ id, name, color }) => ({ id, name, color })),
-      placedSprings: [...personalSprings.values()]
-        .filter((spring) => !spring.used)
-        .map(({ id, x, y, direction }) => ({ id, x, y, direction })),
     };
     sceneMessage = JSON.stringify(encodeScene(scene));
     for (const ws of clients.keys()) send(ws, sceneMessage);
@@ -132,6 +161,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     accumulator = 0;
     boostOwner = null;
     personalSprings.clear();
+    activeSprings.clear();
     race.prepare(settings.stage ?? stages[settings.mapId], parseNames(settings.names), settings.dolphins);
     makeScene();
   }
@@ -143,7 +173,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     if (entities.length !== scene.entities.length) makeScene(entities);
   }
   /** @returns {Frame} */
-  function frame(entities = race.physics.getEntities()) {
+  function frame(entities = mapEntities()) {
     syncScene(entities);
     /** @type {NonNullable<Frame['positions']>} */
     const positions = entities.flatMap((e, i) =>
@@ -173,14 +203,17 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       winners: race.winners.map((b) => b.id),
     };
   }
-  function broadcast() {
-    for (const spring of personalSprings.values()) {
-      if (spring.shape && (race.elapsed >= (spring.removeAt ?? Infinity) || race.state === 'finished')) {
-        race.physics.removeSpring(spring.shape);
-        spring.shape = undefined;
+  function advance() {
+    race.advance();
+    for (const [shape, spring] of activeSprings) {
+      if (springHasExpired(spring, race.elapsed) || race.state === 'finished') {
+        race.physics.removeSpring(shape);
+        activeSprings.delete(shape);
       }
     }
-    const entities = race.physics.getEntities();
+  }
+  function broadcast() {
+    const entities = mapEntities();
     const snapshot = frame(entities),
       hasSprings = entities.some((e) => e.shape.type === 'box' && e.shape.spring);
     for (const [ws, client] of clients)
@@ -194,7 +227,9 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
   /** @param {Session} session @returns {NonNullable<Frame['personalSpring']>} */
   function personalSpringStatus(session) {
     const spring = personalSprings.get(session);
-    return spring ? { state: spring.used ? 'used' : 'placed', id: spring.id } : { state: 'available' };
+    return spring
+      ? { state: spring.activatedAt === undefined ? 'placed' : 'used', id: spring.id }
+      : { state: 'available' };
   }
   /** @param {Session} session @param {Command} msg */
   function execute(session, msg) {
@@ -221,17 +256,22 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     if (msg.type === 'place-spring') {
       requireThat(race.state !== 'finished', '다음 경기가 준비되면 배치할 수 있어요.');
       requireThat(!personalSprings.has(session), '이번 경기의 스프링은 이미 배치했어요.');
-      personalSpringEntity(race.stage, msg);
-      personalSprings.set(session, { id: randomUUID(), x: msg.x, y: msg.y, direction: msg.direction, used: false });
-      // A placement changes only its preview list. Retain the position bases used by buffered frames.
-      const entities = race.physics.getEntities();
-      makeScene(entities.length === scene.entities.length ? scene.entities : entities);
+      validatePersonalSpring(race.stage, msg, currentSprings());
+      personalSprings.set(session, {
+        id: randomUUID(),
+        x: msg.x,
+        y: msg.y,
+        direction: msg.direction,
+        ownerName: session.name,
+        placedAt: race.elapsed,
+      });
+      publishSprings();
       return;
     }
     if (msg.type === 'use-spring') {
       requireThat(race.state === 'running', '경기가 진행 중일 때 발동할 수 있어요.');
       const spring = personalSprings.get(session);
-      if (!spring || spring.used) throw new Error('배치한 스프링이 없거나 이미 사용했어요.');
+      if (!spring || spring.activatedAt !== undefined) throw new Error('배치한 스프링이 없거나 이미 사용했어요.');
       const entity = personalSpringEntity(race.stage, spring);
       race.physics.createEntities([entity]);
       const index = race.physics.getEntities().findIndex((entry) => entry.shape === entity.shape);
@@ -239,26 +279,23 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
         race.physics.removeSpring(entity.shape);
         throw new Error('스프링을 발동하지 못했어요. 다시 시도해 주세요.');
       }
-      spring.used = true;
-      spring.shape = entity.shape;
-      spring.removeAt = race.elapsed + PERSONAL_SPRING_DURATION;
-      makeScene();
+      spring.activatedAt = race.elapsed;
+      activeSprings.set(entity.shape, spring);
+      publishSprings();
       return;
     }
     if (msg.type === 'spring') {
       // A contact may have removed an obstacle since the last scheduled snapshot.
-      syncScene(race.physics.getEntities());
+      syncScene(mapEntities());
       requireThat(
         Number.isInteger(msg.revision) && msg.revision === revision,
         '맵 장치가 바뀌었어요. 최신 화면에서 스프링을 다시 선택해 주세요.'
       );
-      const shape = race.physics.getEntities()[msg.index]?.shape;
       requireThat(
-        ![...personalSprings.values()].some((spring) => spring.shape === shape && shape),
-        '참여자 스프링은 소유자만 한 번 발동할 수 있어요.'
-      );
-      requireThat(
-        Number.isInteger(msg.index) && race.activateSpring(msg.index, session),
+        Number.isInteger(msg.index) &&
+          msg.index >= 0 &&
+          msg.index < scene.entities.length &&
+          race.activateSpring(msg.index, session),
         '작동 가능한 스프링을 선택하고 쿨타임과 복귀가 끝난 후 다시 눌러 주세요.'
       );
       return;
@@ -340,11 +377,18 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       if (limited(req.socket.remoteAddress, 'session', 60, 60_000))
         return json(res, 429, { error: '잠시 후 다시 접속해 주세요.' });
       let session = sessionOf(req);
+      const suppliedName = req.headers['x-participant-name'],
+        name = readParticipantName(suppliedName);
+      if (!isHost && suppliedName !== undefined && !name)
+        return json(res, 400, { error: '이름을 1~24자로 입력해 주세요.' });
+      if (!isHost && session && name && session.name !== name)
+        return json(res, 409, { error: '입장할 때 등록한 이름은 바꿀 수 없어요.' });
       if (!session) {
+        if (!isHost && !name) return json(res, 428, { error: '입장할 이름을 입력해 주세요.' });
         for (const [token, old] of sessions) if (Date.now() - old.touched > 12 * 3600_000) sessions.delete(token);
         if (sessions.size >= 2000) return json(res, 503, { error: '접속자가 많습니다.' });
         const token = randomBytes(32).toString('hex');
-        session = { token, role: 'viewer', touched: Date.now(), results: new Map() };
+        session = { token, role: 'viewer', name: isHost ? '방장' : name, touched: Date.now(), results: new Map() };
         sessions.set(token, session);
       }
       if (isHost) session.role = 'host';
@@ -436,9 +480,10 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
         send(ws, result);
         broadcast();
       });
-      const entities = race.physics.getEntities(),
+      const entities = mapEntities(),
         snapshot = frame(entities);
       send(ws, sceneMessage);
+      send(ws, springLayout());
       send(ws, {
         ...snapshot,
         springs: race.springStatuses(session, entities),
@@ -470,7 +515,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       steps < Math.max(6, Math.ceil(rate * 2)) &&
       performance.now() - tickStarted < 12
     ) {
-      race.advance();
+      advance();
       accumulator -= 1 / 60;
       steps++;
     }
@@ -492,6 +537,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
   return {
     port: actualPort,
     race,
+    advance,
     info,
     async close() {
       clearInterval(timer);

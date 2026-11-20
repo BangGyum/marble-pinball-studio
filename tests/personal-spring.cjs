@@ -13,6 +13,7 @@ const {
   personalSpringEntity,
   personalSpringExtension,
   PERSONAL_SPRING_DURATION,
+  validatePersonalSpring,
 } = require('../src/personal-spring.ts');
 const { PersonalSpringPlacement } = require('../src/lan/spring-placement.ts');
 const { Race } = require('../src/race.ts');
@@ -32,6 +33,11 @@ for (const invalid of [
 ])
   assert.throws(() => personalSpringEntity(stage, invalid));
 assert.equal(personalSpringEntity(stage, valid).shape.spring.distance, 1.5);
+assert.throws(() => validatePersonalSpring(stage, valid, [valid]), /겹쳐요/);
+assert.throws(() => validatePersonalSpring(stage, valid, [{ x: 14.5, y: 19, direction: Math.PI }]), /겹쳐요/);
+assert.doesNotThrow(() => validatePersonalSpring(stage, valid, [{ ...valid, x: 15 }]));
+const fixedSpringStage = { ...stage, entities: [personalSpringEntity(stage, valid)] };
+assert.throws(() => validatePersonalSpring(fixedSpringStage, valid, []), /맵 스프링/);
 assert.equal(personalSpringExtension(0), 0);
 assert.ok(personalSpringExtension(0.04) > 0.8, 'snappy outward stroke reaches most of its travel in 40ms');
 assert.equal(personalSpringExtension(0.1), 1, 'brief extended hold remains visible between LAN snapshots');
@@ -54,6 +60,47 @@ console.log('PASS two-step placement, invalid coordinates, stroke bounds, cancel
   const race = new Race();
   await race.physics.init();
   try {
+    race.prepare(stage, ['위쪽 발사']);
+    race.startRace([1, 1]);
+    const upward = personalSpringEntity(stage, { x: 13, y: 3, direction: -Math.PI / 2 });
+    race.physics.createEntities([upward]);
+    race.physics.placeMarble(0, 13, 2.4);
+    assert.equal(race.activateSpring(0), true);
+    let highest = Infinity;
+    for (let i = 0; i < 90; i++) {
+      race.advance();
+      highest = Math.min(highest, race.balls[0].y);
+      if (i === 39) race.physics.removeSpring(upward.shape);
+    }
+    assert.ok(highest > -15 && highest < -14.6, `upward spring hits the ceiling, highest y = ${highest}`);
+    assert.ok(race.balls[0].y > 0, 'the spring-launched marble returns to the track');
+    for (const map of stages) {
+      race.prepare(
+        map,
+        Array.from({ length: 300 }, (_, i) => String(i))
+      );
+      assert.ok(
+        race.balls.every(({ y }) => y > -14.6),
+        `${map.title}: all spawn rows fit below the ceiling`
+      );
+      for (const [vx, vy] of [
+        [0, -75],
+        [-5, -160],
+        [5, -160],
+      ]) {
+        race.prepare(map, ['위쪽 경계']);
+        race.startRace([1, 1]);
+        race.physics.placeMarble(0, map.spawnX ?? 12.85, -1);
+        race.physics.setMarbleVelocity(0, vx, vy);
+        for (let tick = 0; tick < 60; tick++) {
+          race.advance();
+          assert.ok(race.balls[0].y > -15, `${map.title}: upper boundary at speeds ${vx}, ${vy}`);
+        }
+      }
+    }
+    console.log(
+      `PASS upward spring and three upward shots per map across ${stages.length} maps; 300 spawn slots per map`
+    );
     for (const direction of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
       race.prepare(stage, ['구슬']);
       race.startRace([1, 1]);

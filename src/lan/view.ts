@@ -13,7 +13,7 @@ import { drawMantaPenalty } from '../manta-penalty';
 import { Recorder } from '../recorder';
 import { toast } from '../ui';
 import { SnapshotPlayback } from './playback';
-import type { Scene, Frame } from './protocol';
+import type { Scene, Frame, SpringLayout } from './protocol';
 import type { Ball } from '../race';
 import type { StageDef } from '../data/maps';
 import type { MapEntityState } from '../types/map-entity';
@@ -22,7 +22,7 @@ import { SeaAnimalRenderer as DolphinRenderer } from '../sea-animal-render';
 import type { AnimalKind } from '../sea-animals';
 import { DolphinDrag } from '../dolphin-drag';
 import { PersonalSpringPlacement, drawPlacedSprings } from './spring-placement';
-import type { SpringPlacement } from '../personal-spring';
+import { springHasExpired, type PlacedSpring, type SpringPlacement } from '../personal-spring';
 
 export class LanView {
   private focusedId: number | null = null;
@@ -40,6 +40,9 @@ export class LanView {
   onPlacementChange: () => void = () => {};
   readonly springPlacement = new PersonalSpringPlacement();
   personalSpring?: Frame['personalSpring'];
+  private placedSprings: PlacedSpring[] = [];
+  private springElapsed = 0;
+  private displayedElapsed = 0;
   springConnected = false;
   private springView = { x: 0, y: 0, scale: 1 };
   private placementDrag?: {
@@ -221,7 +224,7 @@ export class LanView {
       )
         return;
       try {
-        const placement = this.springPlacement.choose(this.springPoint(event));
+        const placement = this.springPlacement.choose(this.springPoint(event), this.placedSprings, this.springElapsed);
         if (placement) {
           this.cancelSpringPlacement(true);
           this.onPlaceSpring(placement);
@@ -429,6 +432,9 @@ export class LanView {
       this.springPlacement?.cancel();
       this.placementDrag = undefined;
       this.personalSpring = undefined;
+      this.placedSprings = [];
+      this.springElapsed = 0;
+      this.displayedElapsed = 0;
       if (this.scene && JSON.stringify(this.scene.stage) !== JSON.stringify(scene.stage)) this.setZoom(1);
       this.goalScale = 0;
       this.goalFollow = false;
@@ -472,6 +478,17 @@ export class LanView {
         })),
     };
   }
+  setSpringLayout({ raceId, springs }: SpringLayout) {
+    if (raceId !== this.scene?.raceId) return;
+    // Another player's layout can arrive before the buffered canvas finishes a return stroke.
+    const ids = new Set(springs.map((spring) => spring.id));
+    const returning = this.placedSprings.filter(
+      (spring) =>
+        spring.activatedAt !== undefined && !ids.has(spring.id) && !springHasExpired(spring, this.displayedElapsed)
+    );
+    this.placedSprings = springs.concat(returning);
+    this.renderDirty = true;
+  }
   push(frame: Frame) {
     if (frame.raceId !== this.scene?.raceId || frame.revision !== this.scene.revision) return;
     if (frame.state === 'finished' && this.state !== 'finished' && this.recording)
@@ -483,6 +500,7 @@ export class LanView {
     }
     this.springControls.setStatuses(frame.springs ?? []);
     this.personalSpring = frame.personalSpring;
+    this.springElapsed = frame.elapsed;
     if (this.springPlacement?.active && (frame.personalSpring?.state !== 'available' || frame.state === 'finished'))
       this.cancelSpringPlacement();
     if (frame.state === 'running' && this.state === 'ready' && this.dolphinOverview) {
@@ -591,6 +609,7 @@ export class LanView {
     if (!scene || !sample) return;
     const { before, after, t, elapsed } = sample,
       shown = t >= 1 ? after : before;
+    this.displayedElapsed = elapsed;
     if (this.state === 'running' && before.seq !== this.elasticFrameSeq) {
       this.elasticFrameSeq = before.seq;
       if (before.state === 'running')
@@ -725,8 +744,17 @@ export class LanView {
         ),
         scale
       );
-    drawPlacedSprings(ctx, scene.stage, scene.placedSprings ?? [], this.personalSpring?.id, scale);
-    this.springPlacement?.draw(ctx, scale);
+    drawPlacedSprings(
+      ctx,
+      this.placedSprings,
+      this.personalSpring?.id,
+      scale,
+      elapsed,
+      shown.state === 'finished',
+      view,
+      dpr
+    );
+    this.springPlacement?.draw(ctx, scale, this.placedSprings, this.springElapsed);
     if (this.state === 'ready') {
       if (this.dolphinPreview) {
         this.dolphinRenderer.guides(ctx, scene.stage, this.dolphins, scale);

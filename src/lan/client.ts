@@ -27,7 +27,7 @@ const order = el<HTMLSelectElement>('winner-mode'),
   record = el<HTMLInputElement>('record');
 const isLocal = ['127.0.0.1', 'localhost'].includes(location.hostname);
 let socket: WebSocket | undefined, scene: Scene | undefined, frame: Frame | undefined;
-let identity: Identity = { type: 'identity', role: 'viewer' };
+let identity: Identity = { type: 'identity', role: 'viewer', name: '' };
 let info: Info,
   online = false,
   retry = 0,
@@ -39,6 +39,7 @@ let springPending = false;
 const library = new MapLibrary(stages, hiddenStages);
 let inputTimer: ReturnType<typeof setTimeout> | undefined, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
+const participantKey = 'marble-pinball.lan-name';
 const dolphinPanel = new SeaAnimalSettingsPanel(
   el('dolphin-settings'),
   (settings, commit) => {
@@ -291,13 +292,65 @@ function setAddress() {
     el('join-url').textContent = address.url;
   }
 }
+function requestSession(name?: string) {
+  return fetch(isLocal ? '/api/host-session' : '/api/session', {
+    method: 'POST',
+    ...(name ? { headers: { 'X-Participant-Name': encodeURIComponent(name) } } : {}),
+  });
+}
+async function joinSession(): Promise<Identity> {
+  let response = await requestSession();
+  if (response.status === 428 && !isLocal) {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(participantKey);
+    } catch {}
+    if (saved) response = await requestSession(saved);
+    if (response.status === 428 || response.status === 400) {
+      const dialog = el<HTMLDialogElement>('participant-join'),
+        form = el<HTMLFormElement>('participant-form'),
+        input = el<HTMLInputElement>('participant-name'),
+        error = el('participant-error'),
+        submit = form.querySelector('button')!;
+      dialog.oncancel = (event) => event.preventDefault();
+      response = await new Promise<Response>((resolve) => {
+        form.onsubmit = async (event) => {
+          event.preventDefault();
+          if (submit.disabled) return;
+          submit.disabled = true;
+          error.hidden = true;
+          try {
+            const name = input.value.trim();
+            if (!name) throw new Error('입장할 이름을 입력해 주세요.');
+            const joined = await requestSession(name);
+            if (!joined.ok) throw new Error((await joined.json()).error);
+            dialog.close();
+            form.onsubmit = null;
+            resolve(joined);
+          } catch (failure) {
+            error.textContent = message(failure);
+            error.hidden = false;
+          } finally {
+            submit.disabled = false;
+          }
+        };
+        dialog.showModal();
+      });
+    }
+  }
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error);
+  if (!isLocal) {
+    try {
+      localStorage.setItem(participantKey, data.name);
+    } catch {}
+  }
+  return data;
+}
 async function connect() {
   connection(false, retry ? '재접속 중' : '서버에 연결 중');
   try {
-    const response = await fetch(isLocal ? '/api/host-session' : '/api/session', { method: 'POST' });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-    identity = data;
+    identity = await joinSession();
     info = await (await fetch('/api/info')).json();
     info.maps.forEach((map) => {
       stages[map.id].title = map.title;
@@ -346,6 +399,8 @@ async function connect() {
           preferredPicks = scene.settings.picks || 2;
           updatePicks(scene.balls.length);
         }
+      } else if (incoming.type === 'spring-layout') {
+        view.setSpringLayout(incoming);
       } else if (incoming.type === 'frame') {
         if (
           incoming.raceId !== scene?.raceId ||
