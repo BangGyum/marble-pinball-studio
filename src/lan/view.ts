@@ -1,4 +1,4 @@
-import { SpringControls } from '../spring-controls';
+import { acceptsSpringSpace, SpringControls } from '../spring-controls';
 import { drawEntities } from '../draw';
 import { drawGoalArea, raceProgress } from '../finish';
 import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from '../map-art';
@@ -256,14 +256,7 @@ export class LanView {
           this.cancelSpringPlacement();
           return;
         }
-        const target = event.target as HTMLElement | null;
-        if (
-          event.code !== 'Space' ||
-          target?.isContentEditable ||
-          ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName ?? '') ||
-          document.querySelector('dialog[open]')
-        )
-          return;
+        if (!acceptsSpringSpace(event, this.state === 'running')) return;
         if (!this.springPlacement.active && this.springControls.selected >= 0) return;
         if (this.springPlacement.active || this.personalSpring?.state === 'placed') {
           event.preventDefault();

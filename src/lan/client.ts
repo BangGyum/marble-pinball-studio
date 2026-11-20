@@ -79,7 +79,7 @@ function updatePicks(count: number, preferred = preferredPicks) {
   picks.value = String(Math.min(count, preferred));
 }
 function collapse(collapsed: boolean) {
-  if (collapsed && panel.contains(document.activeElement)) el('panel-toggle').focus({ preventScroll: true });
+  if (collapsed && panel.contains(document.activeElement)) el('game').focus({ preventScroll: true });
   gameView.classList.toggle('controls-collapsed', collapsed);
   panel.inert = collapsed;
   el('panel-toggle').setAttribute('aria-expanded', String(!collapsed));

@@ -2,6 +2,19 @@ import { sceneColor } from './scene-theme';
 import type { StageDef } from './data/maps';
 import { ladderSpringHousing } from './ladder-art';
 import type { MapEntityState } from './types/map-entity';
+
+export function acceptsSpringSpace(event: KeyboardEvent, running: boolean) {
+  if (event.code !== 'Space') return false;
+  const target = event.target as HTMLElement | null;
+  if (target?.isContentEditable || document.querySelector('dialog[open]')) return false;
+  if (running && target?.id === 'panel-toggle') {
+    // Reserve Space for gameplay even when there is no spring left to fire.
+    event.preventDefault();
+    return true;
+  }
+  return !['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName ?? '');
+}
+
 // Selection is local; activation is performed by the authoritative race.
 export class SpringControls {
   selected = -1;
@@ -28,16 +41,12 @@ export class SpringControls {
     private running: () => boolean
   ) {
     window.addEventListener('keydown', (event) => {
-      const target = event.target as HTMLElement | null;
       if (
-        event.code !== 'Space' ||
+        !this.running() ||
+        !acceptsSpringSpace(event, true) ||
         event.repeat ||
         this.selected < 0 ||
-        !this.running() ||
-        target?.isContentEditable ||
-        ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target?.tagName ?? '') ||
-        !this.canvas.getBoundingClientRect().width ||
-        document.querySelector('dialog[open]')
+        !this.canvas.getBoundingClientRect().width
       )
         return;
       event.preventDefault();

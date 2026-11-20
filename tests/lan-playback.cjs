@@ -594,13 +594,16 @@ const selectMapSpring = () => {
   drawSpringControls();
   assert.equal(interactive.springControls.select({ button: 0, pointerType: 'mouse', clientX: 23, clientY: 40 }), true);
 };
-const dispatchSpace = () => {
+const dispatchSpace = (target = { tagName: 'CANVAS' }, repeat = false) => {
   const event = {
     key: ' ',
     code: 'Space',
-    repeat: false,
-    target: { tagName: 'CANVAS' },
-    preventDefault() {},
+    repeat,
+    target,
+    defaultPrevented: false,
+    preventDefault() {
+      this.defaultPrevented = true;
+    },
     stopImmediatePropagation() {
       this.stopped = true;
     },
@@ -611,16 +614,31 @@ const dispatchSpace = () => {
     listener.callback(event);
     if (event.stopped) break;
   }
+  return event.defaultPrevented;
 };
 receiveScene(springScene);
 interactive.state = 'running';
 interactive.springConnected = true;
 interactive.personalSpring = { state: 'placed', id: 'mine' };
+const handle = { tagName: 'BUTTON', id: 'panel-toggle' };
+const usesBeforeHandle = used.length;
+assert.equal(dispatchSpace(handle), true, 'running Space on settings suppresses the native button click');
+assert.equal(used.length, usesBeforeHandle + 1, 'the host fires the placed spring from settings focus');
+assert.equal(dispatchSpace(handle, true), true);
+assert.equal(used.length, usesBeforeHandle + 1, 'holding Space cannot send a second spring command');
+interactive.personalSpring = { state: 'used' };
+assert.equal(dispatchSpace(handle), true, 'an empty inventory cannot turn Space into a settings click');
+interactive.state = 'paused';
+assert.equal(dispatchSpace(handle), false, 'settings retains normal keyboard activation outside a running race');
+interactive.state = 'running';
+interactive.personalSpring = { state: 'placed', id: 'mine' };
+for (const tagName of ['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT']) assert.equal(dispatchSpace({ tagName }), false);
+assert.equal(used.length, usesBeforeHandle + 1);
 const mapUses = [],
   personalUsesBefore = used.length;
 interactive.onSpring = (index) => mapUses.push(index);
 selectMapSpring();
-dispatchSpace();
+assert.equal(dispatchSpace(handle), true);
 assert.deepEqual(mapUses, [0]);
 assert.equal(used.length, personalUsesBefore);
 interactive.springControls.setStatuses([[0, 4900, false]]);

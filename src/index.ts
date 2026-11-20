@@ -133,7 +133,7 @@ function resumeGame() {
 }
 el('gallery-resume').addEventListener('click', resumeGame);
 function setPanelCollapsed(collapsed: boolean) {
-  if (collapsed && panel.contains(document.activeElement)) panelToggle.focus({ preventScroll: true });
+  if (collapsed && panel.contains(document.activeElement)) game.canvas.focus({ preventScroll: true });
   gameView.classList.toggle('controls-collapsed', collapsed);
   panel.inert = collapsed;
   panelToggle.setAttribute('aria-expanded', String(!collapsed));
