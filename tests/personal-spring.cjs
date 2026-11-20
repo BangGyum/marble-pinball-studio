@@ -72,8 +72,23 @@ console.log('PASS two-step placement, invalid coordinates, stroke bounds, cancel
       highest = Math.min(highest, race.balls[0].y);
       if (i === 39) race.physics.removeSpring(upward.shape);
     }
-    assert.ok(highest > -15 && highest < -14.6, `upward spring hits the ceiling, highest y = ${highest}`);
+    assert.ok(highest >= 0.25 && highest < 0.26, `upward spring hits the ceiling, highest y = ${highest}`);
     assert.ok(race.balls[0].y > 0, 'the spring-launched marble returns to the track');
+    // Rows staged above the board enter through the one-way top, then collide on the way back.
+    race.prepare(
+      stage,
+      Array.from({ length: 100 }, (_, i) => String(i))
+    );
+    race.startRace([100, 100]);
+    const queued = race.balls.at(-1);
+    assert.ok(queued.y < 0);
+    for (let i = 0; i < 120 && queued.y < 0.25; i++) race.advance();
+    assert.ok(queued.y >= 0.25);
+    race.physics.setMarbleVelocity(queued.id, 0, -75);
+    for (let i = 0; i < 30; i++) {
+      race.advance();
+      assert.ok(queued.y >= 0.25);
+    }
     for (const map of stages) {
       race.prepare(
         map,
@@ -81,7 +96,7 @@ console.log('PASS two-step placement, invalid coordinates, stroke bounds, cancel
       );
       assert.ok(
         race.balls.every(({ y }) => y > -14.6),
-        `${map.title}: all spawn rows fit below the ceiling`
+        `${map.title}: all starting rows fit in the spawn queue`
       );
       for (const [vx, vy] of [
         [0, -75],
@@ -90,11 +105,11 @@ console.log('PASS two-step placement, invalid coordinates, stroke bounds, cancel
       ]) {
         race.prepare(map, ['위쪽 경계']);
         race.startRace([1, 1]);
-        race.physics.placeMarble(0, map.spawnX ?? 12.85, -1);
+        race.physics.placeMarble(0, map.spawnX ?? 12.85, 1);
         race.physics.setMarbleVelocity(0, vx, vy);
         for (let tick = 0; tick < 60; tick++) {
           race.advance();
-          assert.ok(race.balls[0].y > -15, `${map.title}: upper boundary at speeds ${vx}, ${vy}`);
+          assert.ok(race.balls[0].y >= 0.25, `${map.title}: upper boundary at speeds ${vx}, ${vy}`);
         }
       }
     }

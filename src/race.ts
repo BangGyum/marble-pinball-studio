@@ -34,8 +34,7 @@ export type Ball = {
 };
 
 const STEP = 1 / 60;
-// Marble-center limit above the last starting row (300 marbles start at y >= -13.02).
-const TOP_LIMIT = -14.75;
+const TRACK_TOP_LIMIT = 0.25; // Keep the entire marble inside the visible board.
 // Only this much improvement in depth or distance to the circular finish counts as progress.
 const PROGRESS = 0.5;
 // A still marble that this many nudges could not free is wedged in a pocket.
@@ -207,11 +206,13 @@ export class Race {
         p = { x: ball.x, y: ball.y, angle: ball.angle };
         this.rescues++;
       }
-      if (p.y < TOP_LIMIT) {
+      // Starting rows can feed in from above. Once inside, the top edge is closed.
+      const topLimit = Math.min(ball.y, TRACK_TOP_LIMIT);
+      if (p.y < topLimit) {
         const { vx, vy } = this.physics.getMarbleVelocity(ball.id);
-        this.physics.placeMarble(ball.id, p.x, TOP_LIMIT);
+        this.physics.placeMarble(ball.id, p.x, topLimit);
         this.physics.setMarbleVelocity(ball.id, vx, Math.max(vy, -vy * 0.15));
-        p.y = TOP_LIMIT;
+        p.y = topLimit;
       }
       const fraction = finishFraction(this.stage, ball, p);
       const still = Math.hypot(p.x - ball.x, p.y - ball.y) < 0.0002;

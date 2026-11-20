@@ -2,6 +2,8 @@ import type { MapEntity } from './types/map-entity';
 
 export const ART_STYLES = [
   'reversal-ladder',
+  'shortcut-cascade',
+  'seesaw-valley',
   'roundhouse',
   'rapids',
   'jackpot',

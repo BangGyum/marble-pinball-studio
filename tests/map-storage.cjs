@@ -111,8 +111,8 @@ assert.equal(library.list().length, stages.length - hiddenStages.length);
 console.log('PASS shared library save/re-edit/reload/duplicate titles/preview/removal and failed writes');
 assert.equal(stages[DEFAULT_MAP_INDEX].title, '네온 분기점');
 console.log('PASS shared initial map is neon junction');
-assert.equal(stages.length, 19, 'the registered maps include orbiting gate and exclude neon hourglass');
-assert.equal(library.list().length, 17, 'both pickers offer seventeen built-in maps');
+assert.equal(stages.length, 21, 'the registered maps include seesaw valley and exclude neon hourglass');
+assert.equal(library.list().length, 19, 'both pickers offer nineteen built-in maps');
 assert.equal(
   library.list().find((map) => map.stage.title === '떠도는 입구').id,
   'builtin-18',

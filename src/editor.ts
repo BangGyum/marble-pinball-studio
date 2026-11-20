@@ -579,6 +579,7 @@ export class Editor {
     c.save();
     c.scale(SCALE, SCALE);
     const liveArt =
+      this.stage.art?.style === 'seesaw-valley' ||
       this.stage.art?.style === 'reversal-ladder' ||
       this.stage.art?.style === 'infinite-funnel' ||
       this.stage.art?.style === 'twin-funnel';

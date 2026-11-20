@@ -2,6 +2,7 @@ import { sceneColor, sceneGlow } from './scene-theme';
 import { drawFunnelArt } from './funnel-art';
 import { drawTwinFunnelArt } from './twin-funnel-art';
 import { drawLadderArt, drawLadderDevices } from './ladder-art';
+import { drawCascadeArt, drawCascadeDevices } from './cascade-art';
 import { drawRoundhouseArt, drawRoundhouseTrains } from './roundhouse-art';
 import { drawExpressArt, drawExpressDevices } from './express-art';
 import type { StageDef } from './data/maps';
@@ -11,6 +12,7 @@ import { clipOrbitalBridgeWalls, drawOrbitalArt, drawOrbitalExitWalls, orbitalWa
 import { drawHourglassArt } from './hourglass-art';
 import { drawCanyonArt, drawCanyonDevices } from './canyon-art';
 import { drawEntities } from './draw';
+import { drawSeesawCabinet, drawSeesaws, drawShortcutDeck } from './seesaw-art';
 import { drawBounceStairsArt } from './bounce-stairs-art';
 import { drawOrbitingGateArt, drawOrbitingGateMouth } from './orbiting-gate-art';
 import type { MapEntityState } from './types/map-entity';
@@ -23,9 +25,12 @@ export function drawMapOverlay(
   entities: MapEntityState[],
   scale: number,
   cacheBackground = true,
-  view?: ViewBounds
+  view?: ViewBounds,
+  elapsed = 0
 ) {
   if (stage.art?.style === 'reversal-ladder') drawLadderDevices(ctx, stage, entities, view);
+  if (stage.art?.style === 'seesaw-valley') drawSeesaws(ctx, stage, entities, elapsed, view);
+  if (stage.art?.style === 'shortcut-cascade') drawCascadeDevices(ctx, stage, entities);
   if (stage.art?.style === 'roundhouse') drawRoundhouseTrains(ctx, entities, view);
   if (stage.art?.style === 'switchback-express') drawExpressDevices(ctx, entities, view);
   if (stage.art?.style === 'crossway') drawCrosswayDevices(ctx, entities, view);
@@ -39,6 +44,8 @@ export function drawMapOverlay(
     drawFunnelArt(ctx, stage, 2, cacheBackground);
   } else if (stage.art?.style === 'twin-funnel') {
     drawTwinFunnelArt(ctx, stage, 2, cacheBackground);
+  } else if (stage.art?.style === 'seesaw-valley') {
+    drawShortcutDeck(ctx, stage);
   } else {
     const points = stage.exitBridge.deck;
     ctx.beginPath();
@@ -107,12 +114,20 @@ export function drawMapArt(
     drawFunnelArt(ctx, stage, 1, cacheBackground);
     return;
   }
+  if (stage.art.style === 'shortcut-cascade') {
+    drawCascadeArt(ctx, stage, cacheBackground);
+    return;
+  }
   if (stage.art.style === 'reversal-ladder') {
     drawLadderArt(ctx, stage, cacheBackground);
     return;
   }
   if (stage.art.style === 'roundhouse') {
     drawRoundhouseArt(ctx, stage);
+    return;
+  }
+  if (stage.art.style === 'seesaw-valley') {
+    drawSeesawCabinet(ctx, stage, cacheBackground);
     return;
   }
   if (stage.art.style === 'bounce-stairs') {

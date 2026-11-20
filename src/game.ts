@@ -483,7 +483,7 @@ export class Game extends Race {
       }
     }
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
-    drawMapOverlay(ctx, this.stage, entities, scale, true, view);
+    drawMapOverlay(ctx, this.stage, entities, scale, true, view, this.elapsed);
     if (this.state === 'ready') {
       if (this.dolphinPreview) {
         this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale);
@@ -604,7 +604,7 @@ export class Game extends Race {
     ctx.fillRect(0, 0, mapWidth, this.stage.goalY);
     this.renderCache.drawMinimap(ctx, this.stage, entities, scale, Math.min(devicePixelRatio, 2));
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
-    drawMapOverlay(ctx, this.stage, entities, scale);
+    drawMapOverlay(ctx, this.stage, entities, scale, true, undefined, this.elapsed);
     if (this.state === 'ready' && this.dolphinPreview)
       this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale, true);
     for (const b of this.balls) {

@@ -725,7 +725,7 @@ export class LanView {
       }
     }
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
-    drawMapOverlay(ctx, scene.stage, entities, scale, true, view);
+    drawMapOverlay(ctx, scene.stage, entities, scale, true, view, elapsed);
     if (scene.stage.art?.style === 'reversal-ladder')
       drawEntities(
         ctx,
@@ -880,7 +880,7 @@ export class LanView {
     ctx.fillRect(0, 0, mapWidth, scene.stage.goalY);
     this.cache.drawMinimap(ctx, this.minimapStage!, entities, scale, Math.min(devicePixelRatio, 2));
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
-    drawMapOverlay(ctx, scene.stage, entities, scale);
+    drawMapOverlay(ctx, scene.stage, entities, scale, true, undefined, elapsed);
     if (this.state === 'ready' && this.dolphinPreview)
       this.dolphinRenderer.guides(ctx, scene.stage, this.dolphins, scale, true);
     for (const ball of this.balls)

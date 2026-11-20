@@ -1,4 +1,6 @@
+import { drawSeesawCabinet } from './seesaw-art';
 import { drawLadderArt } from './ladder-art';
+import { drawCascadeArt } from './cascade-art';
 import { drawFunnelArt } from './funnel-art';
 import { drawTwinFunnelArt } from './twin-funnel-art';
 import { drawCanyonArt } from './canyon-art';
@@ -22,6 +24,8 @@ function drawMinimapArt(
 ) {
   // These maps use scenery in place of hidden collision rails. The minimap caches it once.
   if (stage.art?.style === 'reversal-ladder') drawLadderArt(ctx, stage, false);
+  if (stage.art?.style === 'seesaw-valley') drawSeesawCabinet(ctx, stage, false);
+  if (stage.art?.style === 'shortcut-cascade') drawCascadeArt(ctx, stage, false);
   if (stage.art?.style === 'infinite-funnel') drawFunnelArt(ctx, stage, 1, false);
   if (stage.art?.style === 'twin-funnel') drawTwinFunnelArt(ctx, stage, 1, false);
   if (stage.art?.style === 'fracture-canyon') drawCanyonArt(ctx, stage, false);

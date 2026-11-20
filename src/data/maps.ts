@@ -1,4 +1,6 @@
 import { reversalLadder } from './reversal-ladder';
+import { seesawValley } from './seesaw-valley';
+import { shortcutCascade } from './shortcut-cascade';
 import { infiniteFunnel } from './infinite-funnel';
 import { twinFunnel } from './twin-funnel';
 import { springLab } from './spring-lab';
@@ -40,6 +42,8 @@ export const stages: StageDef[] = [
   twinFunnel,
   bounceStairs,
   orbitingGate,
+  shortcutCascade,
+  seesawValley,
 ];
 
 export const hiddenStages: StageDef[] = [springLab, reversalLadder];
