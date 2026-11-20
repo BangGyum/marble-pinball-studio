@@ -34,6 +34,7 @@ export type Ball = {
 };
 
 const STEP = 1 / 60;
+const QUEUE_TOP_LIMIT = -14.75; // Leave room for all 300 starting slots.
 const TRACK_TOP_LIMIT = 0.25; // Keep the entire marble inside the visible board.
 // Only this much improvement in depth or distance to the circular finish counts as progress.
 const PROGRESS = 0.5;
@@ -207,7 +208,7 @@ export class Race {
         this.rescues++;
       }
       // Starting rows can feed in from above. Once inside, the top edge is closed.
-      const topLimit = Math.min(ball.y, TRACK_TOP_LIMIT);
+      const topLimit = ball.y >= TRACK_TOP_LIMIT ? TRACK_TOP_LIMIT : QUEUE_TOP_LIMIT;
       if (p.y < topLimit) {
         const { vx, vy } = this.physics.getMarbleVelocity(ball.id);
         this.physics.placeMarble(ball.id, p.x, topLimit);
