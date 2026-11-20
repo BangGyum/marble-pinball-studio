@@ -95,8 +95,8 @@ const canvas = {
 const game = new Game(canvas);
 game.stage = { title: 'Test', goalY: 100, entities: [] };
 game.state = 'running';
-game.balls = [{ id: 0, name: 'A', color: '#fff', x: 10, y: 0, angle: 0, stuck: 0 }];
-const heights = [0, 0.2, 0.15];
+game.balls = [{ id: 0, name: 'A', color: '#fff', x: 10, y: 5, angle: 0, stuck: 0 }];
+const heights = [5, 5.2, 5.15];
 game.physics = { step() {}, getMarblePosition: () => ({ x: 10, y: heights.shift(), angle: 0 }), getEntities: () => [] };
 game.advance();
 game.advance();
