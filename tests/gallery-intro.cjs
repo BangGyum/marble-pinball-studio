@@ -129,7 +129,8 @@ for (const width of [160, 400]) {
     [false, true, false],
     'only visible cards enter'
   );
-  assert.equal(f.effects.children.length, 21);
+  assert.equal(f.effects.children.length, 3, 'one contact ring per marble');
+  assert.ok(f.animations.reduce((sum, animation) => sum + animation.frames.length, 0) <= 90, 'keyframe budget');
   const deformations = f.animations.filter(
     (animation) => animation.frames[0].offset === 0 && animation.frames[0].transform.startsWith('scale(')
   );
@@ -153,7 +154,7 @@ for (const width of [160, 400]) {
   }
   for (const animation of f.animations) {
     assert.ok(
-      animation.timing.duration + animation.timing.delay < 2000,
+      animation.timing.duration + animation.timing.delay <= 1100,
       'every marble/particle finishes before cleanup'
     );
     assert.equal(animation.timing.iterations, undefined, 'no looping animations');
@@ -173,7 +174,7 @@ for (const width of [160, 400]) {
     );
   }
   const [finish, delay] = [...f.timers][0];
-  assert.equal(delay, 2000);
+  assert.equal(delay, 1100);
   finish();
   assert.equal(f.timers.size, 0);
   assert.equal(f.effects.children.length, 0);
@@ -192,16 +193,27 @@ console.log(
 {
   const f = fixture({ cardTops: Array.from({ length: 12 }, (_, i) => 100 + i * 40) });
   f.intro.play();
-  const delays = f.cards.map((card) => parseFloat(card.style['--entry-delay']));
+  const delays = f.cards.flatMap((card) =>
+    card.style['--entry-delay'] ? [parseFloat(card.style['--entry-delay'])] : []
+  );
+  assert.equal(delays.length, 8, 'visible-card animation work is capped');
   assert.ok(
     delays.every((delay, index) => !index || delay >= delays[index - 1]),
     'visible cards enter in order'
   );
-  assert.ok(Math.max(...delays) + 110 + 900 < 2000, 'even a large visible grid finishes before the intro cleanup');
+  assert.ok(Math.max(...delays) + 340 < 1100, 'even a large visible grid finishes before the intro cleanup');
   f.intro.stop();
   assert.ok(f.cards.every((card) => !card.classList.contains('map-card-entering')));
 }
-console.log('PASS contact squash settles round and staggered cards finish within the existing two-second entrance');
+console.log('PASS contact squash settles round and staggered cards finish within the shorter entrance');
+
+{
+  const f = fixture();
+  f.intro.play();
+  const unrelated = f.view.animate([{ opacity: 0.8 }, { opacity: 1 }], { duration: 120 });
+  f.intro.stop();
+  assert.equal(unrelated.cancelled, false, 'intro cleanup leaves unrelated UI animations alone');
+}
 
 for (const action of ['stop', 'hidden', 'pagehide', 'resize', 'reduced']) {
   const f = fixture();

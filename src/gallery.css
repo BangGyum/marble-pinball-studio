@@ -199,18 +199,6 @@
   background: radial-gradient(ellipse, #000b, transparent 70%);
   opacity: 0.65;
 }
-.gallery-marble-trail {
-  position: absolute;
-  left: 70%;
-  top: 57%;
-  width: 64px;
-  height: 3px;
-  z-index: -1;
-  opacity: 0;
-  transform-origin: left;
-  background: linear-gradient(90deg, var(--ball-color), transparent);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--ball-color) 35%, transparent);
-}
 .gallery-impact-ring {
   position: absolute;
   width: 16px;
@@ -220,15 +208,6 @@
   border-radius: 50%;
   opacity: 0;
   box-shadow: 0 0 10px color-mix(in srgb, var(--impact-color) 55%, transparent);
-}
-.gallery-impact-spark {
-  position: absolute;
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  opacity: 0;
-  background: #f1fff9;
-  box-shadow: 0 0 7px var(--impact-color);
 }
 .gallery-energy {
   position: absolute;
@@ -505,28 +484,34 @@
   gap: 22px;
   flex-wrap: wrap;
 }
-@keyframes gallery-light {
+@keyframes gallery-card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(13px) scale(0.987);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes gallery-copy-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes gallery-rail-light {
   from {
     transform: scaleX(0);
-    opacity: 0.1;
+    opacity: 0.35;
   }
   to {
     transform: scaleX(1);
     opacity: 1;
-  }
-}
-@keyframes gallery-card-rise {
-  0% {
-    opacity: 0;
-    transform: perspective(900px) translate3d(0, 32px, 0) rotateX(7deg) scale(0.97);
-  }
-  72% {
-    opacity: 1;
-    transform: perspective(900px) translate3d(0, -3px, 0) rotateX(0) scale(1.004);
-  }
-  100% {
-    opacity: 1;
-    transform: perspective(900px) translate3d(0, 0, 0) rotateX(0) scale(1);
   }
 }
 @keyframes gallery-energy-run {
@@ -534,8 +519,8 @@
     transform: translateX(0);
     opacity: 0;
   }
-  10%,
-  85% {
+  15%,
+  72% {
     opacity: 1;
   }
   100% {
@@ -543,153 +528,21 @@
     opacity: 0;
   }
 }
-@keyframes gallery-copy-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-@keyframes gallery-heading-reveal {
-  from {
-    opacity: 0;
-    transform: translateY(24px) rotate(-1deg);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) rotate(0);
-  }
-}
-@keyframes gallery-mark-pop {
-  0% {
-    opacity: 0;
-    transform: translateY(10px) rotate(-18deg) scale(0.65);
-  }
-  65% {
-    opacity: 1;
-    transform: translateY(-3px) rotate(7deg) scale(1.12);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) rotate(0) scale(1);
-  }
-}
-@keyframes gallery-preview-reveal {
-  from {
-    opacity: 0.3;
-    transform: translateY(8px) scale(1.07);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-@keyframes gallery-neon-bloom {
-  0% {
-    opacity: 0.2;
-    transform: scale(0.85);
-  }
-  35% {
-    opacity: 1;
-    transform: scale(1.12);
-  }
-  100% {
-    opacity: 0.72;
-    transform: scale(1);
-  }
-}
-@keyframes gallery-neon-sweep {
-  0% {
-    opacity: 0;
-    translate: 100px 0;
-  }
-  25% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 0.28;
-    translate: 0 0;
-  }
-}
-@keyframes gallery-card-charge {
-  0%,
-  100% {
-    opacity: 0;
-  }
-  35% {
-    opacity: 0.45;
-  }
-}
-@keyframes gallery-card-shine {
-  0% {
-    opacity: 0;
-    transform: translateX(-70%);
-  }
-  18%,
-  55% {
-    opacity: 0.8;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(70%);
-  }
-}
-.gallery-entering .gallery-topbar {
-  animation: gallery-copy-reveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.gallery-entering .gallery-eyebrow {
-  animation: gallery-copy-reveal 0.55s 60ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.gallery-entering .gallery-intro h1 {
-  animation: gallery-heading-reveal 0.75s 120ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.gallery-entering .gallery-intro h1 span {
-  animation: gallery-mark-pop 0.8s 270ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-.gallery-entering .gallery-description {
-  animation: gallery-copy-reveal 0.65s 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+.gallery-entering .gallery-copy,
+.gallery-entering .gallery-list-heading {
+  animation: gallery-copy-reveal 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .gallery-entering .gallery-list-heading {
-  animation: gallery-copy-reveal 0.65s 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 50ms;
 }
 .gallery-entering .gallery-rail::after {
-  animation: gallery-light 1.35s both;
+  animation: gallery-rail-light 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .gallery-entering .gallery-energy-dot {
-  animation: gallery-energy-run 1.35s both;
-}
-.gallery-entering .gallery-neon-halo {
-  animation: gallery-neon-bloom 1.7s both;
-}
-.gallery-entering .gallery-neon-streak {
-  animation: gallery-neon-sweep 1.4s both;
-  animation-delay: var(--streak-delay);
+  animation: gallery-energy-run 0.68s ease-out both;
 }
 .gallery-entering .map-card-entering {
-  transform-origin: center bottom;
-  will-change: transform, opacity;
-  animation: gallery-card-rise 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: var(--entry-delay);
-}
-.gallery-entering .map-card-entering .map-preview canvas {
-  animation: gallery-preview-reveal 0.78s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--entry-delay) + 70ms);
-}
-.gallery-entering .map-card-entering::before {
-  animation: gallery-card-shine 0.9s both;
-  animation-delay: calc(var(--entry-delay) + 110ms);
-}
-.gallery-entering .map-card-entering::after {
-  background: radial-gradient(
-    ellipse at 50% 0,
-    color-mix(in srgb, var(--map-accent) 30%, transparent),
-    transparent 72%
-  );
-  animation: gallery-card-charge 0.9s both;
-  animation-delay: var(--entry-delay);
+  animation: gallery-card-rise 0.34s var(--entry-delay) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .map-card-launching {
   will-change: transform;

@@ -117,6 +117,9 @@ export class MapGallery {
   private reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   private returnHighlight?: Animation;
   private grid = el('map-grid');
+  private view = el('map-gallery');
+  private pendingThumbnails = new Set<HTMLCanvasElement>();
+  private thumbnailFrame = 0;
   private maps: SavedMap[] = [];
   private selectedId?: string;
   private group: 'builtin' | 'custom' = 'builtin';
@@ -127,9 +130,12 @@ export class MapGallery {
       for (const entry of entries)
         if (entry.isIntersecting) {
           const canvas = entry.target as HTMLCanvasElement;
-          drawThumbnail(canvas, this.stages.get(canvas)!);
+          this.pendingThumbnails.add(canvas);
           this.observer.unobserve(canvas);
         }
+      if (this.pendingThumbnails.size && !this.thumbnailFrame) {
+        this.thumbnailFrame = requestAnimationFrame(() => this.paintThumbnail());
+      }
     },
     { rootMargin: '240px' }
   );
@@ -145,7 +151,7 @@ export class MapGallery {
     for (const event of ['pinball-theme-change', 'pinball-marble-design-change'])
       window.addEventListener(event, () => {
         this.intro.stop();
-        this.observer.disconnect();
+        this.resetThumbnailQueue();
         for (const canvas of this.grid.querySelectorAll('canvas')) {
           canvas.removeAttribute('data-rendered');
           this.observer.observe(canvas);
@@ -176,6 +182,27 @@ export class MapGallery {
     });
   }
 
+  private resetThumbnailQueue() {
+    this.observer.disconnect();
+    cancelAnimationFrame(this.thumbnailFrame);
+    this.thumbnailFrame = 0;
+    this.pendingThumbnails.clear();
+  }
+
+  private paintThumbnail() {
+    this.thumbnailFrame = 0;
+    if (this.view.hidden) {
+      this.pendingThumbnails.clear();
+      return;
+    }
+    // Batch the expensive canvas paints across animation frames.
+    const canvas = this.pendingThumbnails.values().next().value;
+    if (!canvas) return;
+    this.pendingThumbnails.delete(canvas);
+    if (this.grid.contains(canvas)) drawThumbnail(canvas, this.stages.get(canvas)!);
+    if (this.pendingThumbnails.size) this.thumbnailFrame = requestAnimationFrame(() => this.paintThumbnail());
+  }
+
   refresh(maps: SavedMap[], selected: string) {
     if (this.selectedId !== selected) this.group = selected.startsWith('builtin-') ? 'builtin' : 'custom';
     this.selectedId = selected;
@@ -186,7 +213,7 @@ export class MapGallery {
   private render() {
     this.returnHighlight?.cancel();
     this.returnHighlight = undefined;
-    this.observer.disconnect();
+    this.resetThumbnailQueue();
     const builtin = this.group === 'builtin';
     const maps = this.maps.filter((map) => map.id.startsWith('builtin-') === builtin);
     el('gallery-list-title').textContent = builtin ? '원래 맵' : '내 맵';

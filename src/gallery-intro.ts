@@ -1,9 +1,12 @@
-/** A finite entrance animation, isolated from the game's render and physics loops. */
+const INTRO_MS = 1100;
+
 export class GalleryIntro {
   private played = false;
   private timer?: ReturnType<typeof setTimeout>;
   private reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   private effects: HTMLElement;
+  private cards: HTMLElement[] = [];
+  private animations: Animation[] = [];
 
   constructor(private view: HTMLElement) {
     this.effects = view.querySelector<HTMLElement>('.gallery-impact-layer')!;
@@ -21,18 +24,35 @@ export class GalleryIntro {
     if (this.played || this.view.hidden || document.hidden || this.reduced.matches) return;
     this.played = true;
     const intro = this.view.querySelector<HTMLElement>('.gallery-intro')!;
-    this.view.style.setProperty('--energy-width', `${intro.clientWidth * 0.98}px`);
-    let order = 0;
+    const art = this.view.querySelector<HTMLElement>('.gallery-neon-art')!;
+    const energyWidth = intro.clientWidth * 0.98;
+    const artWidth = art.clientWidth;
+    const balls = [...art.querySelectorAll<HTMLElement>('.gallery-marble')].map((ball) => ({
+      ball,
+      left: ball.offsetLeft,
+      radius: ball.offsetWidth / 2,
+      color: getComputedStyle(ball).getPropertyValue('--ball-color'),
+    }));
     for (const card of this.view.querySelectorAll<HTMLElement>('.map-card')) {
       const bounds = card.getBoundingClientRect();
-      if (bounds.top < window.innerHeight && bounds.bottom > 0) {
-        card.style.setProperty('--entry-delay', `${400 + Math.min(order++, 5) * 85}ms`);
-        card.classList.add('map-card-entering');
-      }
+      if (bounds.top < window.innerHeight && bounds.bottom > 0) this.cards.push(card);
+      if (this.cards.length === 8) break;
     }
+
+    this.view.style.setProperty('--energy-width', energyWidth + 'px');
+    this.cards.forEach((card, index) => {
+      card.style.setProperty('--entry-delay', 60 + Math.min(index, 5) * 38 + 'ms');
+      card.classList.add('map-card-entering');
+    });
     this.view.classList.add('gallery-entering');
-    this.rollMarbles();
-    this.timer = setTimeout(() => this.stop(), 2000);
+    const last = balls.at(-1);
+    if (last) {
+      const distance = Math.min(72, Math.max(0, artWidth * 0.96 - last.left - last.radius * 2));
+      balls.forEach(({ ball, left, radius, color }, index) => {
+        if (radius) this.roll(ball, left, radius, color, distance, index * 50);
+      });
+    }
+    this.timer = setTimeout(() => this.stop(), INTRO_MS);
   }
 
   stop() {
@@ -40,118 +60,74 @@ export class GalleryIntro {
     clearTimeout(this.timer);
     this.timer = undefined;
     this.view.classList.remove('gallery-entering');
-    for (const card of this.view.querySelectorAll<HTMLElement>('.map-card-entering')) {
+    this.view.style.removeProperty('--energy-width');
+    for (const card of this.cards) {
       card.classList.remove('map-card-entering');
       card.style.removeProperty('--entry-delay');
     }
-    for (const animation of this.view.getAnimations({ subtree: true })) animation.cancel();
+    for (const animation of this.animations) animation.cancel();
+    this.cards = [];
+    this.animations = [];
     this.effects.replaceChildren();
   }
 
-  private rollMarbles() {
-    const duration = 1.35,
-      gravity = 1600;
-    const art = this.view.querySelector<HTMLElement>('.gallery-neon-art')!;
-    const balls = [...art.querySelectorAll<HTMLElement>('.gallery-marble')];
-    const last = balls[balls.length - 1];
-    const distance = Math.min(78, Math.max(0, art.clientWidth * 0.96 - last.offsetLeft - last.offsetWidth));
-    balls.forEach((ball, index) => {
-      const radius = ball.offsetWidth / 2;
-      const dropHeight = radius * (1.05 + index * 0.1);
-      const fallTime = Math.sqrt((2 * dropHeight) / gravity);
-      const impacts = [{ at: fallTime, strength: 0.16 }];
-      let impactTime = fallTime,
-        impactSpeed = gravity * fallTime * 0.36;
-      while (impactSpeed > 4) {
-        impactTime += (2 * impactSpeed) / gravity;
-        impacts.push({ at: impactTime, strength: impacts.at(-1)!.strength * 0.36 });
-        impactSpeed *= 0.36;
-      }
-      const heightAt = (time: number) => {
-        if (time < fallTime) return dropHeight - (gravity * time * time) / 2;
-        let remaining = time - fallTime,
-          speed = gravity * fallTime * 0.36;
-        while (speed > 4) {
-          const flight = (2 * speed) / gravity;
-          if (remaining < flight) return speed * remaining - (gravity * remaining * remaining) / 2;
-          remaining -= flight;
-          speed *= 0.36;
-        }
-        return 0;
-      };
-      const positions: Keyframe[] = [],
-        deformations: Keyframe[] = [],
-        rotations: Keyframe[] = [],
-        shadows: Keyframe[] = [];
-      for (let step = 0; step <= 120; step++) {
-        const progress = step / 120,
-          x = distance * (1 - progress) ** 2;
-        const time = progress * duration,
-          height = heightAt(time),
-          compression = Math.max(
-            ...impacts.map(({ at, strength }) => strength * Math.max(0, 1 - Math.abs(time - at) / 0.055))
-          );
-        positions.push({ offset: progress, transform: `translate(${x}px, ${-height}px)` });
-        deformations.push({ offset: progress, transform: `scale(${1 + compression * 0.65}, ${1 - compression})` });
-        rotations.push({ offset: progress, transform: `rotate(${x / radius}rad)` });
-        shadows.push({
-          offset: progress,
-          transform: `translateY(${height}px) scaleX(${1 + height / 45})`,
-          opacity: 0.65 / (1 + height / 12),
-        });
-      }
-      const timing: KeyframeAnimationOptions = {
-        duration: duration * 1000,
-        delay: index * 85,
-        easing: 'linear',
-        fill: 'both',
-      };
-      ball.animate(positions, timing);
-      ball.querySelector<HTMLElement>('.gallery-marble-body')!.animate(deformations, timing);
-      ball.querySelector<HTMLElement>('.gallery-marble-core')!.animate(rotations, timing);
-      ball.querySelector<HTMLElement>('.gallery-marble-shadow')!.animate(shadows, timing);
-      ball.querySelector<HTMLElement>('.gallery-marble-trail')!.animate(
-        [
-          { opacity: 0.65, transform: 'scaleX(1)' },
-          { opacity: 0, transform: 'scaleX(.12)' },
-        ],
+  private roll(ball: HTMLElement, left: number, radius: number, color: string, distance: number, delay: number) {
+    const duration = 900;
+    // Keep exact contact frames. Easing covers the gaps between samples.
+    const poses: [offset: number, height: number, stretch: number][] = [
+      [0, radius, 1],
+      [0.12, radius * 0.64, 1],
+      [0.2, 0, 0.86],
+      [0.26, radius * 0.23, 1],
+      [0.34, 0, 0.96],
+      [0.44, 0, 1],
+      [0.7, 0, 1],
+      [1, 0, 1],
+    ];
+    const xAt = (offset: number) => distance * (1 - offset) ** 2;
+    const timing: KeyframeAnimationOptions = { duration, delay, fill: 'both' };
+    const body = ball.querySelector<HTMLElement>('.gallery-marble-body')!;
+    const core = ball.querySelector<HTMLElement>('.gallery-marble-core')!;
+    const shadow = ball.querySelector<HTMLElement>('.gallery-marble-shadow')!;
+    this.animations.push(
+      ball.animate(
+        poses.map(([offset, height]) => ({ offset, transform: 'translate(' + xAt(offset) + 'px, ' + -height + 'px)' })),
         timing
-      );
-      const impactX = ball.offsetLeft + radius + distance * (1 - fallTime / duration) ** 2;
-      const impactDelay = fallTime * 1000 + index * 85;
-      const color = getComputedStyle(ball).getPropertyValue('--ball-color');
-      const ring = document.createElement('i');
-      ring.className = 'gallery-impact-ring';
-      ring.style.cssText = `left:${impactX}px;top:118px;--impact-color:${color}`;
-      this.effects.append(ring);
+      ),
+      body.animate(
+        poses.map(([offset, , stretch]) => ({
+          offset,
+          transform: 'scale(' + (1 + (1 - stretch) * 0.65) + ', ' + stretch + ')',
+        })),
+        timing
+      ),
+      core.animate([{ transform: 'rotate(' + distance / radius + 'rad)' }, { transform: 'rotate(0rad)' }], {
+        ...timing,
+        easing: 'cubic-bezier(.33,.67,.67,1)',
+      }),
+      shadow.animate(
+        poses.map(([offset, height]) => ({
+          offset,
+          transform: 'translateY(' + height + 'px) scaleX(' + (1 + height / 45) + ')',
+          opacity: 0.65 / (1 + height / 12),
+        })),
+        timing
+      )
+    );
+
+    const ring = document.createElement('i');
+    ring.className = 'gallery-impact-ring';
+    ring.style.cssText = 'left:' + (left + radius + xAt(0.2)) + 'px;top:118px;--impact-color:' + color;
+    this.effects.append(ring);
+    this.animations.push(
       ring.animate(
         [
-          { opacity: 0, transform: 'scale(.4,.15)' },
-          { offset: 0.12, opacity: 0.9, transform: 'scale(1.6,.5)' },
-          { opacity: 0, transform: 'scale(7,1.8)' },
+          { opacity: 0, transform: 'scale(.5,.18)' },
+          { offset: 0.18, opacity: 0.72, transform: 'scale(1.5,.42)' },
+          { opacity: 0, transform: 'scale(4.5,1.15)' },
         ],
-        { duration: 850, delay: impactDelay, fill: 'both', easing: 'cubic-bezier(.2,.7,.3,1)' }
-      );
-      for (let sparkIndex = 0; sparkIndex < 6; sparkIndex++) {
-        const angle = -Math.PI * (0.15 + sparkIndex * 0.14);
-        const reach = (28 + (sparkIndex % 3) * 13) * Math.min(1, art.clientWidth / 280);
-        const spark = document.createElement('i');
-        spark.className = 'gallery-impact-spark';
-        spark.style.cssText = `left:${impactX}px;top:117px;--impact-color:${color}`;
-        this.effects.append(spark);
-        spark.animate(
-          [
-            { opacity: 0, transform: 'translate(0,0)' },
-            {
-              offset: 0.12,
-              opacity: 1,
-              transform: `translate(${Math.cos(angle) * reach * 0.2}px,${Math.sin(angle) * reach * 0.2}px)`,
-            },
-            { opacity: 0, transform: `translate(${Math.cos(angle) * reach}px,${Math.sin(angle) * reach + 12}px)` },
-          ],
-          { duration: 600, delay: impactDelay, fill: 'both', easing: 'cubic-bezier(.12,.6,.3,1)' }
-        );
-      }
-    });
+        { duration: 390, delay: delay + duration * 0.2, fill: 'both', easing: 'cubic-bezier(.2,.7,.3,1)' }
+      )
+    );
   }
 }
