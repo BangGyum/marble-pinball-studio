@@ -20,31 +20,37 @@ import { desireJar } from './desire-jar';
 import { bounceStairs } from './bounce-stairs';
 import { orbitingGate } from './orbiting-gate';
 import type { StageDef } from '../stage-def';
+import { mapPlayKeys, type MapPlayKey } from './map-play-keys';
 export { ART_STYLES, type StageDef, type WindZone } from '../stage-def';
 
-export const stages: StageDef[] = [
-  neonJackpot,
-  desireJar,
-  neonJunction,
-  pipelineRun,
-  twinVortex,
-  zigzagRapids,
-  pinballCascade,
-  chaosClocktower,
-  orbitalLock,
-  fractureCanyon,
-  neonCrossway,
-  switchbackExpress,
-  roundhouse,
-  springLab,
-  reversalLadder,
-  infiniteFunnel,
-  twinFunnel,
-  bounceStairs,
-  orbitingGate,
-  shortcutCascade,
-  seesawValley,
+const builtins: [StageDef, MapPlayKey?][] = [
+  [neonJackpot, mapPlayKeys.neonJackpot],
+  [desireJar, mapPlayKeys.desireJar],
+  [neonJunction, mapPlayKeys.neonJunction],
+  [pipelineRun, mapPlayKeys.pipelineRun],
+  [twinVortex, mapPlayKeys.twinVortex],
+  [zigzagRapids, mapPlayKeys.zigzagRapids],
+  [pinballCascade, mapPlayKeys.pinballCascade],
+  [chaosClocktower, mapPlayKeys.chaosClocktower],
+  [orbitalLock, mapPlayKeys.orbitalLock],
+  [fractureCanyon, mapPlayKeys.fractureCanyon],
+  [neonCrossway, mapPlayKeys.neonCrossway],
+  [switchbackExpress, mapPlayKeys.switchbackExpress],
+  [roundhouse, mapPlayKeys.roundhouse],
+  [springLab],
+  [reversalLadder],
+  [infiniteFunnel, mapPlayKeys.infiniteFunnel],
+  [twinFunnel, mapPlayKeys.twinFunnel],
+  [bounceStairs, mapPlayKeys.bounceStairs],
+  [orbitingGate, mapPlayKeys.orbitingGate],
+  [shortcutCascade, mapPlayKeys.shortcutCascade],
+  [seesawValley, mapPlayKeys.seesawValley],
 ];
+
+export const stages = builtins.map(([stage]) => stage);
+export function mapPlayKey(stage: StageDef) {
+  return builtins.find(([builtin]) => builtin === stage)?.[1];
+}
 
 export const hiddenStages: StageDef[] = [springLab, reversalLadder];
 export const DEFAULT_MAP_INDEX = stages.indexOf(neonJunction);

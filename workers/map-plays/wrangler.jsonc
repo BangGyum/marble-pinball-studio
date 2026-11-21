@@ -1,0 +1,17 @@
+{
+  "name": "paul-pinball-map-plays",
+  "main": "index.mjs",
+  "compatibility_date": "2026-11-21",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "SITE_ORIGIN": "https://banggyum.github.io"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "MAP_PLAYS", "class_name": "MapPlays" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MapPlays"] }],
+  "ratelimits": [
+    { "name": "PLAY_RATE", "namespace_id": "43187", "simple": { "limit": 20, "period": 60 } }
+  ]
+}

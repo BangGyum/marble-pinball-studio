@@ -14,6 +14,7 @@ dist/
 
 fairness-results/
 .openai/
+.wrangler/
 .env
 .env.*
 !.env.example

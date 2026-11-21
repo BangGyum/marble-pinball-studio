@@ -1,4 +1,4 @@
-import { DEFAULT_MAP_INDEX, type StageDef } from './data/maps';
+import { DEFAULT_MAP_INDEX, mapPlayKey, type StageDef } from './data/maps';
 import type { SavedMap } from './model';
 import { drawEntities } from './draw';
 import { drawMapArt, drawMapOverlay } from './map-art';
@@ -7,6 +7,8 @@ import { drawGoalArea } from './finish';
 import { drawMarble } from './marble-art';
 import { getMarbleDesign } from './marble-design';
 import { el } from './ui';
+import type { MapPlayKey } from './data/map-play-keys';
+import { getMapPlayCount, refreshMapPlays } from './map-plays';
 import { GalleryIntro } from './gallery-intro';
 import { MapTransition } from './map-transition';
 import { getSceneTheme, sceneColor } from './scene-theme';
@@ -106,6 +108,8 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
   canvas.dataset.theme = getSceneTheme();
   canvas.dataset.marbleDesign = getMarbleDesign();
 }
+
+const playCountFormat = new Intl.NumberFormat('ko-KR');
 
 export class MapGallery {
   readonly intro = new GalleryIntro(el('map-gallery'));
@@ -208,11 +212,13 @@ export class MapGallery {
       card.setAttribute('aria-label', `${map.stage.title} · 맵 선택`);
       if (map.id === this.selectedId) card.setAttribute('aria-current', 'true');
       card.style.setProperty('--map-color', color);
-      card.innerHTML = `<span class="map-card-heading"><span class="map-card-number" aria-hidden="true"></span><span class="map-card-title"></span></span><span class="map-preview"><span class="map-card-tag"></span></span><span class="map-card-body"><span class="map-card-description"></span><span class="map-card-action">이 맵으로 준비 <span class="map-card-ball" aria-hidden="true"></span></span></span>`;
+      card.innerHTML = `<span class="map-card-heading"><span class="map-card-number" aria-hidden="true"></span><span class="map-card-title"></span></span><span class="map-preview"><span class="map-card-tag"></span></span><span class="map-card-body"><span class="map-card-description"></span><span class="map-card-play-count" hidden></span><span class="map-card-action">이 맵으로 준비 <span class="map-card-ball" aria-hidden="true"></span></span></span>`;
       card.querySelector('.map-card-number')!.textContent = String(index + 1).padStart(2, '0');
       card.querySelector('.map-card-tag')!.textContent = tag;
       card.querySelector('.map-card-title')!.textContent = map.stage.title;
       card.querySelector('.map-card-description')!.textContent = description;
+      const key = custom ? undefined : mapPlayKey(map.stage);
+      if (key) card.querySelector<HTMLElement>('.map-card-play-count')!.dataset.playKey = key;
       let canvas = this.thumbnails.get(map.stage);
       if (!canvas) {
         canvas = document.createElement('canvas');
@@ -228,9 +234,23 @@ export class MapGallery {
       return card;
     });
     this.grid.replaceChildren(...cards);
+    if (builtin) {
+      this.updatePlayCounts();
+      void refreshMapPlays().then(() => this.updatePlayCounts());
+    }
     el('gallery-count').textContent = String(maps.length).padStart(2, '0');
     for (const canvas of this.grid.querySelectorAll<HTMLCanvasElement>('canvas:not([data-rendered])'))
       this.observer.observe(canvas);
+  }
+
+  updatePlayCounts() {
+    for (const label of this.grid.querySelectorAll<HTMLElement>('[data-play-key]')) {
+      const count = getMapPlayCount(label.dataset.playKey as MapPlayKey);
+      if (count === undefined) continue;
+      label.textContent = playCountFormat.format(count) + '회 플레이';
+      label.hidden = false;
+      label.closest('button')?.setAttribute('aria-description', label.textContent);
+    }
   }
 
   focus(id: string, highlight = false) {

@@ -29,9 +29,15 @@ const game = {
     this.state = 'running';
   },
 };
+const countedMaps = [];
 const context = vm.createContext({
   initialized: true,
-  gallery: { transition: { finish() {} } },
+  gallery: { transition: { finish() {} }, updatePlayCounts() {} },
+  mapPlayKey: (map) => (map === stage ? 'neon-junction' : undefined),
+  async recordMapPlay(key) {
+    assert.equal(game.state, 'running', 'only a successful new start is counted');
+    countedMaps.push(key);
+  },
   game,
   currentStage: stage,
   names,
@@ -53,6 +59,8 @@ vm.runInContext(code, context);
 vm.runInContext('startRace()', context);
 assert.equal(game.prepareCalls, 0, 'starting keeps the already shuffled preview positions');
 assert.equal(game.startCalls, 1);
+assert.throws(() => vm.runInContext('startRace()', context), /이미 진행 중/);
+assert.deepEqual(countedMaps, ['neon-junction']);
 
 game.state = 'ready';
 names.value = '가,나,다,라';
@@ -63,4 +71,5 @@ assert.deepEqual(game.balls, ['가', '나', '다', '라']);
 game.state = 'finished';
 vm.runInContext('startRace()', context);
 assert.equal(game.prepareCalls, 2, 'starting again after a finished race prepares a fresh round');
+assert.deepEqual(countedMaps, ['neon-junction', 'neon-junction', 'neon-junction']);
 console.log('PASS standalone start preserves prepared shuffle and refreshes stale or finished rounds');

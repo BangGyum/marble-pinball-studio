@@ -1,7 +1,8 @@
-import { stages, hiddenStages, DEFAULT_MAP_INDEX, type StageDef } from './data/maps';
+import { stages, hiddenStages, DEFAULT_MAP_INDEX, mapPlayKey, type StageDef } from './data/maps';
 import { Game } from './game';
 import { parseNames, winningRange, type WinnerOrder } from './model';
 import { MapLibrary } from './map-library';
+import { recordMapPlay } from './map-plays';
 import { Recorder } from './recorder';
 import { el, toast, message, STALLED_MESSAGE } from './ui';
 import { Editor } from './editor';
@@ -247,6 +248,7 @@ function startRace() {
     preparedNames = names.value;
   }
   game.start(range, record.checked, order);
+  void recordMapPlay(mapPlayKey(currentStage)).then(() => gallery.updatePlayCounts());
   updateStandings();
   setPanelCollapsed(true);
   lockControls(true);

@@ -1,0 +1,23 @@
+// Public analytics keys are independent of the map title and picker order.
+export const mapPlayKeys = {
+  neonJackpot: 'neon-jackpot',
+  desireJar: 'desire-jar',
+  neonJunction: 'neon-junction',
+  pipelineRun: 'pipeline-run',
+  twinVortex: 'twin-vortex',
+  zigzagRapids: 'zigzag-rapids',
+  pinballCascade: 'pinball-cascade',
+  chaosClocktower: 'chaos-clocktower',
+  orbitalLock: 'orbital-lock',
+  fractureCanyon: 'fracture-canyon',
+  neonCrossway: 'neon-crossway',
+  switchbackExpress: 'switchback-express',
+  roundhouse: 'roundhouse',
+  infiniteFunnel: 'infinite-funnel',
+  twinFunnel: 'twin-funnel',
+  bounceStairs: 'bounce-stairs',
+  orbitingGate: 'orbiting-gate',
+  shortcutCascade: 'shortcut-cascade',
+  seesawValley: 'seesaw-valley',
+} as const;
+export type MapPlayKey = (typeof mapPlayKeys)[keyof typeof mapPlayKeys];

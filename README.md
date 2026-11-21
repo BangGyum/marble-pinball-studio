@@ -75,6 +75,23 @@ yarn test
 
 빌드 결과는 `dist`에 생성됩니다. HTTP 서버로 제공해야 하며 HTML 파일을 직접 열어 실행하지 않습니다.
 
+### 공개 맵 플레이 횟수
+
+GitHub Pages의 기본 맵에서 경주가 시작될 때 1회를 기록합니다. 집계는 Workers Free에서 실행할 수 있는
+SQLite 기반 Durable Object에 저장됩니다. 카드에는 맵별 전체 누적 횟수를 표시합니다.
+
+Cloudflare에 로그인한 뒤 `npx wrangler@4.166.0 deploy --config workers/map-plays/wrangler.jsonc`로
+카운터를 배포합니다. GitHub 저장소의 Actions 변수 `MAP_PLAYS_API`에 배포된 Worker의 URL을 넣으면
+다음 Pages 빌드에 반영됩니다. 기본 설정에는 `https://banggyum.github.io`만 집계 요청을 보낼 수 있습니다.
+다른 계정으로 사이트를 배포할 경우 Worker의 `SITE_ORIGIN`을 해당 주소로 바꿉니다.
+
+로컬에서는 아래 Worker를 실행하고 `MAP_PLAYS_API=http://127.0.0.1:43194`를 설정해 게임을 실행합니다.
+
+```sh
+npx wrangler@4.166.0 dev --config workers/map-plays/wrangler.jsonc --port 43194 --var SITE_ORIGIN:http://127.0.0.1:43187
+```
+
+
 ## 사용
 
 **네온 핀볼 폭포**는 6단 플리퍼·횡풍·부스터와 하단의 좌우 이동 발판으로 구성됩니다.

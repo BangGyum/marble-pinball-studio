@@ -24,6 +24,8 @@ jobs:
       - run: node tests/dolphin-bounce.cjs
       - run: yarn test
       - run: yarn build
+        env:
+          MAP_PLAYS_API: ${{ github.event_name != 'pull_request' && vars.MAP_PLAYS_API || '' }}
       - name: Include dolphin effect preview
         run: |
           node -e "require('node:fs').cpSync('src/assets/effects/dolphin-v1', 'dist/effects/dolphin-v1', { recursive: true })"

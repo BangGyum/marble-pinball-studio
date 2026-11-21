@@ -458,6 +458,12 @@
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
+.map-card-play-count {
+  color: var(--text);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 8px;
+}
 .map-card-action {
   display: flex;
   justify-content: space-between;
