@@ -12,6 +12,6 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MapPlays"] }],
   "ratelimits": [
-    { "name": "PLAY_RATE", "namespace_id": "43187", "simple": { "limit": 20, "period": 60 } }
+    { "name": "PLAY_RATE", "namespace_id": "43187", "simple": { "limit": 5, "period": 60 } }
   ]
 }
