@@ -135,10 +135,9 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     raceId,
     springs: currentSprings(),
   });
-  function publishSprings() {
-    const data = JSON.stringify(springLayout());
-    for (const ws of clients.keys()) send(ws, data);
-  }
+  let springLayoutDirty = false;
+  /** @type {NodeJS.Immediate | undefined} */
+  let springBroadcast;
   function makeScene(entities = mapEntities()) {
     const fixed = new Set(
       (race.stage.entities ?? []).filter((e) => e.type === 'static' && (e.props.life ?? -1) <= 0).map((e) => e.shape)
@@ -213,6 +212,15 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     }
   }
   function broadcast() {
+    if (springBroadcast) {
+      clearImmediate(springBroadcast);
+      springBroadcast = undefined;
+    }
+    if (springLayoutDirty) {
+      const layout = JSON.stringify(springLayout());
+      for (const ws of clients.keys()) send(ws, layout);
+      springLayoutDirty = false;
+    }
     const entities = mapEntities();
     const snapshot = frame(entities),
       hasSprings = entities.some((e) => e.shape.type === 'box' && e.shape.spring);
@@ -223,6 +231,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
           ...(hasSprings ? { springs: race.springStatuses(client.session, entities) } : {}),
           personalSpring: personalSpringStatus(client.session),
         });
+    return race.state === 'running' && (hasSprings || personalSprings.size > 0);
   }
   /** @param {Session} session @returns {NonNullable<Frame['personalSpring']>} */
   function personalSpringStatus(session) {
@@ -265,7 +274,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
         ownerName: session.name,
         placedAt: race.elapsed,
       });
-      publishSprings();
+      springLayoutDirty = true;
       return;
     }
     if (msg.type === 'use-spring') {
@@ -281,7 +290,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       }
       spring.activatedAt = race.elapsed;
       activeSprings.set(entity.shape, spring);
-      publishSprings();
+      springLayoutDirty = true;
       return;
     }
     if (msg.type === 'spring') {
@@ -400,7 +409,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     if (url.pathname === '/api/health')
       return json(res, 200, { ok: true, state: race.state, clients: clients.size, count: race.balls.length });
     const file = ['/', '/host'].includes(url.pathname) ? 'lan.html' : url.pathname.slice(1);
-    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.(html|js|css|svg|png|ico|txt)$/.test(file))
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.(html|js|css|svg|png|webp|ico|txt)$/.test(file))
       return json(res, 404, { error: '페이지를 찾을 수 없습니다.' });
     const target = path.join(publicDir, file);
     if (!fs.existsSync(target) || !fs.statSync(target).isFile())
@@ -411,6 +420,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       '.css': 'text/css',
       '.svg': 'image/svg+xml',
       '.png': 'image/png',
+      '.webp': 'image/webp',
       '.ico': 'image/x-icon',
     };
     res.writeHead(200, {
@@ -478,7 +488,10 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
         if (session.results.size > 64)
           session.results.delete(/** @type {string} */ (session.results.keys().next().value));
         send(ws, result);
-        broadcast();
+        // Acknowledge each input now, then share one authoritative update for this batch.
+        if (msg.type === 'spring' || msg.type === 'place-spring' || msg.type === 'use-spring')
+          springBroadcast ??= setImmediate(broadcast);
+        else broadcast();
       });
       const entities = mapEntities(),
         snapshot = frame(entities);
@@ -522,7 +535,12 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     // Keep collision steps fixed; shed overdue wall time instead of starving connections.
     if (accumulator >= 1 / 60) accumulator %= 1 / 60;
   }, 8);
-  const snapshots = setInterval(broadcast, 50);
+  // Shorten the interval only in live races with interactive springs.
+  function sendSnapshot() {
+    const springRace = broadcast();
+    snapshots = setTimeout(sendSnapshot, springRace ? 25 : 50);
+  }
+  let snapshots = setTimeout(sendSnapshot, 50);
   const heartbeat = setInterval(() => {
     for (const [ws, client] of clients) {
       if (!client.alive || ws.bufferedAmount > MAX_LAN_BUFFERED_BYTES) {
@@ -540,8 +558,9 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     advance,
     info,
     async close() {
+      if (springBroadcast) clearImmediate(springBroadcast);
       clearInterval(timer);
-      clearInterval(snapshots);
+      clearTimeout(snapshots);
       clearInterval(heartbeat);
       for (const ws of clients.keys()) ws.terminate();
       wss.close();

@@ -10,7 +10,7 @@ import type { Ball } from './game';
 import type { StageDef } from './data/maps';
 import type { MapEntityState } from './types/map-entity';
 import { drawEntities } from './draw';
-import { drawMarble } from './marble-art';
+import { drawMarble, marbleLabelFont, marbleLabelOffset } from './marble-art';
 import { getMarbleDesign } from './marble-design';
 import type { MarbleSquash } from './marble-elasticity';
 import { getSceneTheme, type SceneTheme } from './scene-theme';
@@ -68,7 +68,7 @@ export class RenderCache {
     const resolution = Math.ceil(scale / 8) * 8;
     const key = `${getMarbleDesign()}/${getSceneTheme()}/${ball.color}`;
     let cached = this.balls.get(ball);
-    const font = Math.min(17, Math.max(12, scale * 0.24)),
+    const font = marbleLabelFont(scale),
       rasterFont = Math.ceil(font);
     const labelKey = `${getSceneTheme()}/${ball.color}/${ball.name}`;
     let label = this.labels.get(ball);
@@ -156,7 +156,7 @@ export class RenderCache {
     ctx.drawImage(
       s.canvas,
       x - s.left * labelScale,
-      y + 0.55 - s.top * labelScale,
+      y + marbleLabelOffset(scale, font) - s.top * labelScale,
       s.width * labelScale,
       s.height * labelScale
     );

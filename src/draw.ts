@@ -1,4 +1,6 @@
 import { sceneColor, sceneGlow } from './scene-theme';
+import { BARREL_LENGTH } from './marble-launcher';
+import { drawLauncher } from './launcher-art';
 import { drawPersonalSpring } from './personal-spring-art';
 import type { MapEntityState } from './types/map-entity';
 type ViewBounds = { left: number; right: number; top: number; bottom: number };
@@ -37,7 +39,9 @@ export function drawEntities(
       if (shape.type !== 'polyline') {
         const radius =
           shape.type === 'circle'
-            ? shape.radius
+            ? shape.launcher
+              ? BARREL_LENGTH + 0.7
+              : shape.radius
             : Math.hypot(
                 shape.width,
                 shape.spring?.personal
@@ -135,6 +139,8 @@ export function drawEntities(
       }
       if (i === selected)
         ctx.strokeRect(-shape.width - 0.08, -shape.height - 0.08, shape.width * 2 + 0.16, shape.height * 2 + 0.16);
+    } else if (shape.type === 'circle' && shape.launcher) {
+      drawLauncher(ctx, color, scale);
     } else if (shape.type === 'circle') {
       ctx.beginPath();
       ctx.arc(0, 0, shape.radius, 0, Math.PI * 2);

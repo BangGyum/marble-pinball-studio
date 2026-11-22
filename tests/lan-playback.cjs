@@ -89,6 +89,23 @@ exercise(60, 0.98);
 for (const rate of [0.225, 0.45, 0.5, 2, 4, 8]) exercise(60, rate, rate);
 console.log('PASS restored 0.5/2/4x speed, held 8x acceleration and finish slow motion');
 
+// Render at 120 Hz while the 60 Hz physics server sends spring-race poses every 25 ms.
+const springPlayback = new SnapshotPlayback();
+const springDelays = [];
+let previousPose = 0;
+for (let tick = 0; tick <= 360; tick++) {
+  const now = (tick * 1000) / 120;
+  if (tick % 3 === 0) springPlayback.push(frame(Math.floor(tick / 2) / 60, tick + 1), now);
+  const pose = springPlayback.sample(now).elapsed;
+  if (tick > 120) {
+    springDelays.push(now / 1000 - pose);
+    assert.ok(pose > previousPose, 'no frozen render frames on a steady spring connection');
+    assert.ok(pose <= Math.floor((tick - (tick % 3)) / 2) / 60, 'never predict ahead of a collision');
+  }
+  previousPose = pose;
+}
+assert.ok(quantile(springDelays, 0.95) < 0.06, 'steady spring playback stays within 60 ms of server time');
+
 const changing = new SnapshotPlayback(),
   changes = [1, 4, 0.45, 2, 8, 1],
   packets = [];
@@ -274,6 +291,7 @@ strokeView.setSpringLayout({
 strokeView.push(frame(0, 1, 'running', 0, 4));
 strokeView.push(frame(0.8, 2, 'running', 200, 4));
 const springLabels = [];
+strokeView.cache.drawBall = () => true; // Observe only the spring owner labels.
 ctx.strokeText = (label) => springLabels.push(label);
 strokeView.draw(200);
 assert.deepEqual(springLabels.splice(0), [peerSpring.ownerName], 'stroke is still visible on the buffered 4x timeline');

@@ -1,13 +1,13 @@
 import { acceptsSpringSpace, SpringControls } from '../spring-controls';
 import { drawEntities } from '../draw';
 import { drawGoalArea, raceProgress } from '../finish';
-import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from '../map-art';
+import { bridgeBallOpacity, drawMapArt, drawMapOverlay, usesGlassRails } from '../map-art';
 import { drawWind } from '../wind-render';
 import { drawCelebration } from '../celebration';
 import { drawFunnelEntryCue } from '../funnel-art';
 import { RenderCache } from '../render-cache';
 import { RenderResolution } from '../render-resolution';
-import { drawMarble } from '../marble-art';
+import { drawMarble, drawMarbleLabel } from '../marble-art';
 import { MarbleElasticity } from '../marble-elasticity';
 import { drawMantaPenalty } from '../manta-penalty';
 import { Recorder } from '../recorder';
@@ -135,6 +135,13 @@ export class LanView {
     window.addEventListener('pinball-marble-design-change', () => {
       this.renderDirty = true;
     });
+    window.addEventListener(
+      'load',
+      () => {
+        this.renderDirty = true;
+      },
+      true
+    );
     new ResizeObserver(() => {
       const size = canvas.getBoundingClientRect();
       this.width = Math.max(1, size.width);
@@ -708,7 +715,7 @@ export class LanView {
       -1,
       true,
       view,
-      !!scene.stage.art,
+      usesGlassRails(scene.stage),
       scene.stage.art?.style === 'reversal-ladder'
     );
     if (scene.stage.vortex) {
@@ -810,10 +817,7 @@ export class LanView {
         ) ?? this.marbleElasticity.effect(ball.id, now, this.reducedMotion?.matches ?? false);
       if (!this.cache.drawBall(ctx, ball, scale, dpr, ball.x, ball.y, squash)) {
         drawMarble(ctx, ball.x, ball.y, 0.25, ball.color, squash);
-        ctx.fillStyle = ball.color;
-        ctx.font = 12 / scale + 'px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(ball.name, ball.x, ball.y + 0.55);
+        drawMarbleLabel(ctx, ball.name, ball.color, ball.x, ball.y, scale);
       }
       ctx.globalAlpha = 1;
     }

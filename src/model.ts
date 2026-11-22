@@ -348,6 +348,22 @@ export function validateStage(value: unknown): StageDef {
       (sh.color !== undefined && !/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(sh.color))
     )
       throw new Error('장애물 색상이 올바르지 않아요.');
+    if (
+      'launcher' in sh &&
+      (sh.type !== 'circle' ||
+        sh.launcher !== true ||
+        !sh.sensor ||
+        e.type !== 'kinematic' ||
+        !e.props.oscillation ||
+        e.props.angularVelocity !== 0 ||
+        e.props.sliding ||
+        e.props.timedGate ||
+        e.props.spinCycle ||
+        (e.props.life ?? -1) !== -1 ||
+        !finite(sh.radius, 0.25, 1.8))
+    ) {
+      throw new Error('구슬 발사기에는 고정된 회전축과 장전 영역(반지름 0.25~1.8)이 필요해요.');
+    }
     if (sh.type === 'circle') {
       if (!finite(sh.radius, 0.05, 30)) throw new Error('핀 크기가 올바르지 않아요.');
     } else if (sh.type === 'box') {
@@ -367,6 +383,11 @@ export function validateStage(value: unknown): StageDef {
       if (sh.backing !== undefined && (!finite(sh.backing, -5, 5) || sh.solid || e.type !== 'static'))
         throw new Error('외벽 충돌 두께가 올바르지 않아요.');
       if (sh.solid !== undefined && typeof sh.solid !== 'boolean') throw new Error('벽 채움 설정이 올바르지 않아요.');
+      if (
+        sh.trainCar !== undefined &&
+        (!sh.solid || !sh.hidden || !['engine', 'tender', 'coach'].includes(sh.trainCar))
+      )
+        throw new Error('열차 차량의 종류와 충돌 윤곽을 확인해 주세요.');
       if (sh.solid) {
         const points = sh.points.slice(0, -1),
           last = sh.points[sh.points.length - 1];

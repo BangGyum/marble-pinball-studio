@@ -18,6 +18,7 @@ export const ART_STYLES = [
   'twin-funnel',
   'bounce-stairs',
   'orbiting-gate',
+  'one-bounce',
 ] as const;
 
 type BridgeArea = { x: number; y: number; width: number; height: number };

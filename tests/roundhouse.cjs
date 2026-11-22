@@ -11,6 +11,7 @@ require.extensions['.ts'] = (m, f) =>
 global.fetch = undefined;
 const { Race } = require('../src/race.ts');
 const { roundhouse: stage } = require('../src/data/roundhouse.ts');
+const { railRadius, railGauge, trainCars } = require('../src/data/roundhouse-train.ts');
 const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
 (async () => {
   assert.deepEqual(validateStage(stage), stage);
@@ -22,6 +23,29 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
   for (const wind of stage.windZones) {
     const train = stage.entities.filter((e) => e.type === 'kinematic' && e.shape.hidden && e.position.y === wind.y);
     assert.equal(train.length, 3);
+    assert.deepEqual(
+      train.map((e) => e.shape.trainCar),
+      ['engine', 'tender', 'coach']
+    );
+    for (const { shape, props } of train) {
+      const car = trainCars[shape.trainCar];
+      const [[x, y], [nextX, nextY]] = shape.points;
+      const [[px, py], [nextPx]] = car.hull;
+      const a = (nextX - x) / (nextPx - px);
+      const b = (nextY - y) / (nextPx - px);
+      for (const axle of [-1, 1]) {
+        const radii = [-1, 1]
+          .map((wheel) => {
+            const dx = car.axleX + (axle * car.wheelbase) / 2 - px;
+            const dy = car.axleY + (wheel * car.gauge) / 2 - py;
+            return Math.hypot(x + a * dx - b * dy, y + b * dx + a * dy);
+          })
+          .sort((l, r) => l - r);
+        assert.ok(Math.abs(radii[0] - (railRadius - railGauge / 2)) < 0.001);
+        assert.ok(Math.abs(radii[1] - (railRadius + railGauge / 2)) < 0.001);
+      }
+      assert.ok((x * b - y * a) * props.angularVelocity > 0, 'each sprite faces its direction of travel');
+    }
     assert.ok(
       train.every((e) => e.props.angularVelocity * wind.speed < 0),
       'trains oppose the wind'

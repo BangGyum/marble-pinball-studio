@@ -3,7 +3,7 @@ import { Race } from './race';
 import { drawGoalArea } from './finish';
 import type { StageDef } from './data/maps';
 import { drawEntities } from './draw';
-import { bridgeBallOpacity, drawMapArt, drawMapOverlay } from './map-art';
+import { bridgeBallOpacity, drawMapArt, drawMapOverlay, usesGlassRails } from './map-art';
 import { drawWind } from './wind-render';
 import type { WinnerOrder } from './model';
 import { drawCelebration } from './celebration';
@@ -11,7 +11,7 @@ import { Recorder } from './recorder';
 import { toast } from './ui';
 import { RenderCache } from './render-cache';
 import { RenderResolution } from './render-resolution';
-import { drawMarble } from './marble-art';
+import { drawMarble, drawMarbleLabel } from './marble-art';
 import { MarbleElasticity } from './marble-elasticity';
 import { drawMantaPenalty } from './manta-penalty';
 import { getSceneTheme, sceneColor } from './scene-theme';
@@ -464,7 +464,7 @@ export class Game extends Race {
       -1,
       true,
       view,
-      !!this.stage.art,
+      usesGlassRails(this.stage),
       this.stage.art?.style === 'reversal-ladder'
     );
     if (this.stage.vortex) {
@@ -532,13 +532,7 @@ export class Game extends Race {
         continue;
       }
       drawMarble(ctx, x, y, 0.25, b.color, squash);
-      ctx.fillStyle = beige ? '#44382d' : b.color;
-      ctx.font = `${Math.min(17, Math.max(12, scale * 0.24)) / scale}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.strokeStyle = beige ? '#fff8eb' : '#050a10';
-      ctx.lineWidth = 3 / scale;
-      ctx.strokeText(b.name, x, y + 0.55);
-      ctx.fillText(b.name, x, y + 0.55);
+      drawMarbleLabel(ctx, b.name, b.color, x, y, scale);
       ctx.globalAlpha = 1;
     }
     if (this.drainCueAt && !this.reducedMotion?.matches)

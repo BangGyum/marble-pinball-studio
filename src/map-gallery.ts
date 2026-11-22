@@ -1,7 +1,7 @@
 import { DEFAULT_MAP_INDEX, mapPlayKey, type StageDef } from './data/maps';
 import type { SavedMap } from './model';
 import { drawEntities } from './draw';
-import { drawMapArt, drawMapOverlay } from './map-art';
+import { drawMapArt, drawMapOverlay, usesGlassRails } from './map-art';
 import { drawWind } from './wind-render';
 import { drawGoalArea } from './finish';
 import { drawMarble } from './marble-art';
@@ -54,6 +54,12 @@ const details: Record<string, [string, string, string]> = {
   '균열 협곡': ['협곡 · 급강하', '깊은 암벽 사이의 경사 다리와 스프링 부스터를 달려요.', '#a8d898'],
   '네온 크로스웨이': ['교차 · 합류', '청록과 금빛 선로를 오가며 하나의 결승선으로 합류해요.', '#65e4f5'],
   '스위치백 익스프레스': ['철교 · 지름길', '밤의 철교를 따라 급커브를 돌고, 열린 지름길로 질주해요.', '#edcb8b'],
+  '원바운드 샷': [
+    '발사 · 원바운드',
+    '오른쪽에서 날아온 구슬이 민트 발판에 한 번 튀면 왼쪽 컵으로 들어가요.',
+    '#65efda',
+  ],
+  '구슬 발사 시험장': ['조준 · 발사', '스프링 발사기로 반대편 골인 컵을 맞혀 보세요.', '#ffc675'],
   '반동 계단': ['연쇄 반발', '좌우 발판을 번갈아 튕기며 내려가는 탱탱볼 레이스.', '#ffc26e'],
 };
 
@@ -85,7 +91,7 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
     -1,
     true,
     undefined,
-    !!stage.art,
+    usesGlassRails(stage),
     stage.art?.style === 'reversal-ladder'
   );
   drawWind(ctx, stage.windZones ?? [], 1, scale);
@@ -174,12 +180,18 @@ export class MapGallery {
         this.transition.play(card, () => select(card.dataset.mapId!), reveal);
       }
     });
-    el<HTMLImageElement>('canyon-rock-texture').addEventListener('load', () => {
-      for (const canvas of this.grid.querySelectorAll<HTMLCanvasElement>('canvas[data-rendered]')) {
-        const stage = this.stages.get(canvas)!;
-        if (stage.art?.style === 'fracture-canyon') drawThumbnail(canvas, stage);
-      }
-    });
+    for (const [id, style] of [
+      ['canyon-rock-texture', 'fracture-canyon'],
+      ['roundhouse-train', 'roundhouse'],
+    ]) {
+      el<HTMLImageElement>(id).addEventListener('load', () => {
+        for (const { stage } of this.maps) {
+          if (stage.art?.style !== style) continue;
+          const canvas = this.thumbnails.get(stage);
+          if (canvas?.dataset.rendered) drawThumbnail(canvas, stage);
+        }
+      });
+    }
   }
 
   private resetThumbnailQueue() {

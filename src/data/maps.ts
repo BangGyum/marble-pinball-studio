@@ -3,6 +3,8 @@ import { seesawValley } from './seesaw-valley';
 import { shortcutCascade } from './shortcut-cascade';
 import { infiniteFunnel } from './infinite-funnel';
 import { twinFunnel } from './twin-funnel';
+import { oneBounce } from './one-bounce';
+import { launcherLab } from './launcher-lab';
 import { springLab } from './spring-lab';
 import { roundhouse } from './roundhouse';
 import { neonJunction } from './neon-junction';
@@ -45,6 +47,8 @@ const builtins: [StageDef, MapPlayKey?][] = [
   [orbitingGate, mapPlayKeys.orbitingGate],
   [shortcutCascade, mapPlayKeys.shortcutCascade],
   [seesawValley, mapPlayKeys.seesawValley],
+  [launcherLab, mapPlayKeys.launcherLab],
+  [oneBounce, mapPlayKeys.oneBounce],
 ];
 
 export const stages = builtins.map(([stage]) => stage);

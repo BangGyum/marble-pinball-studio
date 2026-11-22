@@ -49,6 +49,7 @@ const ctx = context(),
   };
 const { BackgroundCache } = require('../src/background-cache.ts');
 const { RenderCache } = require('../src/render-cache.ts');
+const { drawMarbleLabel } = require('../src/marble-art.ts');
 const { drawEntities } = require('../src/draw.ts');
 const { drawRoundhouseArt } = require('../src/roundhouse-art.ts');
 const { drawOrbitalArt } = require('../src/orbital-art.ts');
@@ -123,6 +124,11 @@ const { drawPlacedSprings } = require('../src/lan/spring-placement.ts');
       const images = calls.filter(([method]) => method === 'drawImage');
       assert.equal(images[0][1], body);
       assert.equal(images[1][1], label);
+      const inkTop = images[1][3] + 4 / scale; // Four pixels of padding above the name bitmap.
+      assert.ok((inkTop - marble.y - 0.25) * scale >= 1.99, 'overview labels clear the marble by two pixels');
+      drawMarbleLabel(ctx, marble.name, marble.color, marble.x, marble.y, scale);
+      const baseline = calls.at(-1)[3];
+      assert.ok(Math.abs((baseline - inkTop) * scale - 12) < 1e-8, 'fallback and cached names align');
       assert.equal(images[0][4], body.width / 1.75 / 40, 'the marble retains its world-space radius');
       assert.equal(bitmaps.length, allocated, 'zoom and lower canvas density do not allocate replacement sprites');
       assert.equal(cache.warming, false);

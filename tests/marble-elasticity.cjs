@@ -127,41 +127,38 @@ const frame = (seq, elapsed, y, state = 'running') => ({
   raceId: 'bounce',
   revision: 1,
   seq,
+  time: 1000 + (seq - 1) * 50,
   elapsed,
   state,
   balls: [[0, 10, y, 0, 0]],
   angles: [],
   winners: [],
 });
-view.push(frame(1, 0, 0));
-view.push(frame(2, 0.05, 0.6));
-view.push(frame(3, 0.1, 0.45));
-view.push(frame(4, 0.15, 0.3));
-view.draw(1000);
-view.draw(1050);
-view.draw(1100);
+// Submit and display the same 20 Hz stream as a LAN client, including the host timestamps.
+function displayRebound(raceId, playbackRate) {
+  const start = performance.now();
+  [-0.6, 0, 0.6, 0.45, 0.3].forEach((y, i) => {
+    view.push({ ...frame(i + 1, i * 0.05 * playbackRate, y * playbackRate), raceId, playbackRate });
+    for (let tick = 0; tick < 3; tick++) view.draw(start + i * 50 + (tick * 50) / 3);
+  });
+  const displayedAt = start + 250;
+  view.draw(displayedAt);
+  return displayedAt;
+}
+const displayedAt = displayRebound('bounce', 1);
 assert.ok(
-  view.marbleElasticity.effect(0, 1100),
+  view.marbleElasticity.effect(0, displayedAt),
   'LAN playback animates a rebound when the matching snapshot reaches the screen'
 );
-view.push(frame(5, 0.15, 0.3, 'paused'));
-assert.equal(view.marbleElasticity.effect(0, 1100), undefined, 'pause clears the transient effect');
+view.push(frame(6, 0.2, 0.3, 'paused'));
+assert.equal(view.marbleElasticity.effect(0, displayedAt), undefined, 'pause clears the transient effect');
 console.log('PASS LAN playback shows the rebound at the displayed snapshot and clears it on pause');
 
 for (const playbackRate of [0.5, 1, 2, 4, 8]) {
   view.setScene({ ...view.scene, raceId: `bounce-${playbackRate}` });
-  [0, 0.6, 0.45, 0.3].forEach((y, i) => {
-    view.push({
-      ...frame(i + 1, i * 0.05 * playbackRate, y * playbackRate),
-      raceId: `bounce-${playbackRate}`,
-      playbackRate,
-    });
-  });
-  view.draw(1000);
-  view.draw(1050);
-  view.draw(1100);
+  const at = displayRebound(view.scene.raceId, playbackRate);
   assert.ok(
-    view.marbleElasticity.effect(0, 1100),
+    view.marbleElasticity.effect(0, at),
     `LAN ${playbackRate}x must keep rebound effects at the normal 20Hz snapshot rate`
   );
 }

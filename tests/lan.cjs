@@ -175,13 +175,13 @@ async function connect(port, cookie, options = {}) {
       'UTF-8 message size is rejected before opening a pending request'
     );
     assert.equal(app.info().maps[0].title, '네온 잭팟', 'map order must never overwrite a different map title');
-    assert.equal(app.info().maps.length, 19);
+    assert.equal(app.info().maps.length, 21);
     assert.deepEqual(
       app
         .info()
         .maps.slice(-2)
         .map((map) => map.title),
-      ['샛길 캐스케이드', '시소 계곡']
+      ['구슬 발사 시험장', '원바운드 샷']
     );
     assert.ok(!app.info().maps.some((map) => ['네온 모래시계', '스프링 놀이터', '역전 사다리'].includes(map.title)));
     assert.ok(

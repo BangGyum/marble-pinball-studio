@@ -299,14 +299,14 @@ console.log('PASS resumed motion, turning points, fresh trapping window, brief n
     'obstacles blend with the same fraction'
   );
   assert.ok(
-    Math.abs(calls.find((c) => c[0] === 'strokeText')[3] - 15.55) < 1e-9,
+    calls.some(([method, x, y]) => method === 'translate' && x === 10 && y === 15),
     'the marble is drawn half-way between steps'
   );
   calls.length = 0;
   game.stepped = false;
   game.render();
   assert.ok(
-    Math.abs(calls.find((c) => c[0] === 'strokeText')[3] - 20.55) < 1e-9,
+    calls.some(([method, x, y]) => method === 'translate' && x === 10 && y === 20),
     'right after a resume the latest step is drawn'
   );
   game.manual = null;

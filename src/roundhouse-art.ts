@@ -3,12 +3,16 @@ import type { StageDef } from './data/maps';
 import { visibleArt, type ViewBounds } from './art-visibility';
 import type { MapEntityState } from './types/map-entity';
 import { yards } from './data/roundhouse';
+import { railGauge, railRadius, trainCars } from './data/roundhouse-train';
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 function circle(ctx: Ctx, x: number, y: number, r: number) {
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
 }
-export function drawRoundhouseArt(ctx: Ctx, _stage: StageDef) {
+export function drawRoundhouseArt(ctx: Ctx, stage: StageDef) {
+  const fitted = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.trainCar);
+  const inner = fitted ? railRadius - railGauge / 2 : 12.25;
+  const outer = fitted ? railRadius + railGauge / 2 : 16.6;
   ctx.save();
   ctx.fillStyle = sceneColor('#172724');
   ctx.fillRect(20, -3, 8, 15);
@@ -29,10 +33,10 @@ export function drawRoundhouseArt(ctx: Ctx, _stage: StageDef) {
       ctx.translate(x, y);
       ctx.rotate(a);
       ctx.fillStyle = sceneColor(i % 2 ? '#4c4030' : '#62513a');
-      ctx.fillRect(11.7, -0.12, 5.5, 0.24);
+      ctx.fillRect(inner - 0.55, -0.12, outer - inner + 1.1, 0.24);
       ctx.restore();
     }
-    for (const r of [12.25, 16.6]) {
+    for (const r of [inner, outer]) {
       circle(ctx, x, y, r);
       ctx.strokeStyle = sceneColor('#0a0c0b');
       ctx.lineWidth = 0.62;
@@ -97,10 +101,44 @@ export function drawRoundhouseArt(ctx: Ctx, _stage: StageDef) {
   ctx.restore();
 }
 export function drawRoundhouseTrains(ctx: CanvasRenderingContext2D, entities: MapEntityState[], view?: ViewBounds) {
+  const atlas = globalThis.document?.getElementById?.('roundhouse-train') as HTMLImageElement | null | undefined;
   for (const entity of entities) {
     if (!visibleArt(entity, view)) continue;
     if (entity.shape.type !== 'polyline' || !entity.shape.solid || !entity.shape.hidden) continue;
     const corners = entity.shape.points;
+    if (entity.shape.trainCar) {
+      const car = trainCars[entity.shape.trainCar];
+      ctx.save();
+      ctx.translate(entity.x, entity.y);
+      ctx.rotate(entity.angle);
+      if (atlas?.complete && atlas.naturalWidth) {
+        const [x, y] = corners[0];
+        const width = car.hull[1][0] - car.hull[0][0];
+        const a = (corners[1][0] - x) / width;
+        const b = (corners[1][1] - y) / width;
+        ctx.transform(a, b, -b, a, x, y);
+        ctx.drawImage(
+          atlas,
+          0,
+          car.row,
+          atlas.naturalWidth,
+          car.rowHeight,
+          -car.hull[0][0],
+          -car.hull[0][1],
+          car.width,
+          car.height
+        );
+      } else {
+        ctx.fillStyle = sceneColor('#847356');
+        ctx.beginPath();
+        ctx.moveTo(...corners[0]);
+        for (const point of corners.slice(1)) ctx.lineTo(...point);
+        ctx.fill();
+      }
+      ctx.restore();
+      continue;
+    }
+    // Locally saved layouts can still contain the original, wider rectangular carriages.
     const phase = Math.atan2(corners[0][1] + corners[2][1], corners[0][0] + corners[2][0]);
     const car = Math.round(Math.abs(phase) / 0.48);
     const accent = entity.shape.color ?? '#65efcf';

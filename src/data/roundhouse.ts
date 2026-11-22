@@ -1,6 +1,7 @@
 import type { StageDef } from './maps';
 import type { MapEntity } from '../types/map-entity';
 import { arc, wall } from './wind-map-shapes';
+import { trainFixtures } from './roundhouse-train';
 
 export const yards = [
   { x: 24, y: 28, spin: -0.65, color: '#65efcf' },
@@ -21,32 +22,11 @@ for (const yard of yards) {
     shape: { type: 'circle', radius: 10.8, hidden: true },
     props: { density: 1, restitution: 0.15, angularVelocity: 0 },
   });
-  // Each carriage is an offset convex fixture rotating about the yard centre.
-  // The visible train uses these same vertices and body angles.
-  for (let car = 0; car < 3; car++) {
-    const angle = car ? -Math.sign(yard.spin) * car * 0.48 : 0;
-    const points: [number, number][] = [
-      [12.3, -3],
-      [17.1, -3],
-      [17.1, 3],
-      [12.3, 3],
-      [12.3, -3],
-    ];
+  for (const shape of trainFixtures(yard.spin)) {
     entities.push({
       position: { x: 24, y: yard.y },
       type: 'kinematic',
-      shape: {
-        type: 'polyline',
-        solid: true,
-        hidden: true,
-        rotation: 0,
-        points: points.map(([px, py]): [number, number] => {
-          const x = px,
-            y = py;
-          return [x * Math.cos(angle) - y * Math.sin(angle), x * Math.sin(angle) + y * Math.cos(angle)];
-        }),
-        color: yard.color,
-      },
+      shape: { ...shape, color: yard.color },
       props: { density: 1, restitution: 0.12, angularVelocity: yard.spin },
     });
   }

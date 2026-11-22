@@ -2,6 +2,7 @@
 import Box2DFactory from 'box2d-wasm';
 import type { StageDef, WindZone } from './data/maps';
 import { windPower } from './wind-power';
+import { BARREL_LENGTH, BARREL_TILT, LAUNCH_SPEED } from './marble-launcher';
 import { timedGateAngle } from './timed-gate';
 import { rotorPower } from './rotor-cycle';
 import type { IPhysics } from './i-physics';
@@ -62,6 +63,10 @@ export class Box2dPhysics implements IPhysics {
   private sliders: PhysicsEntity[] = [];
   private rotators: PhysicsEntity[] = [];
   private boosters: PhysicsEntity[] = [];
+  private launchers: {
+    entity: PhysicsEntity;
+    loaded?: { body: Box2D.b2Body; at: number; x: number; y: number };
+  }[] = [];
   private breakables: PhysicsEntity[] = [];
   private broken = new Set<PhysicsEntity>();
   private breakableContacts = new Map<PhysicsEntity, Set<number>>();
@@ -104,6 +109,8 @@ export class Box2dPhysics implements IPhysics {
     if (this.world && !this.disposed && this.world.GetBodyCount() === 0) this.leaks.freeLeaked();
   }
   clear() {
+    for (const launcher of this.launchers) launcher.loaded?.body.SetEnabled(true);
+    this.launchers = [];
     this.vortex = undefined;
     this.windZones = [];
     this.winds = [];
@@ -129,6 +136,7 @@ export class Box2dPhysics implements IPhysics {
     this.releaseWrappers();
   }
   clearMarbles() {
+    for (const launcher of this.launchers) launcher.loaded = undefined;
     for (const body of Object.values(this.marbleMap)) this.world.DestroyBody(body);
     this.marbleMap = {};
     this.marbleBodies = [];
@@ -285,6 +293,7 @@ export class Box2dPhysics implements IPhysics {
       }
       if (state.moving) this.leaks.recordLeak(body.GetPosition());
       if (s.type === 'box' && s.spring) this.springs.push(state);
+      if (s.type === 'circle' && s.launcher) this.launchers.push({ entity: state });
       if (state.sliding) this.sliders.push(state);
       if (state.oscillation || state.timedGate || state.spinCycle) this.rotators.push(state);
       if (s.type === 'box' && s.boostSpeed !== undefined) this.boosters.push(state);
@@ -324,6 +333,9 @@ export class Box2dPhysics implements IPhysics {
   removeMarble(id: number) {
     const body = this.marbleMap[id];
     if (body) {
+      for (const launcher of this.launchers) {
+        if (launcher.loaded?.body === body) launcher.loaded = undefined;
+      }
       this.world.DestroyBody(body);
       this.bridgeBodies.delete(body);
       delete this.marbleMap[id];
@@ -595,6 +607,44 @@ export class Box2dPhysics implements IPhysics {
       body.SetAwake(true);
     }
   }
+  private stepLaunchers() {
+    for (const launcher of this.launchers) {
+      const e = launcher.entity;
+      if (!launcher.loaded) {
+        let edge = this.leaks.recordLeak(e.body.GetContactList());
+        while (this.Box2D.getPointer(edge)) {
+          const body = edge.other;
+          if (body.GetType() === this.Box2D.b2_dynamicBody && this.leaks.recordLeak(edge.contact).IsTouching()) {
+            const pos = body.GetPosition();
+            launcher.loaded = { body, at: this.motionTime, x: pos.x, y: pos.y };
+            body.SetEnabled(false);
+            break;
+          }
+          edge = this.leaks.recordLeak(edge.next);
+        }
+      }
+      const ball = launcher.loaded;
+      if (!ball) continue;
+      const age = this.motionTime - ball.at;
+      const intake = Math.min(1, age / 0.18);
+      const travel = Math.max(0, (age - 0.32) * LAUNCH_SPEED);
+      const angle = BARREL_TILT + e.body.GetAngle();
+      const dx = -Math.cos(angle),
+        dy = -Math.sin(angle);
+      const distance = Math.min(BARREL_LENGTH, travel);
+      this.vector.Set(
+        ball.x + (e.x - ball.x) * intake + dx * distance,
+        ball.y + (e.y - ball.y) * intake + dy * distance
+      );
+      ball.body.SetTransform(this.vector, ball.body.GetAngle());
+      if (travel < BARREL_LENGTH) continue;
+      ball.body.SetEnabled(true);
+      this.vector.Set(dx * LAUNCH_SPEED, dy * LAUNCH_SPEED);
+      ball.body.SetLinearVelocity(this.vector);
+      ball.body.SetAwake(true);
+      launcher.loaded = undefined;
+    }
+  }
   step(seconds: number, beforeSubstep?: (dt: number, offset: number) => void) {
     this.recordPoses();
     const bodies = this.marbleBodies;
@@ -771,6 +821,7 @@ export class Box2dPhysics implements IPhysics {
         this.breakableContacts.set(e, touching);
       }
     }
+    if (this.launchers.length) this.stepLaunchers();
     if (this.broken.size) {
       for (let i = this.entities.length - 1; i >= 0; i--) {
         const e = this.entities[i];

@@ -32,11 +32,13 @@ export interface EntityBoxShape extends EntityShapeBase {
 export interface EntityCircleShape extends EntityShapeBase {
   type: 'circle';
   radius: number;
+  launcher?: true;
 }
 
 export interface EntityPolylineShape extends EntityShapeBase {
   type: 'polyline';
   solid?: boolean;
+  trainCar?: 'engine' | 'tender' | 'coach';
   // Signed collision depth on the right-hand side of the directed wall.
   backing?: number;
   rotation: number;

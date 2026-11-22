@@ -4,6 +4,32 @@ import { getSceneTheme } from './scene-theme';
 
 type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 
+export const marbleLabelFont = (scale: number) => Math.min(17, Math.max(12, scale * 0.24));
+
+// At overview zoom the name stays screen-sized while the marble shrinks.
+export const marbleLabelOffset = (scale: number, font: number) => Math.max(0.55, 0.25 + (font + 2) / scale);
+
+export function drawMarbleLabel(
+  ctx: CanvasRenderingContext2D,
+  name: string,
+  color: string,
+  x: number,
+  y: number,
+  scale: number
+) {
+  const font = marbleLabelFont(scale);
+  const baseline = y + marbleLabelOffset(scale, font);
+  const beige = getSceneTheme() === 'beige';
+  ctx.fillStyle = beige ? '#44382d' : color;
+  ctx.font = `${font / scale}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.strokeStyle = beige ? '#fff8eb' : '#050a10';
+  ctx.lineWidth = 3 / scale;
+  ctx.strokeText(name, x, baseline);
+  ctx.fillText(name, x, baseline);
+}
+
 // Deformation only affects the drawing; the physical collision radius remains unchanged.
 export function drawMarble(ctx: Context, x: number, y: number, radius: number, color: string, squash?: MarbleSquash) {
   ctx.save();

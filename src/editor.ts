@@ -1,14 +1,15 @@
 import { blankStage, cloneStage, validateStage, exportMap, MAX_MAP_IMPORT_BYTES, type SavedMap } from './model';
 import type { StageDef } from './data/maps';
 import type { MapEntity } from './types/map-entity';
+import { BARREL_LENGTH, BARREL_TILT, marbleLauncher } from './marble-launcher';
 import { drawEntities } from './draw';
-import { drawMapArt, drawMapOverlay } from './map-art';
+import { drawMapArt, drawMapOverlay, usesGlassRails } from './map-art';
 import { drawWind } from './wind-render';
 import { drawGoalArea } from './finish';
 import { el, toast, message } from './ui';
 import { getSceneTheme, sceneColor } from './scene-theme';
 
-type Tool = 'select' | 'wall' | 'freehand' | 'pin' | 'bumper' | 'ramp' | 'rotor' | 'boost' | 'spring';
+type Tool = 'select' | 'wall' | 'freehand' | 'pin' | 'bumper' | 'ramp' | 'rotor' | 'boost' | 'spring' | 'launcher';
 type Point = { x: number; y: number };
 type EditorActions = {
   list: () => SavedMap[];
@@ -26,6 +27,7 @@ const HELP: Record<Tool, string> = {
   bumper: '배치할 곳을 클릭하세요. 구슬을 튕겨 내는 범퍼가 만들어집니다.',
   ramp: '클릭해서 반사판을 배치한 뒤 속성에서 기울기를 바꾸세요.',
   rotor: '클릭해서 회전 장애물을 배치하세요. 회전 속도를 바꿀 수 있어요.',
+  launcher: '오른쪽 회전축을 배치하세요. 축에 들어온 구슬을 한 알씩 왼쪽으로 자동 발사합니다.',
   spring: '스프링을 배치하세요. 경기 중 클릭해 선택하고 SPACE로 작동하며, 거리와 방향을 바꿀 수 있어요.',
   boost: '클릭해서 부스터를 배치하세요. 화살표 방향과 부스트 속도를 바꿀 수 있어요. 0°는 오른쪽, 90°는 아래쪽입니다.',
 };
@@ -47,6 +49,9 @@ export class Editor {
   constructor(private actions: EditorActions) {
     window.addEventListener('pinball-theme-change', () => {
       if (this.dialog.open) this.render();
+    });
+    document.getElementById('roundhouse-train')?.addEventListener('load', () => {
+      if (this.dialog.open && this.stage.art?.style === 'roundhouse') this.render();
     });
     this.canvas.width = 26 * SCALE;
     el('tools').addEventListener('click', (e) => {
@@ -328,32 +333,41 @@ export class Editor {
     }
     this.checkpoint();
     const circle = this.tool === 'pin' || this.tool === 'bumper';
-    const entity: MapEntity = {
-      position: p,
-      type: this.tool === 'rotor' || this.tool === 'spring' ? 'kinematic' : 'static',
-      shape: circle
-        ? {
-            type: 'circle',
-            radius: this.tool === 'bumper' ? 0.65 : 0.22,
-            color: this.tool === 'bumper' ? '#f2ba6f' : '#65efda',
-          }
+    const entity: MapEntity =
+      this.tool === 'launcher'
+        ? marbleLauncher(p.x, p.y)
         : {
-            type: 'box',
-            width: this.tool === 'rotor' ? 2 : 2.5,
-            height: this.tool === 'spring' ? 0.45 : this.tool === 'boost' ? 1 : 0.15,
-            rotation: this.tool === 'boost' ? Math.PI / 2 : this.tool === 'ramp' ? 0.3 : 0,
-            color: this.tool === 'boost' ? '#ffc653' : '#65efda',
-            ...(this.tool === 'boost' ? { boostSpeed: 35 } : {}),
-            ...(this.tool === 'spring'
-              ? { spring: { distance: 1.2, direction: -Math.PI / 2, cooldown: { scope: 'personal', seconds: 10 } } }
-              : {}),
-          },
-      props: {
-        density: 1,
-        restitution: this.tool === 'bumper' ? 1.25 : 0.35,
-        angularVelocity: this.tool === 'rotor' ? 1.5 : 0,
-      },
-    };
+            position: p,
+            type: this.tool === 'rotor' || this.tool === 'spring' ? 'kinematic' : 'static',
+            shape: circle
+              ? {
+                  type: 'circle',
+                  radius: this.tool === 'bumper' ? 0.65 : 0.22,
+                  color: this.tool === 'bumper' ? '#f2ba6f' : '#65efda',
+                }
+              : {
+                  type: 'box',
+                  width: this.tool === 'rotor' ? 2 : 2.5,
+                  height: this.tool === 'spring' ? 0.45 : this.tool === 'boost' ? 1 : 0.15,
+                  rotation: this.tool === 'boost' ? Math.PI / 2 : this.tool === 'ramp' ? 0.3 : 0,
+                  color: this.tool === 'boost' ? '#ffc653' : '#65efda',
+                  ...(this.tool === 'boost' ? { boostSpeed: 35 } : {}),
+                  ...(this.tool === 'spring'
+                    ? {
+                        spring: {
+                          distance: 1.2,
+                          direction: -Math.PI / 2,
+                          cooldown: { scope: 'personal', seconds: 10 },
+                        },
+                      }
+                    : {}),
+                },
+            props: {
+              density: 1,
+              restitution: this.tool === 'bumper' ? 1.25 : 0.35,
+              angularVelocity: this.tool === 'rotor' ? 1.5 : 0,
+            },
+          };
     this.stage.entities!.push(entity);
     this.selected = this.stage.entities!.length - 1;
     this.changed();
@@ -442,6 +456,15 @@ export class Editor {
         s = e.shape;
       const x = p.x - e.position.x,
         y = p.y - e.position.y;
+      if (s.type === 'circle' && s.launcher) {
+        const along = -x * Math.cos(BARREL_TILT) - y * Math.sin(BARREL_TILT);
+        if (
+          along >= 0 &&
+          along <= BARREL_LENGTH + 0.2 &&
+          Math.abs(x * Math.sin(BARREL_TILT) - y * Math.cos(BARREL_TILT)) <= 0.65
+        )
+          return i;
+      }
       if (s.type === 'circle' && Math.hypot(x, y) < s.radius + 0.35) return i;
       if (s.type === 'box') {
         const c = Math.cos(s.rotation),
@@ -543,8 +566,12 @@ export class Editor {
     const spring = e?.shape.type === 'box' && !!e.shape.spring;
     el('spring-properties').hidden = !spring;
     el('boost-properties').hidden = !boost;
-    el<HTMLInputElement>('prop-spin').disabled = boost || spring || !!e?.props.timedGate || !!e?.props.sliding;
-    el<HTMLInputElement>('prop-bounce').disabled = boost;
+    const launcher = e?.shape.type === 'circle' && e.shape.launcher;
+    el<HTMLInputElement>('prop-radius').min = launcher ? '0.25' : '0.1';
+    el<HTMLInputElement>('prop-radius').max = launcher ? '1.8' : '5';
+    el<HTMLInputElement>('prop-spin').disabled =
+      !!launcher || boost || spring || !!e?.props.timedGate || !!e?.props.sliding;
+    el<HTMLInputElement>('prop-bounce').disabled = !!launcher || boost;
     el<HTMLButtonElement>('undo').disabled = !this.history.length;
     el<HTMLButtonElement>('redo').disabled = !this.future.length;
     if (!e) return;
@@ -579,6 +606,7 @@ export class Editor {
     c.save();
     c.scale(SCALE, SCALE);
     const liveArt =
+      this.stage.art?.style === 'roundhouse' ||
       this.stage.art?.style === 'seesaw-valley' ||
       this.stage.art?.style === 'reversal-ladder' ||
       this.stage.art?.style === 'infinite-funnel' ||
@@ -625,7 +653,7 @@ export class Editor {
       this.selected,
       false,
       undefined,
-      !!this.stage.art,
+      usesGlassRails(this.stage),
       this.stage.art?.style === 'reversal-ladder'
     );
     if (liveArt || this.stage.art?.style === 'orbiting-gate') drawMapOverlay(c, this.stage, entities, SCALE, false);

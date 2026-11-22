@@ -18,6 +18,8 @@ export const mapPlayKeys = {
   bounceStairs: 'bounce-stairs',
   orbitingGate: 'orbiting-gate',
   shortcutCascade: 'shortcut-cascade',
+  oneBounce: 'one-bounce',
+  launcherLab: 'launcher-lab',
   seesawValley: 'seesaw-valley',
 } as const;
 export type MapPlayKey = (typeof mapPlayKeys)[keyof typeof mapPlayKeys];

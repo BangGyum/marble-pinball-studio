@@ -13,10 +13,15 @@ import { drawHourglassArt } from './hourglass-art';
 import { drawCanyonArt, drawCanyonDevices } from './canyon-art';
 import { drawEntities } from './draw';
 import { drawSeesawCabinet, drawSeesaws, drawShortcutDeck } from './seesaw-art';
+import { drawBankShotGuide } from './one-bounce-art';
 import { drawBounceStairsArt } from './bounce-stairs-art';
 import { drawOrbitingGateArt, drawOrbitingGateMouth } from './orbiting-gate-art';
 import type { MapEntityState } from './types/map-entity';
 import type { ViewBounds } from './art-visibility';
+
+export function usesGlassRails(stage: StageDef) {
+  return !!stage.art && stage.art.style !== 'one-bounce';
+}
 
 // Draw the elevated exit after the ground-level rings, including on both minimaps.
 export function drawMapOverlay(
@@ -62,7 +67,7 @@ export function drawMapOverlay(
     elevated = drawOrbitalExitWalls(ctx, stage, elevated, scale, cacheBackground);
     if (orbitalWallsNeedClip(elevated, scale)) clipOrbitalBridgeWalls(ctx, stage);
   }
-  drawEntities(ctx, elevated, scale, -1, scale > 3, view, !!stage.art);
+  drawEntities(ctx, elevated, scale, -1, scale > 3, view, usesGlassRails(stage));
   ctx.restore();
 }
 
@@ -102,6 +107,10 @@ export function drawMapArt(
   cacheBackground = true
 ) {
   if (!stage.art) return;
+  if (stage.art.style === 'one-bounce') {
+    drawBankShotGuide(ctx, stage, scale);
+    return;
+  }
   if (stage.art.style === 'orbiting-gate') {
     drawOrbitingGateArt(ctx, stage, cacheBackground);
     return;
