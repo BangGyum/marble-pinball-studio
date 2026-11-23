@@ -59,6 +59,32 @@ function hingedRail(
 }
 
 const stationGate = { period: 8.5, openFor: 2.9, phase: 4, releaseAfter: 5.7 };
+const stationApproach = curve([0.7, 6.8], [0.7, 12], [2.2, 13.9], [7.05, 15.5]);
+// Give the crowded left approach a solid face behind the visible curve, without narrowing the station.
+const stationWall = stationApproach.slice(1).map((end, i): MapEntity => {
+  const start = stationApproach[i];
+  const dx = end[0] - start[0],
+    dy = end[1] - start[1],
+    depth = 0.28 / Math.hypot(dx, dy);
+  return {
+    type: 'static',
+    position: { x: 0, y: 0 },
+    shape: {
+      type: 'polyline',
+      solid: true,
+      hidden: true,
+      rotation: 0,
+      points: [
+        start,
+        end,
+        [end[0] - dy * depth, end[1] + dx * depth],
+        [start[0] - dy * depth, start[1] + dx * depth],
+        start,
+      ],
+    },
+    props: { density: 1, restitution: 0.05, angularVelocity: 0 },
+  };
+});
 
 export const lastGondola: StageDef = {
   title: '막차 곤돌라',
@@ -75,7 +101,8 @@ export const lastGondola: StageDef = {
       [31.3, -20],
       [31.3, 42],
     ]),
-    rail(curve([0.7, 6.8], [0.7, 12], [2.2, 13.9], [7.05, 15.5])),
+    rail(stationApproach, undefined, true),
+    ...stationWall,
     rail([[16.2, -20], ...curve([16.2, 7.2], [16.2, 12.2], [13.7, 14.4], [10.2, 15.53])]),
     // Both paddles lift marbles toward the center before the two halves of the hatch open together.
     hingedRail(7.05, 15.5, 1.575, 0.015, { ...stationGate, angle: 1.32 }),
@@ -130,7 +157,9 @@ export const lastGondola: StageDef = {
       shape: { type: 'box', width: 0.92, height: 0.5, rotation: 0.34, boostSpeed: 12.5, color: '#81d3c2' },
       props: { density: 1, restitution: 0, angularVelocity: 0 },
     },
+    // Catch ordinary-route rebounds under the cable before the gondola unloads to the right.
     rail([
+      [21.9, 25.9],
       ...curve([23.4, 26.45], [24, 26.8], [24.1, 27.9], [24.1, 28.9]),
       ...curve([24.1, 40.6], [24.1, 42], [24.6, 43], [25.5, 43.65]),
     ]),

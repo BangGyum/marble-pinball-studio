@@ -15,9 +15,76 @@ const { validateStage } = require('../src/model.ts');
 const index = stage.entities.findIndex((e) => e.shape.gondola);
 const device = stage.entities[index];
 
+async function verifyCrowdedStations() {
+  const race = new Race();
+  const physics = race.physics;
+  const random = Math.random;
+  await physics.init();
+  try {
+    for (const count of [100, 300]) {
+      for (const initial of [77, 527, 1337]) {
+        let seed = initial;
+        Math.random = () => {
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          return seed / 4294967296;
+        };
+        race.prepare(
+          stage,
+          Array.from({ length: count }, (_, id) => String(id))
+        );
+        race.startRace([count - 1, count], 'desc');
+        const car = physics.gondolas[0];
+        const ids = new Map(Object.entries(physics.marbleMap).map(([id, body]) => [body, Number(id)]));
+        const boarded = new Set();
+        const unloaded = new Map();
+        const leftStation = new Set();
+        const express = new Set();
+        const label = `${count} marbles / seed ${initial}`;
+        while (race.state === 'running' && race.elapsed < 50) {
+          const before = car.seats.filter(Boolean);
+          race.advance();
+          const seats = car.seats.filter(Boolean);
+          assert.ok(seats.length <= 2, label);
+          for (const body of seats) boarded.add(ids.get(body));
+          for (const body of before) {
+            if (seats.includes(body)) continue;
+            const id = ids.get(body);
+            const { x, y } = race.balls[id];
+            assert.ok(body.IsEnabled() && x > 25 && x < 29 && y > 25 && y < 28, label + ' unload inside the station');
+            unloaded.set(id, race.elapsed);
+          }
+          for (const ball of race.balls) {
+            if (ball.rank) continue;
+            assert.ok(ball.x >= 0.55 && ball.x <= 31.45 && ball.y >= -20 && ball.y <= 54, label + ' stays on the map');
+            if (ball.py < 28.85 && ball.y >= 28.85 && unloaded.has(ball.id) && !leftStation.has(ball.id)) {
+              assert.ok(race.elapsed - unloaded.get(ball.id) < 2, label + ' clears the arrival station promptly');
+              leftStation.add(ball.id);
+            }
+            if (ball.py < 40 && ball.y >= 40 && ball.x > 24.1 && unloaded.has(ball.id)) {
+              express.add(ball.id);
+            }
+          }
+        }
+        assert.equal(race.finishReason, 'arrived', label);
+        assert.equal(race.arrivals.length, count, label);
+        assert.equal(race.rescues, 0, label + ' solid approach holds against crowd pressure');
+        assert.ok(boarded.size >= 2, label);
+        assert.deepEqual(new Set(unloaded.keys()), boarded, label + ' all riders unload');
+        assert.deepEqual(leftStation, boarded, label + ' no riders remain at the station');
+        assert.deepEqual(express, boarded, label + ' all riders reach the express exit');
+      }
+    }
+    console.log('PASS 100/300 marbles across three seeds: safe approach, boarding, unloading and full finishes');
+  } finally {
+    Math.random = random;
+    physics.dispose();
+  }
+}
+
 (async () => {
   assert.deepEqual(validateStage(JSON.parse(JSON.stringify(stage))), stage);
   assert.throws(() => validateStage({ ...stage, entities: [{ ...device, type: 'static' }] }));
+  await verifyCrowdedStations();
   const race = new Race();
   await race.physics.init();
   const random = Math.random;
@@ -104,6 +171,21 @@ const device = stage.entities[index];
         shortcutTotal += drop.length;
         outerTotal += outer.length;
       }
+    race.prepare(stage, ['bypass rebound']);
+    race.startRace([1, 1]);
+    p.placeMarble(0, 22.35, 26.4);
+    p.setMarbleVelocity(0, 7.85, -1.5);
+    let routeX;
+    while (race.state === 'running' && race.elapsed < 20) {
+      race.advance();
+      const ball = race.balls[0];
+      if (ball.py < 40 && ball.y >= 40) routeX ??= ball.x;
+    }
+    assert.equal(race.finishReason, 'arrived');
+    assert.ok(routeX < 24.1, 'an upward bounce on the bypass must stay out of the gondola exit');
+    assert.equal(race.rescues, 0);
+    console.log('PASS bypass rebound stays on the ordinary route without a wall rescue');
+
     const seats = firstBoardings.reduce((a, b) => a + b, 0);
     const lowerRowShare = firstBoardings.slice(0, 10).reduce((a, b) => a + b, 0) / seats;
     assert.ok(
