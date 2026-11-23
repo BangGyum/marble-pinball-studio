@@ -107,6 +107,7 @@ export const launcherLab: StageDef = {
   ],
   windZones: [
     { type: 'directional', x: 32, y: 25.4, width: 2.9, height: 20.4, velocityX: 0, velocityY: -9, strength: 6 },
-    { type: 'directional', x: 30.6, y: 16.1, width: 5.5, height: 2.3, velocityX: -6, velocityY: 0, strength: 6 },
+    // Cover both sides of the sloped lip so a marble cannot settle at the edge of the return wind.
+    { type: 'directional', x: 30.6, y: 15.05, width: 5.5, height: 4.4, velocityX: -6, velocityY: 0, strength: 6 },
   ],
 };

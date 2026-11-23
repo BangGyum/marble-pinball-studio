@@ -54,6 +54,20 @@ const { validateStage } = require('../src/model.ts');
     for (let i = 0; i < 50; i++) physics.step(1 / 60);
     console.log('PASS moving muzzle position and velocity, occupied-device cleanup and map serialization');
 
+    for (const [x, y] of [
+      [31.63, 14.94],
+      [29.15, 13.19],
+    ]) {
+      race.prepare(launcherLab, ['return-lip probe']);
+      race.startRace([1, 1]);
+      physics.placeMarble(0, x, y);
+      Object.assign(race.balls[0], { x, y });
+      physics.setMarbleVelocity(0, 0, 0);
+      for (let frame = 0; frame < 180; frame++) race.advance();
+      assert.ok(race.balls[0].x < 28 && race.balls[0].y > 15, 'the return lip releases a resting marble to the feed');
+    }
+    console.log('PASS returning marbles clear the sloped wind lip from both former resting points');
+
     for (const count of [1, 20, 40]) {
       for (const initial of [77, 527, 1337]) {
         let seed = initial;

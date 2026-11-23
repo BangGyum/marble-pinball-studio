@@ -39,12 +39,13 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
   listener.EndContact = listener.PreSolve = listener.PostSolve = () => {};
   physics.world.SetContactListener(listener);
   try {
-    for (const count of [1, 8, 20, 40]) {
+    for (const count of [1, 8, 20, 40, 300]) {
       let direct = 0,
         bank = 0,
         total = 0,
         retries = 0;
-      for (const initial of [77, 527, 1337]) {
+      const seeds = count === 300 ? [77] : [77, 527, 1337];
+      for (const initial of seeds) {
         let seed = initial;
         Math.random = () => {
           seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
@@ -60,7 +61,9 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
         marbleBodies = new Map(
           Object.entries(physics.marbleMap).map(([id, body]) => [box.getPointer(body), Number(id)])
         );
-        while (race.state === 'running' && race.elapsed < 155) {
+        const clearedFeed = new Set();
+        const timeLimit = count === 300 ? 370 : 155;
+        while (race.state === 'running' && race.elapsed < timeLimit) {
           const launcher = physics.launchers[0],
             held = launcher.loaded?.body;
           race.advance();
@@ -71,6 +74,7 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
             shots.set(id, { angle: (Math.atan2(-vy, -vx) * 180) / Math.PI, hits: [], inCup: false });
           }
           for (const ball of race.balls) {
+            if (count === 300 && race.elapsed < 90 && ball.y >= 15.5) clearedFeed.add(ball.id);
             const shot = shots.get(ball.id);
             if (
               shot &&
@@ -84,6 +88,7 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
             }
           }
         }
+        if (count === 300) assert.ok(clearedFeed.size >= 195, 'crowded marbles keep flowing through the upper ramps');
         assert.equal(race.finishReason, 'arrived');
         assert.equal(race.rescues, 0, 'even misses must return under their own physics');
         assert.equal(shots.size, count, 'all marbles must use the launcher');
@@ -101,7 +106,7 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
       console.log(
         'PASS',
         count,
-        'marbles × 3 races:',
+        `marbles × ${seeds.length} races:`,
         total,
         'arrivals,',
         bank,
