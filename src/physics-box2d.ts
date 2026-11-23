@@ -52,7 +52,8 @@ type Launcher = {
   pistonTravel?: number;
   loaded?: { body: Box2D.b2Body; at: number; x: number; y: number };
 };
-// The marble radius is 0.25; leave a small margin when recovering onto a hit face.
+const MARBLE_RADIUS = 0.25;
+// Leave a small margin when recovering onto a hit face.
 const SWEEP_CLEARANCE = 0.255;
 const RECOVERY_DIRECTIONS = Array.from({ length: 128 }, (_, i) => [
   Math.cos((i * Math.PI) / 64),
@@ -362,7 +363,7 @@ export class Box2dPhysics implements IPhysics {
   createMarble(id: number, x: number, y: number) {
     const B = this.Box2D,
       shape = new B.b2CircleShape();
-    shape.set_m_radius(0.25);
+    shape.set_m_radius(MARBLE_RADIUS);
     const def = new B.b2BodyDef();
     def.set_type(B.b2_dynamicBody);
     this.vector.Set(x, y);
@@ -730,6 +731,46 @@ export class Box2dPhysics implements IPhysics {
       }
     }
   }
+  private separateLauncherMarbles(
+    held: Box2D.b2Body,
+    x: number,
+    y: number,
+    barrel: PhysicsEntity,
+    gate: PhysicsEntity
+  ) {
+    // The piston carries a disabled marble, so Box2D cannot separate it from the queue.
+    const elevated = this.bridgeBodies.has(held);
+    const diameter = 2 * MARBLE_RADIUS;
+    const layer = elevated ? 2 : 1;
+    for (const body of this.marbleBodies) {
+      if (body === held) continue;
+      const pos = body.GetPosition();
+      const dx = pos.x - x,
+        dy = pos.y - y;
+      if (dx * dx + dy * dy >= diameter * diameter || !body.IsEnabled() || this.bridgeBodies.has(body) !== elevated)
+        continue;
+      const angle = dx || dy ? Math.atan2(dy, dx) : -Math.PI / 2;
+      this.sweepEnd ??= new this.Box2D.b2Vec2(0, 0);
+      // Start with the shortest separation. A rail can require sliding around the carried marble.
+      for (const offset of [0, -0.35, 0.35, -0.7, 0.7, -1.05, 1.05]) {
+        const nx = Math.cos(angle + offset),
+          ny = Math.sin(angle + offset);
+        this.sweepEnd.Set(x + nx * diameter, y + ny * diameter);
+        if (
+          this.castMapRay(pos.x, pos.y, this.sweepEnd, 0, layer) ||
+          this.castMapRay(pos.x, pos.y, this.sweepEnd, this.Box2D.getPointer(barrel.body), layer) ||
+          this.castMapRay(pos.x, pos.y, this.sweepEnd, this.Box2D.getPointer(gate.body), layer)
+        )
+          continue;
+        body.SetTransform(this.sweepEnd, body.GetAngle());
+        const v = body.GetLinearVelocity(),
+          inward = Math.min(0, v.x * nx + v.y * ny);
+        this.vector.Set(v.x - inward * nx, v.y - inward * ny);
+        body.SetLinearVelocity(this.vector);
+        break;
+      }
+    }
+  }
   private stepLaunchers(dt: number) {
     for (const launcher of this.launchers) {
       const e = launcher.entity;
@@ -768,10 +809,10 @@ export class Box2dPhysics implements IPhysics {
       const intake = Math.min(1, age / (launcher.gate ? 0.15 : 0.18));
       const dx = -Math.cos(angle),
         dy = -Math.sin(angle);
-      this.vector.Set(
-        ball.x + (e.x - ball.x) * intake + dx * distance,
-        ball.y + (e.y - ball.y) * intake + dy * distance
-      );
+      const x = ball.x + (e.x - ball.x) * intake + dx * distance,
+        y = ball.y + (e.y - ball.y) * intake + dy * distance;
+      if (launcher.gate) this.separateLauncherMarbles(ball.body, x, y, e, launcher.gate);
+      this.vector.Set(x, y);
       ball.body.SetTransform(this.vector, ball.body.GetAngle());
       if (travel < BARREL_LENGTH) continue;
       ball.body.SetEnabled(true);

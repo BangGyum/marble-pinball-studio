@@ -147,13 +147,30 @@ async function verifyDenseRaces() {
             ids = new Map(Object.entries(physics.marbleMap).map(([id, body]) => [body, Number(id)])),
             released = new Set();
           let reloadWait = 0,
-            longestReloadWait = 0;
+            longestReloadWait = 0,
+            longestLoad = 0;
           while (race.state === 'running' && race.elapsed < 400) {
-            const before = launcher.loaded?.body;
+            const before = launcher.loaded;
             race.advance();
             const loaded = launcher.loaded;
-            if (before && !loaded) released.add(ids.get(before));
-            if (loaded) assert.ok(physics.motionTime - loaded.at < 0.45, 'a marble cannot stall in the barrel');
+            if (before && !loaded) released.add(ids.get(before.body));
+            const guided = loaded ?? before;
+            if (guided) {
+              longestLoad = Math.max(longestLoad, physics.motionTime - guided.at);
+              const id = ids.get(guided.body);
+              const held = race.balls[id];
+              // Box2D positions are stored as float32. Allow rounding at exact contact.
+              const minSeparation = 0.4999;
+              for (const other of race.balls) {
+                if (other.id === id || other.rank || Math.abs(held.x - other.x) >= minSeparation) continue;
+                if (Math.abs(held.y - other.y) >= minSeparation) continue;
+                const distance = Math.hypot(held.x - other.x, held.y - other.y);
+                assert.ok(
+                  distance >= minSeparation,
+                  `${stage.title} / ${count} / ${initial}: marbles ${id} and ${other.id} overlap at ${race.elapsed.toFixed(2)}s (distance ${distance.toFixed(4)})`
+                );
+              }
+            }
             const waiting =
               !loaded &&
               race.balls.some(
@@ -171,8 +188,16 @@ async function verifyDenseRaces() {
           assert.equal(race.arrivals.length, count, diagnosis);
           assert.equal(released.size, count, diagnosis + ' all marbles must leave the muzzle');
           assert.equal(race.rescues, 0, diagnosis);
+          assert.ok(longestLoad < 0.45, diagnosis + ' a marble cannot stall in the barrel');
           assert.ok(longestReloadWait < 8, diagnosis + ' the gate must release an occupied throat');
-          console.log('PASS', diagnosis, 'longest ready wait', longestReloadWait.toFixed(2));
+          console.log(
+            'PASS',
+            diagnosis,
+            'longest ready wait',
+            longestReloadWait.toFixed(2),
+            'load',
+            longestLoad.toFixed(3)
+          );
         }
       }
     }
