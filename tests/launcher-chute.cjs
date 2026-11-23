@@ -16,11 +16,13 @@ const { oneBounce } = require('../src/data/one-bounce.ts');
 const {
   BARREL_LENGTH,
   BARREL_TILT,
+  FUNNEL_ENTRY_Y,
   LAUNCHER_ENTRY_HALF_WIDTH,
   LAUNCHER_ENTRY_Y,
   LAUNCHER_GATE_Y,
   LAUNCHER_GATE_OPEN_ANGLE,
   LAUNCH_SPEED,
+  launcherFunnel,
   marbleLauncher,
 } = require('../src/marble-launcher.ts');
 const { encodeScene, decodeScene } = require('../src/lan/protocol.ts');
@@ -67,6 +69,8 @@ async function verifyChute() {
       physics.step(1 / 60);
       const gate = launcher.gate.body;
       const occupied = launcher.loaded?.body;
+      const guided = occupied ?? before;
+      assert.deepEqual(physics.getLauncherGuideIds(), guided ? [physics.marbleBodies.indexOf(guided)] : []);
       assert.equal(physics.marbleBodies.filter((body) => !body.IsEnabled()).length, occupied ? 1 : 0);
       if (gate.IsEnabled()) {
         assert.equal(gate.GetAngle(), 0);
@@ -124,6 +128,72 @@ async function verifyChute() {
   }
 }
 
+async function verifyFunnel() {
+  const race = new Race();
+  const physics = race.physics;
+  await physics.init();
+  try {
+    const x = 18,
+      y = 16;
+    const sides = launcherFunnel({ x, y });
+    const rail = (points) => ({
+      type: 'static',
+      position: { x: 0, y: 0 },
+      shape: { type: 'polyline', rotation: 0, points },
+      props: { density: 1, restitution: 0, angularVelocity: 0 },
+    });
+    const stage = {
+      title: 'Funnel probe',
+      goalY: 40,
+      zoomY: 35,
+      entities: [rail(sides.left), rail(sides.right), marbleLauncher(x, y, 'funnel')],
+    };
+    race.prepare(stage, ['side entry']);
+    race.startRace([1, 1]);
+    physics.placeMarble(0, x + 0.1, y - 0.5);
+    for (let frame = 0; frame < 18; frame++) {
+      physics.step(1 / 60);
+      assert.equal(physics.launchers[0].loaded, undefined, 'a marble below the funnel mouth cannot load');
+    }
+    race.prepare(stage, ['left', 'right']);
+    race.startRace([2, 2]);
+    physics.placeMarble(0, x - 0.28, y - 1.65);
+    physics.placeMarble(1, x + 0.28, y - 1.65);
+    const launcher = physics.launchers[0];
+    assert.equal(launcher.gate, undefined, 'the funnel must never create a horizontal gate');
+    const fired = new Set();
+    let unjammed = false;
+    let clearAt;
+    for (let frame = 0; frame < 300 && fired.size < 2; frame++) {
+      const before = launcher.loaded;
+      physics.step(1 / 60);
+      const after = launcher.loaded;
+      unjammed ||= !!launcher.funnelAssist;
+      assert.equal(physics.marbleBodies.filter((body) => !body.IsEnabled()).length, after ? 1 : 0);
+      if (before && !after) {
+        fired.add(before.id);
+        clearAt = physics.motionTime;
+      }
+    }
+    assert.ok(unjammed, 'a wedged pair triggered the intake recovery');
+    assert.equal(fired.size, 2, 'both marbles are fired within five seconds');
+    const scene = {
+      type: 'scene',
+      raceId: 'funnel',
+      revision: 1,
+      stage,
+      settings: { mapId: 0, names: 'a', order: 'asc', picks: 1 },
+      entities: physics.getEntities(),
+      fixed: [false, false],
+      balls: [],
+    };
+    assert.deepEqual(decodeScene(JSON.parse(JSON.stringify(encodeScene(scene)))).entities, scene.entities);
+    console.log('PASS gate-free funnel, two-marble jam recovery and one-at-a-time firing in', clearAt.toFixed(2), 's');
+  } finally {
+    physics.dispose();
+  }
+}
+
 async function verifyDenseRaces() {
   const race = new Race();
   const physics = race.physics;
@@ -146,6 +216,7 @@ async function verifyDenseRaces() {
           const launcher = physics.launchers[0],
             ids = new Map(Object.entries(physics.marbleMap).map(([id, body]) => [body, Number(id)])),
             released = new Set();
+          assert.equal(launcher.gate, undefined);
           let reloadWait = 0,
             longestReloadWait = 0,
             longestLoad = 0;
@@ -177,8 +248,8 @@ async function verifyDenseRaces() {
                 (ball) =>
                   !ball.rank &&
                   Math.abs(ball.x - launcher.entity.x) < 0.44 &&
-                  ball.y >= launcher.gate.y - 0.36 &&
-                  ball.y < launcher.entity.y + LAUNCHER_ENTRY_Y
+                  ball.y >= launcher.entity.y + FUNNEL_ENTRY_Y - 0.7 &&
+                  ball.y < launcher.entity.y + FUNNEL_ENTRY_Y
               );
             reloadWait = waiting ? reloadWait + 1 / 60 : 0;
             longestReloadWait = Math.max(longestReloadWait, reloadWait);
@@ -189,7 +260,7 @@ async function verifyDenseRaces() {
           assert.equal(released.size, count, diagnosis + ' all marbles must leave the muzzle');
           assert.equal(race.rescues, 0, diagnosis);
           assert.ok(longestLoad < 0.45, diagnosis + ' a marble cannot stall in the barrel');
-          assert.ok(longestReloadWait < 8, diagnosis + ' the gate must release an occupied throat');
+          assert.ok(longestReloadWait < 2, diagnosis + ' the funnel must clear an occupied throat');
           console.log(
             'PASS',
             diagnosis,
@@ -209,6 +280,7 @@ async function verifyDenseRaces() {
 
 (async () => {
   await verifyChute();
+  await verifyFunnel();
   await verifyDenseRaces();
 })().catch((error) => {
   console.error(error);

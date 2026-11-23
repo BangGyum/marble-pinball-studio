@@ -415,6 +415,7 @@ for (const range of [
     physics: {
       step: () => tick++,
       getMarblePosition: (id) => ({ x: id, y: tick > id ? 11 : tick, angle: 0 }),
+      getLauncherGuideIds: () => [],
       removeMarble: (id) => removed.push(id),
     },
     onFinish: (winners) => {

@@ -1,4 +1,4 @@
-import { marbleLauncher } from '../marble-launcher';
+import { funnelSide, launcherFunnel, marbleLauncher } from '../marble-launcher';
 import type { StageDef } from '../stage-def';
 import type { MapEntity } from '../types/map-entity';
 import { curve, wall } from './wind-map-shapes';
@@ -12,7 +12,8 @@ const rail = (points: Point[], color: string): MapEntity => {
   entity.shape.color = color;
   return entity;
 };
-const launcher = marbleLauncher(28, 21.5, 'chute');
+const launcher = marbleLauncher(28, 21.5, 'funnel');
+const funnel = launcherFunnel(launcher.position);
 
 const enclosure = rail(
   [
@@ -24,10 +25,11 @@ const enclosure = rail(
   returnRail
 );
 
+// Keep the left edge clear of marbles falling out of the feed ramp before a shot.
 export const reboundPad: MapEntity = {
   type: 'static',
-  position: { x: 13, y: 22.5 },
-  shape: { type: 'box', width: 2.9, height: 0.23, rotation: 0.03, color: '#65efda' },
+  position: { x: 13.45, y: 22.5 },
+  shape: { type: 'box', width: 2.45, height: 0.23, rotation: 0.03, color: '#65efda' },
   props: { density: 1, restitution: 1.55, angularVelocity: 0 },
 };
 export const oneBounce: StageDef = {
@@ -57,29 +59,14 @@ export const oneBounce: StageDef = {
       feed
     ),
     rail([...curve([24.6, 15.13], [25.1, 14.85], [25.6, 14.7], [26.15, 15.6]), [27.45, 17.9]], feed),
-    rail(
-      [
-        [19.25, 15.75],
-        [24.5, 17.35],
-        [27.34, 19.72],
-        [27.34, 20.5],
-      ],
-      feed
-    ),
+    rail([[19.25, 15.75], [24.5, 17.35], ...funnel.left], feed),
     {
       type: 'kinematic',
       position: { x: 16.6, y: 11.62 },
       shape: { type: 'box', width: 0.22, height: 1.15, rotation: 0, color: '#ba9cff' },
       props: { density: 1, restitution: 0.32, angularVelocity: 0, oscillation: { amplitude: 0.85, period: 2.5 } },
     },
-    rail(
-      [
-        [30.5, 18.8],
-        [28.66, 20.16],
-        [28.66, 21.7],
-      ],
-      returnRail
-    ),
+    funnelSide(funnel.right, returnRail),
     launcher,
     reboundPad,
     rail(

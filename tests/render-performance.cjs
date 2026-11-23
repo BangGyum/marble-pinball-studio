@@ -592,6 +592,51 @@ game.render();
 assert.equal(entityReads, 1, 'spring status calculation reuses the rendered entity snapshot');
 console.log('PASS idle cadence, immediate input, camera, recording, celebration and single entity read');
 
+{
+  const launcherGame = new Game(canvas);
+  launcherGame.stage = { title: 'Launcher draw', goalY: 40, entities: [] };
+  launcherGame.state = 'running';
+  launcherGame.stepped = true;
+  launcherGame.accumulator = 1 / 120;
+  launcherGame.camera = { x: 12, y: 10 };
+  launcherGame.balls = [
+    { id: 0, x: 10, y: 10, px: 10, py: 10 },
+    { id: 1, x: 10, y: 10.5, px: 10.5, py: 10 },
+    { id: 2, x: 14, y: 10, px: 13, py: 10 },
+  ].map((ball) => ({ ...ball, name: String(ball.id), color: '#fff' }));
+  const draw = new Map(),
+    squash = { angle: 0, amount: 0.1 };
+  let snapLauncher;
+  launcherGame.physics.getEntities = (_blend, snap) => {
+    snapLauncher = snap;
+    return [];
+  };
+  launcherGame.physics.getLauncherGuideIds = () => [0];
+  launcherGame.marbleElasticity.effect = () => squash;
+  launcherGame.renderCache.drawBall = (_ctx, ball, _scale, _ratio, x, y, deformation) => {
+    draw.set(ball.id, { x, y, deformation });
+    return true;
+  };
+
+  launcherGame.updateLauncherDrawing();
+  launcherGame.render();
+  assert.equal(snapLauncher, true);
+  assert.deepEqual(draw.get(0), { x: 10, y: 10, deformation: undefined });
+  assert.deepEqual(draw.get(1), { x: 10, y: 10.5, deformation: undefined });
+  assert.deepEqual(draw.get(2), { x: 13.5, y: 10, deformation: squash });
+  assert.equal(launcherGame.balls[1].px, 10.5, 'drawing must leave the physics samples intact');
+
+  launcherGame.balls[1].px = 10;
+  launcherGame.balls[1].py = 10.6;
+  launcherGame.updateLauncherDrawing();
+  launcherGame.render();
+  assert.equal(snapLauncher, false);
+  assert.deepEqual(draw.get(1), { x: 10, y: 10.55, deformation: undefined });
+}
+console.log(
+  'PASS launcher rendering avoids an overlapping blend, preserves round silhouettes and blends unrelated marbles'
+);
+
 const scene = {
   raceId: 'r',
   revision: 1,

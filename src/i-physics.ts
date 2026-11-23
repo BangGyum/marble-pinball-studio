@@ -34,8 +34,11 @@ export interface IPhysics {
 
   isMarbleOnBridge(id: number): boolean;
 
+  // Includes marbles released at the muzzle during the last step.
+  getLauncherGuideIds(): readonly number[];
+
   // blend < 1 mixes moving obstacles back toward their pose before the last step.
-  getEntities(blend?: number): MapEntityState[];
+  getEntities(blend?: number, snapLaunchers?: boolean): MapEntityState[];
 
   activateSpring(index: number): boolean;
 

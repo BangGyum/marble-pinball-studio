@@ -6,6 +6,8 @@ import {
   BARREL_LENGTH,
   BARREL_RAILS,
   BARREL_TILT,
+  FUNNEL_ENTRY_HALF_WIDTH,
+  FUNNEL_ENTRY_Y,
   LAUNCHER_ENTRY_HALF_WIDTH,
   LAUNCHER_ENTRY_Y,
   LAUNCHER_GATE_HALF_WIDTH,
@@ -31,6 +33,7 @@ type PhysicsEntity = {
   spinCycle?: MapEntity['props']['spinCycle'];
   spin: number;
   launcherPiston?: boolean;
+  launcherPart?: boolean;
   sweepPose?: {
     x: number;
     y: number;
@@ -49,8 +52,12 @@ type Launcher = {
   entity: PhysicsEntity;
   gate?: PhysicsEntity;
   piston?: PhysicsEntity;
+  waiting?: Set<Box2D.b2Body>;
+  queued?: Box2D.b2Body;
+  jamSince?: number;
+  funnelAssist?: { body: Box2D.b2Body; until: number };
   pistonTravel?: number;
-  loaded?: { body: Box2D.b2Body; at: number; x: number; y: number };
+  loaded?: { body: Box2D.b2Body; at: number; x: number; y: number; id?: number };
 };
 const MARBLE_RADIUS = 0.25;
 // Leave a small margin when recovering onto a hit face.
@@ -85,6 +92,7 @@ export class Box2dPhysics implements IPhysics {
   private rotators: PhysicsEntity[] = [];
   private boosters: PhysicsEntity[] = [];
   private launchers: Launcher[] = [];
+  private launcherGuideIds: number[] = [];
   private launcherApproaches = new Float64Array(0);
   private breakables: PhysicsEntity[] = [];
   private broken = new Set<PhysicsEntity>();
@@ -128,8 +136,12 @@ export class Box2dPhysics implements IPhysics {
     if (this.world && !this.disposed && this.world.GetBodyCount() === 0) this.leaks.freeLeaked();
   }
   clear() {
-    for (const launcher of this.launchers) launcher.loaded?.body.SetEnabled(true);
+    for (const launcher of this.launchers) {
+      launcher.loaded?.body.SetEnabled(true);
+      launcher.queued?.SetType(this.Box2D.b2_dynamicBody);
+    }
     this.launchers = [];
+    this.launcherGuideIds.length = 0;
     this.vortex = undefined;
     this.windZones = [];
     this.winds = [];
@@ -155,7 +167,14 @@ export class Box2dPhysics implements IPhysics {
     this.releaseWrappers();
   }
   clearMarbles() {
-    for (const launcher of this.launchers) launcher.loaded = undefined;
+    for (const launcher of this.launchers) {
+      launcher.loaded = undefined;
+      launcher.waiting?.clear();
+      launcher.queued = undefined;
+      launcher.jamSince = undefined;
+      launcher.funnelAssist = undefined;
+    }
+    this.launcherGuideIds.length = 0;
     for (const body of Object.values(this.marbleMap)) this.world.DestroyBody(body);
     this.marbleMap = {};
     this.marbleBodies = [];
@@ -220,7 +239,7 @@ export class Box2dPhysics implements IPhysics {
         fixture.set_shape(shape);
         this.leaks.recordLeak(body.CreateFixture(fixture));
         B.destroy(shape);
-        if (s.launcher === 'chute') {
+        if (s.launcher && s.launcher !== true) {
           const rail = new B.b2PolygonShape();
           const length = (BARREL_LENGTH + BARREL_RAILS.end) / 2;
           const along = BARREL_RAILS.end - length;
@@ -325,7 +344,7 @@ export class Box2dPhysics implements IPhysics {
           s.type === 'box'
             ? Math.hypot(s.width, s.height)
             : s.type === 'circle'
-              ? s.launcher === 'chute'
+              ? s.launcher && s.launcher !== true
                 ? BARREL_LENGTH + BARREL_RAILS.outer
                 : s.radius
               : Math.max(...s.points.map(([x, y]) => Math.hypot(x, y))) + Math.abs(s.backing ?? 0);
@@ -334,9 +353,13 @@ export class Box2dPhysics implements IPhysics {
       if (state.moving) this.leaks.recordLeak(body.GetPosition());
       if (s.type === 'box' && s.spring) this.springs.push(state);
       if (s.type === 'circle' && s.launcher) {
-        const launcher = { entity: state };
+        const launcher: Launcher = { entity: state };
         this.launchers.push(launcher);
-        if (s.launcher === 'chute') newChutes.push(launcher);
+        if (s.launcher !== true) {
+          state.launcherPart = true;
+          newChutes.push(launcher);
+          if (s.launcher === 'funnel') launcher.waiting = new Set();
+        }
       }
       if (state.sliding) this.sliders.push(state);
       if (state.oscillation || state.timedGate || state.spinCycle) this.rotators.push(state);
@@ -345,18 +368,24 @@ export class Box2dPhysics implements IPhysics {
     }
     for (const launcher of newChutes) {
       const { x, y, shape } = launcher.entity;
-      const gateDefinition = launcherGate(x, y);
-      if (shape.collisionLayer) gateDefinition.shape.collisionLayer = shape.collisionLayer;
+      if (!launcher.waiting) {
+        const gateDefinition = launcherGate(x, y);
+        if (shape.collisionLayer) gateDefinition.shape.collisionLayer = shape.collisionLayer;
+        const index = this.entities.length;
+        this.createEntities([gateDefinition]);
+        const gate = this.entities[index];
+        this.vector.Set(gate.x, gate.y);
+        gate.body.SetTransform(this.vector, LAUNCHER_GATE_OPEN_ANGLE);
+        gate.body.SetEnabled(false);
+        gate.launcherPart = true;
+        launcher.gate = gate;
+      }
       const index = this.entities.length;
-      this.createEntities([gateDefinition, launcherPiston(x, y)]);
-      const gate = this.entities[index],
-        piston = this.entities[index + 1];
-      this.vector.Set(gate.x, gate.y);
-      gate.body.SetTransform(this.vector, LAUNCHER_GATE_OPEN_ANGLE);
-      gate.body.SetEnabled(false);
+      this.createEntities([launcherPiston(x, y)]);
+      const piston = this.entities[index];
+      piston.launcherPart = true;
       piston.launcherPiston = true;
       piston.body.SetEnabled(false);
-      launcher.gate = gate;
       launcher.piston = piston;
     }
   }
@@ -395,6 +424,9 @@ export class Box2dPhysics implements IPhysics {
     if (body) {
       for (const launcher of this.launchers) {
         if (launcher.loaded?.body === body) launcher.loaded = undefined;
+        launcher.waiting?.delete(body);
+        if (launcher.queued === body) launcher.queued = undefined;
+        if (launcher.funnelAssist?.body === body) launcher.funnelAssist = undefined;
       }
       this.world.DestroyBody(body);
       this.bridgeBodies.delete(body);
@@ -437,7 +469,10 @@ export class Box2dPhysics implements IPhysics {
   isMarbleOnBridge(id: number) {
     return this.bridgeBodies.has(this.marbleMap[id]);
   }
-  getEntities(blend = 1): MapEntityState[] {
+  getLauncherGuideIds(): readonly number[] {
+    return this.launcherGuideIds;
+  }
+  getEntities(blend = 1, snapLaunchers = false): MapEntityState[] {
     // A breakable obstacle removed in the last step shifts indices; draw that frame unblended.
     const previous = blend < 1 && this.previousCount === this.entities.length ? this.previousPoses : undefined;
     return this.entities.map((e, i) => {
@@ -446,7 +481,7 @@ export class Box2dPhysics implements IPhysics {
       let x = position ? position.x : e.x,
         y = position ? position.y : e.y,
         angle = e.moving ? e.body.GetAngle() : 0;
-      if (previous && e.moving) {
+      if (previous && e.moving && !(snapLaunchers && e.launcherPart)) {
         x = previous[i * 2] + (x - previous[i * 2]) * blend;
         y = this.previousY[i] + (y - this.previousY[i]) * blend;
         angle = previous[i * 2 + 1] + (angle - previous[i * 2 + 1]) * blend;
@@ -678,8 +713,11 @@ export class Box2dPhysics implements IPhysics {
       this.launcherApproaches[i * 2 + 1] = pos.y;
     }
   }
-  private findChuteMarble(e: PhysicsEntity) {
-    const mouthY = e.y + LAUNCHER_ENTRY_Y;
+  private findChuteMarble(launcher: Launcher) {
+    const { entity: e, waiting } = launcher;
+    const mouthY = e.y + (waiting ? FUNNEL_ENTRY_Y : LAUNCHER_ENTRY_Y);
+    const halfWidth = waiting ? FUNNEL_ENTRY_HALF_WIDTH : LAUNCHER_ENTRY_HALF_WIDTH;
+    const previous = waiting?.values().next().value;
     const elevated = e.shape.collisionLayer === 2;
     let first: Box2D.b2Body | undefined;
     let earliest = Infinity;
@@ -698,12 +736,86 @@ export class Box2dPhysics implements IPhysics {
       const fraction = (mouthY - beforeY) / (pos.y - beforeY);
       const beforeX = this.launcherApproaches[i * 2];
       const crossingX = beforeX + (pos.x - beforeX) * fraction;
-      if (Math.abs(crossingX - e.x) <= LAUNCHER_ENTRY_HALF_WIDTH && fraction < earliest) {
+      if (Math.abs(crossingX - e.x) > halfWidth) continue;
+      if (fraction < earliest) {
         earliest = fraction;
         first = body;
       }
+      waiting?.add(body);
+    }
+    if (waiting) {
+      for (const body of waiting) {
+        const p = body.GetPosition();
+        if (!body.IsEnabled() || Math.abs(p.x - e.x) > halfWidth || p.y < mouthY - 0.25) {
+          if (launcher.queued === body) {
+            body.SetType(this.Box2D.b2_dynamicBody);
+            launcher.queued = undefined;
+          }
+          waiting.delete(body);
+        }
+      }
+      if (launcher.queued) return launcher.queued;
+      if (previous && waiting.has(previous)) return previous;
+      return first && waiting.has(first) ? first : waiting.values().next().value;
     }
     return first;
+  }
+  private clearFunnelJam(launcher: Launcher) {
+    const { entity: e } = launcher;
+    const mouthY = e.y + FUNNEL_ENTRY_Y;
+    const assist = launcher.funnelAssist;
+    if (assist && this.motionTime < assist.until) {
+      const pos = assist.body.GetPosition();
+      if (pos.y < mouthY && Math.abs(pos.x - e.x) < 0.65 && assist.body.IsEnabled()) {
+        this.vector.Set(Math.max(-2.5, Math.min(2.5, (e.x - pos.x) * 12)), 4);
+        assist.body.SetLinearVelocity(this.vector);
+        return;
+      }
+    }
+    launcher.funnelAssist = undefined;
+    let left: Box2D.b2Body | undefined, right: Box2D.b2Body | undefined;
+    let leftY = mouthY - 0.7,
+      rightY = leftY;
+    for (const body of this.marbleBodies) {
+      const p = body.GetPosition();
+      if (
+        Math.abs(p.x - e.x) > 0.64 ||
+        p.y >= mouthY ||
+        p.y < Math.min(leftY, rightY) ||
+        !body.IsEnabled() ||
+        this.bridgeBodies.has(body) !== (e.shape.collisionLayer === 2)
+      )
+        continue;
+      if (p.x < e.x && p.y > leftY) {
+        left = body;
+        leftY = p.y;
+      }
+      if (p.x >= e.x && p.y > rightY) {
+        right = body;
+        rightY = p.y;
+      }
+    }
+    const leading = leftY > rightY ? left : right;
+    if (!leading) {
+      launcher.jamSince = undefined;
+      return;
+    }
+    launcher.jamSince ??= this.motionTime;
+    if (this.motionTime - launcher.jamSince < 0.6) return;
+    // Nudge the lowest marble down the center and lift a neighbor only if it blocks the throat.
+    const neighbor = leading === left ? right : left;
+    if (neighbor) {
+      const a = leading.GetPosition(),
+        b = neighbor.GetPosition();
+      if ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 < 0.58 ** 2) {
+        this.vector.Set(neighbor === left ? -1.3 : 1.3, -4);
+        neighbor.SetLinearVelocity(this.vector);
+        neighbor.SetAwake(true);
+      }
+    }
+    launcher.funnelAssist = { body: leading, until: this.motionTime + 0.25 };
+    leading.SetAwake(true);
+    launcher.jamSince = this.motionTime;
   }
   private moveLauncherGates(dt: number) {
     for (const { entity, gate, loaded } of this.launchers) {
@@ -735,14 +847,13 @@ export class Box2dPhysics implements IPhysics {
     held: Box2D.b2Body,
     x: number,
     y: number,
-    barrel: PhysicsEntity,
-    gate: PhysicsEntity
+    { entity: barrel, gate, waiting }: Launcher
   ) {
     // The piston carries a disabled marble, so Box2D cannot separate it from the queue.
     const elevated = this.bridgeBodies.has(held);
     const diameter = 2 * MARBLE_RADIUS;
     const layer = elevated ? 2 : 1;
-    for (const body of this.marbleBodies) {
+    for (const [i, body] of this.marbleBodies.entries()) {
       if (body === held) continue;
       const pos = body.GetPosition();
       const dx = pos.x - x,
@@ -759,7 +870,15 @@ export class Box2dPhysics implements IPhysics {
         if (
           this.castMapRay(pos.x, pos.y, this.sweepEnd, 0, layer) ||
           this.castMapRay(pos.x, pos.y, this.sweepEnd, this.Box2D.getPointer(barrel.body), layer) ||
-          this.castMapRay(pos.x, pos.y, this.sweepEnd, this.Box2D.getPointer(gate.body), layer)
+          (gate && this.castMapRay(pos.x, pos.y, this.sweepEnd, this.Box2D.getPointer(gate.body), layer)) ||
+          (waiting &&
+            this.castMapRay(
+              this.launcherApproaches[i * 2],
+              this.launcherApproaches[i * 2 + 1],
+              this.sweepEnd,
+              0,
+              layer
+            ))
         )
           continue;
         body.SetTransform(this.sweepEnd, body.GetAngle());
@@ -772,14 +891,29 @@ export class Box2dPhysics implements IPhysics {
     }
   }
   private stepLaunchers(dt: number) {
+    this.launcherGuideIds.length = 0;
     for (const launcher of this.launchers) {
       const e = launcher.entity;
-      if (!launcher.loaded && launcher.gate) {
-        const body = this.findChuteMarble(e);
-        if (body) {
+      if (launcher.piston) {
+        const body = launcher.waiting || !launcher.loaded ? this.findChuteMarble(launcher) : undefined;
+        if (body && !launcher.loaded) {
+          if (launcher.queued === body) {
+            body.SetType(this.Box2D.b2_dynamicBody);
+            launcher.queued = undefined;
+          }
           const pos = body.GetPosition();
-          launcher.loaded = { body, at: this.motionTime, x: pos.x, y: pos.y };
+          const id = Number(Object.keys(this.marbleMap).find((id) => this.marbleMap[Number(id)] === body));
+          launcher.loaded = { body, at: this.motionTime, x: pos.x, y: pos.y, id };
+          launcher.waiting?.delete(body);
+          launcher.jamSince = undefined;
+          launcher.funnelAssist = undefined;
           body.SetEnabled(false);
+        } else if (launcher.waiting && !launcher.loaded) this.clearFunnelJam(launcher);
+        if (body && launcher.waiting?.has(body) && !launcher.queued) {
+          // The next marble itself holds the line while the piston is occupied.
+          // It keeps its circular fixture so waiting marbles still collide normally.
+          body.SetType(this.Box2D.b2_staticBody);
+          launcher.queued = body;
         }
       } else if (!launcher.loaded) {
         let edge = this.leaks.recordLeak(e.body.GetContactList());
@@ -797,7 +931,7 @@ export class Box2dPhysics implements IPhysics {
       const ball = launcher.loaded;
       const age = ball ? this.motionTime - ball.at : 0;
       const angle = BARREL_TILT + e.body.GetAngle();
-      const travel = Math.max(0, (age - (launcher.gate ? 0.195 : 0.32)) * LAUNCH_SPEED);
+      const travel = Math.max(0, (age - (launcher.piston ? 0.195 : 0.32)) * LAUNCH_SPEED);
       const distance = Math.min(BARREL_LENGTH, travel);
       if (launcher.piston) {
         launcher.pistonTravel = ball ? distance : Math.max(0, (launcher.pistonTravel ?? 0) - dt * LAUNCH_SPEED * 2);
@@ -806,12 +940,13 @@ export class Box2dPhysics implements IPhysics {
         launcher.piston.body.SetTransform(this.vector, e.body.GetAngle());
       }
       if (!ball) continue;
-      const intake = Math.min(1, age / (launcher.gate ? 0.15 : 0.18));
+      if (ball.id !== undefined) this.launcherGuideIds.push(ball.id);
+      const intake = Math.min(1, age / (launcher.piston ? 0.15 : 0.18));
       const dx = -Math.cos(angle),
         dy = -Math.sin(angle);
       const x = ball.x + (e.x - ball.x) * intake + dx * distance,
         y = ball.y + (e.y - ball.y) * intake + dy * distance;
-      if (launcher.gate) this.separateLauncherMarbles(ball.body, x, y, e, launcher.gate);
+      if (launcher.piston) this.separateLauncherMarbles(ball.body, x, y, launcher);
       this.vector.Set(x, y);
       ball.body.SetTransform(this.vector, ball.body.GetAngle());
       if (travel < BARREL_LENGTH) continue;
@@ -825,7 +960,8 @@ export class Box2dPhysics implements IPhysics {
   step(seconds: number, beforeSubstep?: (dt: number, offset: number) => void) {
     this.recordPoses();
     const bodies = this.marbleBodies;
-    if (this.launchers.some(({ gate, loaded }) => gate && !loaded)) this.recordLauncherApproaches();
+    if (this.launchers.some(({ gate, waiting, loaded }) => waiting || (gate && !loaded)))
+      this.recordLauncherApproaches();
     if (this.winds.length) {
       this.windTime += seconds;
       for (const sample of this.winds) {

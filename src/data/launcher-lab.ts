@@ -1,5 +1,5 @@
 import type { StageDef } from '../stage-def';
-import { marbleLauncher } from '../marble-launcher';
+import { funnelSide, launcherFunnel, marbleLauncher } from '../marble-launcher';
 import { wall } from './wind-map-shapes';
 
 const rail = (points: [number, number][], color: string) => {
@@ -10,7 +10,8 @@ const rail = (points: [number, number][], color: string) => {
 const feed = '#79d5cf',
   brass = '#ffc675',
   lift = '#82a9c4';
-const launcher = marbleLauncher(28, 21.5, 'chute');
+const launcher = marbleLauncher(28, 21.5, 'funnel');
+const funnel = launcherFunnel(launcher.position);
 launcher.props.oscillation!.amplitude = 0.12;
 
 export const launcherLab: StageDef = {
@@ -60,17 +61,7 @@ export const launcherLab: StageDef = {
       shape: { type: 'box', width: 1.65, height: 0.15, rotation: 0.18, color: brass },
       props: { density: 1, restitution: 0.25, angularVelocity: 0, oscillation: { amplitude: 0.58, period: 1.9 } },
     },
-    rail(
-      [
-        [1, 12],
-        [14, 15.2],
-        [22, 17.1],
-        [26.65, 19.22],
-        [27.34, 19.72],
-        [27.34, 20.5],
-      ],
-      feed
-    ),
+    rail([[1, 12], [14, 15.2], [22, 17.1], ...funnel.left], feed),
     rail(
       [
         [7, 21.7],
@@ -79,14 +70,7 @@ export const launcherLab: StageDef = {
       ],
       brass
     ),
-    rail(
-      [
-        [30.5, 18.8],
-        [28.66, 20.16],
-        [28.66, 21.7],
-      ],
-      brass
-    ),
+    funnelSide(funnel.right, brass),
     launcher,
     rail(
       [

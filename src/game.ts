@@ -58,6 +58,7 @@ export class Game extends Race {
   private renderCache = new RenderCache();
   private renderResolution = new RenderResolution();
   private marbleElasticity = new MarbleElasticity();
+  private launcherDrawing?: { snap: Set<number>; round: Set<number> };
   private springControls: SpringControls;
   private dolphinRenderer = new DolphinRenderer();
   private dolphinDrag: DolphinDrag;
@@ -161,6 +162,7 @@ export class Game extends Race {
     requestAnimationFrame((t) => this.frame(t));
   }
   prepare(stage: StageDef, names: string[], dolphins?: DolphinSettings) {
+    this.launcherDrawing = undefined;
     if (this.stage !== stage) this.setZoom(1);
     this.goalScale = 0;
     this.goalFollow = false;
@@ -382,6 +384,7 @@ export class Game extends Race {
   }
   advance() {
     super.advance();
+    this.updateLauncherDrawing();
     const now = performance.now();
     for (const ball of this.balls)
       if (!ball.rank) this.marbleElasticity?.sample(ball.id, ball.x, ball.y, this.elapsed, now);
@@ -400,6 +403,51 @@ export class Game extends Race {
       if (this.recording) this.recordStop = setTimeout(() => this.stopRecording(), 1800);
     }
   }
+  private updateLauncherDrawing() {
+    const guideIds = this.physics.getLauncherGuideIds();
+    if (!guideIds.length) {
+      this.launcherDrawing = undefined;
+      return;
+    }
+    this.launcherDrawing ??= { snap: new Set(), round: new Set() };
+    const drawing = this.launcherDrawing;
+    drawing.snap.clear();
+    drawing.round.clear();
+    for (const id of guideIds) {
+      const guide = this.balls[id];
+      if (!guide || guide.rank) continue;
+      const previousX = guide.px ?? guide.x,
+        previousY = guide.py ?? guide.y;
+      const nearby = [id];
+      let overlap = false;
+      for (const ball of this.balls) {
+        if (ball === guide || ball.rank || ball.onBridge !== guide.onBridge) continue;
+        const x0 = (ball.px ?? ball.x) - previousX,
+          y0 = (ball.py ?? ball.y) - previousY,
+          x1 = ball.x - guide.x,
+          y1 = ball.y - guide.y;
+        const dx = x1 - x0,
+          dy = y1 - y0;
+        const length = dx * dx + dy * dy;
+        const t = length > 0 ? Math.max(0, Math.min(1, -(x0 * dx + y0 * dy) / length)) : 0;
+        const closest = (x0 + dx * t) ** 2 + (y0 + dy * t) ** 2;
+        // Include balls that could reach the guide after it switches to the current step.
+        const nearCurrent =
+          Math.min(ball.px ?? ball.x, ball.x) <= guide.x + 0.6 &&
+          Math.max(ball.px ?? ball.x, ball.x) >= guide.x - 0.6 &&
+          Math.min(ball.py ?? ball.y, ball.y) <= guide.y + 0.6 &&
+          Math.max(ball.py ?? ball.y, ball.y) >= guide.y - 0.6;
+        if (closest < 0.6 ** 2 || nearCurrent) nearby.push(ball.id);
+        // Allow float32 rounding at contact. A straight blend can cut through a curved separation.
+        if (closest < 0.4999 ** 2) overlap = true;
+      }
+      for (const id of nearby) {
+        drawing.round.add(id);
+        if (overlap) drawing.snap.add(id);
+      }
+    }
+  }
+
   private render() {
     if (!this.stage || !this.visible) return;
     const ctx = this.ctx,
@@ -452,7 +500,7 @@ export class Game extends Race {
       top: cam.y - (h * 0.43) / scale,
       bottom: cam.y + (h * 0.57) / scale,
     };
-    const entities = this.physics.getEntities(blend);
+    const entities = this.physics.getEntities(blend, !!this.launcherDrawing?.snap.size);
     ctx.save();
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
@@ -518,15 +566,25 @@ export class Game extends Race {
     }
     this.renderCache.beginFrame();
     for (const b of active) {
-      const x = at(b.px, b.x),
-        y = at(b.py, b.y);
+      const snap = this.launcherDrawing?.snap.has(b.id);
+      const x = snap ? b.x : at(b.px, b.x),
+        y = snap ? b.y : at(b.py, b.y);
       const labelMargin = Math.max(1, (b.name.length * 17) / scale);
       if (y < view.top - 1 || y > view.bottom + 1 || x < view.left - labelMargin || x > view.right + labelMargin)
         continue;
       ctx.globalAlpha = bridgeBallOpacity(this.stage, { x, y, onBridge: b.onBridge });
-      const squash =
-        drawMantaPenalty(ctx, x, y, b.mantaCaughtAt, this.elapsed, scale, this.reducedMotion?.matches ?? false) ??
-        this.marbleElasticity?.effect(b.id, now, this.reducedMotion?.matches ?? false);
+      const penalty = drawMantaPenalty(
+        ctx,
+        x,
+        y,
+        b.mantaCaughtAt,
+        this.elapsed,
+        scale,
+        this.reducedMotion?.matches ?? false
+      );
+      const squash = this.launcherDrawing?.round.has(b.id)
+        ? undefined
+        : (penalty ?? this.marbleElasticity?.effect(b.id, now, this.reducedMotion?.matches ?? false));
       if (this.renderCache.drawBall(ctx, b, scale, d, x, y, squash)) {
         ctx.globalAlpha = 1;
         continue;
@@ -603,8 +661,9 @@ export class Game extends Race {
       this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale, true);
     for (const b of this.balls) {
       if (b.rank) continue;
-      const x = b.px === undefined ? b.x : b.px + (b.x - b.px) * blend;
-      const y = b.py === undefined ? b.y : b.py + (b.y - b.py) * blend;
+      const snap = this.launcherDrawing?.snap.has(b.id);
+      const x = snap || b.px === undefined ? b.x : b.px + (b.x - b.px) * blend;
+      const y = snap || b.py === undefined ? b.y : b.py + (b.y - b.py) * blend;
       ctx.globalAlpha = bridgeBallOpacity(this.stage, { x, y, onBridge: b.onBridge });
       ctx.fillStyle = b.color;
       ctx.beginPath();

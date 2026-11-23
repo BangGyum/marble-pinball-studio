@@ -351,7 +351,7 @@ export function validateStage(value: unknown): StageDef {
     if (
       'launcher' in sh &&
       (sh.type !== 'circle' ||
-        (sh.launcher !== true && sh.launcher !== 'chute') ||
+        (sh.launcher !== true && sh.launcher !== 'chute' && sh.launcher !== 'funnel') ||
         !sh.sensor ||
         e.type !== 'kinematic' ||
         !e.props.oscillation ||

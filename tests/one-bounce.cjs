@@ -117,6 +117,19 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
         'relaunches'
       );
     }
+    race.prepare(stage, ['off-ramp marble']);
+    race.startRace([1, 1]);
+    physics.placeMarble(0, 18, 16.6);
+    physics.setMarbleVelocity(0, -8.05, 0.85);
+    const launcher = physics.launchers[0];
+    let fired = false;
+    while (race.state === 'running' && race.elapsed < 20 && !fired) {
+      const held = launcher.loaded;
+      race.advance();
+      fired = !!held && !launcher.loaded;
+    }
+    assert.ok(fired, 'a marble deflected off the feed ramp must return to the launcher before reaching the cup');
+    console.log('PASS stray feed marble misses the pad edge and returns to the launcher');
   } finally {
     Math.random = random;
     physics.world.SetContactListener(0);
