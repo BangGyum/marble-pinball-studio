@@ -2,7 +2,19 @@
 import Box2DFactory from 'box2d-wasm';
 import type { StageDef, WindZone } from './data/maps';
 import { windPower } from './wind-power';
-import { BARREL_LENGTH, BARREL_TILT, LAUNCH_SPEED } from './marble-launcher';
+import {
+  BARREL_LENGTH,
+  BARREL_RAILS,
+  BARREL_TILT,
+  LAUNCHER_ENTRY_HALF_WIDTH,
+  LAUNCHER_ENTRY_Y,
+  LAUNCHER_GATE_HALF_WIDTH,
+  LAUNCHER_GATE_OPEN_ANGLE,
+  LAUNCHER_PISTON_REST,
+  LAUNCH_SPEED,
+  launcherGate,
+  launcherPiston,
+} from './marble-launcher';
 import { timedGateAngle } from './timed-gate';
 import { rotorPower } from './rotor-cycle';
 import type { IPhysics } from './i-physics';
@@ -18,6 +30,7 @@ type PhysicsEntity = {
   timedGate?: MapEntity['props']['timedGate'];
   spinCycle?: MapEntity['props']['spinCycle'];
   spin: number;
+  launcherPiston?: boolean;
   sweepPose?: {
     x: number;
     y: number;
@@ -32,6 +45,13 @@ type PhysicsEntity = {
 } & MapEntityState;
 
 type SweepHit = { entity: PhysicsEntity; fraction: number; nx: number; ny: number };
+type Launcher = {
+  entity: PhysicsEntity;
+  gate?: PhysicsEntity;
+  piston?: PhysicsEntity;
+  pistonTravel?: number;
+  loaded?: { body: Box2D.b2Body; at: number; x: number; y: number };
+};
 // The marble radius is 0.25; leave a small margin when recovering onto a hit face.
 const SWEEP_CLEARANCE = 0.255;
 const RECOVERY_DIRECTIONS = Array.from({ length: 128 }, (_, i) => [
@@ -63,10 +83,8 @@ export class Box2dPhysics implements IPhysics {
   private sliders: PhysicsEntity[] = [];
   private rotators: PhysicsEntity[] = [];
   private boosters: PhysicsEntity[] = [];
-  private launchers: {
-    entity: PhysicsEntity;
-    loaded?: { body: Box2D.b2Body; at: number; x: number; y: number };
-  }[] = [];
+  private launchers: Launcher[] = [];
+  private launcherApproaches = new Float64Array(0);
   private breakables: PhysicsEntity[] = [];
   private broken = new Set<PhysicsEntity>();
   private breakableContacts = new Map<PhysicsEntity, Set<number>>();
@@ -171,6 +189,7 @@ export class Box2dPhysics implements IPhysics {
   }
   createEntities(entities: MapEntity[]) {
     const B = this.Box2D;
+    const newChutes: Launcher[] = [];
     for (const entity of entities) {
       const def = new B.b2BodyDef();
       def.set_type(entity.type === 'kinematic' ? B.b2_kinematicBody : B.b2_staticBody);
@@ -200,6 +219,24 @@ export class Box2dPhysics implements IPhysics {
         fixture.set_shape(shape);
         this.leaks.recordLeak(body.CreateFixture(fixture));
         B.destroy(shape);
+        if (s.launcher === 'chute') {
+          const rail = new B.b2PolygonShape();
+          const length = (BARREL_LENGTH + BARREL_RAILS.end) / 2;
+          const along = BARREL_RAILS.end - length;
+          const offset = (BARREL_RAILS.inner + BARREL_RAILS.outer) / 2;
+          fixture.set_isSensor(false);
+          for (const side of [-1, 1]) {
+            const across = side * offset;
+            this.vector.Set(
+              along * Math.cos(BARREL_TILT) - across * Math.sin(BARREL_TILT),
+              along * Math.sin(BARREL_TILT) + across * Math.cos(BARREL_TILT)
+            );
+            rail.SetAsBox(length, (BARREL_RAILS.outer - BARREL_RAILS.inner) / 2, this.vector, BARREL_TILT);
+            fixture.set_shape(rail);
+            this.leaks.recordLeak(body.CreateFixture(fixture));
+          }
+          B.destroy(rail);
+        }
       } else if (s.solid) {
         const shape = new B.b2PolygonShape();
         const points = s.points.slice(0, -1);
@@ -287,17 +324,39 @@ export class Box2dPhysics implements IPhysics {
           s.type === 'box'
             ? Math.hypot(s.width, s.height)
             : s.type === 'circle'
-              ? s.radius
+              ? s.launcher === 'chute'
+                ? BARREL_LENGTH + BARREL_RAILS.outer
+                : s.radius
               : Math.max(...s.points.map(([x, y]) => Math.hypot(x, y))) + Math.abs(s.backing ?? 0);
         this.movingEntities.push(state);
       }
       if (state.moving) this.leaks.recordLeak(body.GetPosition());
       if (s.type === 'box' && s.spring) this.springs.push(state);
-      if (s.type === 'circle' && s.launcher) this.launchers.push({ entity: state });
+      if (s.type === 'circle' && s.launcher) {
+        const launcher = { entity: state };
+        this.launchers.push(launcher);
+        if (s.launcher === 'chute') newChutes.push(launcher);
+      }
       if (state.sliding) this.sliders.push(state);
       if (state.oscillation || state.timedGate || state.spinCycle) this.rotators.push(state);
       if (s.type === 'box' && s.boostSpeed !== undefined) this.boosters.push(state);
       if (state.life > 0) this.breakables.push(state);
+    }
+    for (const launcher of newChutes) {
+      const { x, y, shape } = launcher.entity;
+      const gateDefinition = launcherGate(x, y);
+      if (shape.collisionLayer) gateDefinition.shape.collisionLayer = shape.collisionLayer;
+      const index = this.entities.length;
+      this.createEntities([gateDefinition, launcherPiston(x, y)]);
+      const gate = this.entities[index],
+        piston = this.entities[index + 1];
+      this.vector.Set(gate.x, gate.y);
+      gate.body.SetTransform(this.vector, LAUNCHER_GATE_OPEN_ANGLE);
+      gate.body.SetEnabled(false);
+      piston.launcherPiston = true;
+      piston.body.SetEnabled(false);
+      launcher.gate = gate;
+      launcher.piston = piston;
     }
   }
   createMarble(id: number, x: number, y: number) {
@@ -382,7 +441,7 @@ export class Box2dPhysics implements IPhysics {
     const previous = blend < 1 && this.previousCount === this.entities.length ? this.previousPoses : undefined;
     return this.entities.map((e, i) => {
       const spring = e.shape.type === 'box' && e.shape.spring;
-      const position = e.sliding || spring ? e.body.GetPosition() : undefined;
+      const position = e.sliding || spring || e.launcherPiston ? e.body.GetPosition() : undefined;
       let x = position ? position.x : e.x,
         y = position ? position.y : e.y,
         angle = e.moving ? e.body.GetAngle() : 0;
@@ -400,7 +459,8 @@ export class Box2dPhysics implements IPhysics {
     if (this.previousY.length < this.entities.length) this.previousY = new Float64Array(this.entities.length);
     this.entities.forEach((e, i) => {
       if (!e.moving) return;
-      const position = e.sliding || (e.shape.type === 'box' && e.shape.spring) ? e.body.GetPosition() : undefined;
+      const position =
+        e.sliding || e.launcherPiston || (e.shape.type === 'box' && e.shape.spring) ? e.body.GetPosition() : undefined;
       this.previousY[i] = position ? position.y : e.y;
       this.previousPoses[i * 2] = position ? position.x : e.x;
       this.previousPoses[i * 2 + 1] = e.body.GetAngle();
@@ -607,10 +667,80 @@ export class Box2dPhysics implements IPhysics {
       body.SetAwake(true);
     }
   }
-  private stepLaunchers() {
+  private recordLauncherApproaches() {
+    const bodies = this.marbleBodies;
+    if (this.launcherApproaches.length < bodies.length * 2)
+      this.launcherApproaches = new Float64Array(bodies.length * 2);
+    for (let i = 0; i < bodies.length; i++) {
+      const pos = bodies[i].GetPosition();
+      this.launcherApproaches[i * 2] = pos.x;
+      this.launcherApproaches[i * 2 + 1] = pos.y;
+    }
+  }
+  private findChuteMarble(e: PhysicsEntity) {
+    const mouthY = e.y + LAUNCHER_ENTRY_Y;
+    const elevated = e.shape.collisionLayer === 2;
+    let first: Box2D.b2Body | undefined;
+    let earliest = Infinity;
+    for (let i = 0; i < this.marbleBodies.length; i++) {
+      const beforeY = this.launcherApproaches[i * 2 + 1];
+      if (beforeY >= mouthY || beforeY < mouthY - 4) continue;
+      const body = this.marbleBodies[i];
+      const pos = body.GetPosition();
+      if (
+        pos.y < mouthY ||
+        Math.abs(pos.x - e.x) > 0.85 ||
+        !body.IsEnabled() ||
+        this.bridgeBodies.has(body) !== elevated
+      )
+        continue;
+      const fraction = (mouthY - beforeY) / (pos.y - beforeY);
+      const beforeX = this.launcherApproaches[i * 2];
+      const crossingX = beforeX + (pos.x - beforeX) * fraction;
+      if (Math.abs(crossingX - e.x) <= LAUNCHER_ENTRY_HALF_WIDTH && fraction < earliest) {
+        earliest = fraction;
+        first = body;
+      }
+    }
+    return first;
+  }
+  private moveLauncherGates(dt: number) {
+    for (const { entity, gate, loaded } of this.launchers) {
+      if (!gate) continue;
+      if (loaded && gate.body.IsEnabled()) continue;
+      if (gate.body.IsEnabled()) gate.body.SetEnabled(false);
+      const angle = gate.body.GetAngle();
+      const target = loaded ? 0 : LAUNCHER_GATE_OPEN_ANGLE;
+      if (angle !== Math.fround(target)) {
+        this.vector.Set(gate.x, gate.y);
+        gate.body.SetTransform(this.vector, angle + Math.max(-24 * dt, Math.min(24 * dt, target - angle)));
+      }
+      // Only close the solid stop when clear; swinging a solid arm can squeeze a marble against a rail.
+      if (loaded && gate.body.GetAngle() === 0) {
+        const occupied = this.marbleBodies.some((body) => {
+          const pos = body.GetPosition();
+          return (
+            Math.abs(pos.y - gate.y) < 0.34 &&
+            Math.abs(pos.x - entity.x) < LAUNCHER_GATE_HALF_WIDTH + 0.26 &&
+            this.bridgeBodies.has(body) === (entity.shape.collisionLayer === 2) &&
+            body.IsEnabled()
+          );
+        });
+        if (!occupied) gate.body.SetEnabled(true);
+      }
+    }
+  }
+  private stepLaunchers(dt: number) {
     for (const launcher of this.launchers) {
       const e = launcher.entity;
-      if (!launcher.loaded) {
+      if (!launcher.loaded && launcher.gate) {
+        const body = this.findChuteMarble(e);
+        if (body) {
+          const pos = body.GetPosition();
+          launcher.loaded = { body, at: this.motionTime, x: pos.x, y: pos.y };
+          body.SetEnabled(false);
+        }
+      } else if (!launcher.loaded) {
         let edge = this.leaks.recordLeak(e.body.GetContactList());
         while (this.Box2D.getPointer(edge)) {
           const body = edge.other;
@@ -624,14 +754,20 @@ export class Box2dPhysics implements IPhysics {
         }
       }
       const ball = launcher.loaded;
-      if (!ball) continue;
-      const age = this.motionTime - ball.at;
-      const intake = Math.min(1, age / 0.18);
-      const travel = Math.max(0, (age - 0.32) * LAUNCH_SPEED);
+      const age = ball ? this.motionTime - ball.at : 0;
       const angle = BARREL_TILT + e.body.GetAngle();
+      const travel = Math.max(0, (age - (launcher.gate ? 0.195 : 0.32)) * LAUNCH_SPEED);
+      const distance = Math.min(BARREL_LENGTH, travel);
+      if (launcher.piston) {
+        launcher.pistonTravel = ball ? distance : Math.max(0, (launcher.pistonTravel ?? 0) - dt * LAUNCH_SPEED * 2);
+        const along = LAUNCHER_PISTON_REST - launcher.pistonTravel;
+        this.vector.Set(e.x + Math.cos(angle) * along, e.y + Math.sin(angle) * along);
+        launcher.piston.body.SetTransform(this.vector, e.body.GetAngle());
+      }
+      if (!ball) continue;
+      const intake = Math.min(1, age / (launcher.gate ? 0.15 : 0.18));
       const dx = -Math.cos(angle),
         dy = -Math.sin(angle);
-      const distance = Math.min(BARREL_LENGTH, travel);
       this.vector.Set(
         ball.x + (e.x - ball.x) * intake + dx * distance,
         ball.y + (e.y - ball.y) * intake + dy * distance
@@ -648,6 +784,7 @@ export class Box2dPhysics implements IPhysics {
   step(seconds: number, beforeSubstep?: (dt: number, offset: number) => void) {
     this.recordPoses();
     const bodies = this.marbleBodies;
+    if (this.launchers.some(({ gate, loaded }) => gate && !loaded)) this.recordLauncherApproaches();
     if (this.winds.length) {
       this.windTime += seconds;
       for (const sample of this.winds) {
@@ -708,6 +845,7 @@ export class Box2dPhysics implements IPhysics {
     for (let i = 0; i < this.collisionSubsteps; i++) {
       const dt = seconds / this.collisionSubsteps;
       this.motionTime += dt;
+      if (this.launchers.length) this.moveLauncherGates(dt);
       for (const e of this.springs)
         if (e.shape.type === 'box' && e.shape.spring) {
           const spring = e.shape.spring;
@@ -821,7 +959,7 @@ export class Box2dPhysics implements IPhysics {
         this.breakableContacts.set(e, touching);
       }
     }
-    if (this.launchers.length) this.stepLaunchers();
+    if (this.launchers.length) this.stepLaunchers(seconds);
     if (this.broken.size) {
       for (let i = this.entities.length - 1; i >= 0; i--) {
         const e = this.entities[i];

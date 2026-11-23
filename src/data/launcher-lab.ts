@@ -10,6 +10,8 @@ const rail = (points: [number, number][], color: string) => {
 const feed = '#79d5cf',
   brass = '#ffc675',
   lift = '#82a9c4';
+const launcher = marbleLauncher(28, 21.5, 'chute');
+launcher.props.oscillation!.amplitude = 0.12;
 
 export const launcherLab: StageDef = {
   title: '구슬 발사 시험장',
@@ -63,7 +65,9 @@ export const launcherLab: StageDef = {
         [1, 12],
         [14, 15.2],
         [22, 17.1],
-        [26.8, 19.8],
+        [26.65, 19.22],
+        [27.34, 19.72],
+        [27.34, 20.5],
       ],
       feed
     ),
@@ -77,14 +81,13 @@ export const launcherLab: StageDef = {
     ),
     rail(
       [
-        [25.6, 22.25],
-        [28, 22.7],
-        [29.6, 21.8],
         [30.5, 18.8],
+        [28.66, 20.16],
+        [28.66, 21.7],
       ],
       brass
     ),
-    marbleLauncher(28, 21.5),
+    launcher,
     rail(
       [
         [4.2, 27],

@@ -140,7 +140,7 @@ export function drawEntities(
       if (i === selected)
         ctx.strokeRect(-shape.width - 0.08, -shape.height - 0.08, shape.width * 2 + 0.16, shape.height * 2 + 0.16);
     } else if (shape.type === 'circle' && shape.launcher) {
-      drawLauncher(ctx, color, scale);
+      drawLauncher(ctx, color, scale, shape.launcher === 'chute');
     } else if (shape.type === 'circle') {
       ctx.beginPath();
       ctx.arc(0, 0, shape.radius, 0, Math.PI * 2);

@@ -32,7 +32,7 @@ export interface EntityBoxShape extends EntityShapeBase {
 export interface EntityCircleShape extends EntityShapeBase {
   type: 'circle';
   radius: number;
-  launcher?: true;
+  launcher?: true | 'chute';
 }
 
 export interface EntityPolylineShape extends EntityShapeBase {

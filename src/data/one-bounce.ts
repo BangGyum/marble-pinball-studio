@@ -12,7 +12,7 @@ const rail = (points: Point[], color: string): MapEntity => {
   entity.shape.color = color;
   return entity;
 };
-const launcher = marbleLauncher(28, 21.5);
+const launcher = marbleLauncher(28, 21.5, 'chute');
 
 const enclosure = rail(
   [
@@ -56,12 +56,13 @@ export const oneBounce: StageDef = {
       ],
       feed
     ),
-    rail([...curve([24.6, 15.13], [25.1, 14.85], [25.6, 14.7], [26.15, 15.6]), [28.1, 19.35]], feed),
+    rail([...curve([24.6, 15.13], [25.1, 14.85], [25.6, 14.7], [26.15, 15.6]), [27.45, 17.9]], feed),
     rail(
       [
         [19.25, 15.75],
         [24.5, 17.35],
-        [26.75, 19.8],
+        [27.34, 19.72],
+        [27.34, 20.5],
       ],
       feed
     ),
@@ -73,10 +74,9 @@ export const oneBounce: StageDef = {
     },
     rail(
       [
-        [25.8, 22.3],
-        [28, 22.67],
-        [29.65, 21.8],
         [30.5, 18.8],
+        [28.66, 20.16],
+        [28.66, 21.7],
       ],
       returnRail
     ),
