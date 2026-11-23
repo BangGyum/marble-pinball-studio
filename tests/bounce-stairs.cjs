@@ -10,6 +10,7 @@ require.extensions['.ts'] = (m, f) =>
   );
 global.fetch = undefined;
 const { Race } = require('../src/race.ts');
+const { drawGoalArea } = require('../src/finish.ts');
 const { MarbleElasticity } = require('../src/marble-elasticity.ts');
 const { bounceStairs: stage } = require('../src/data/bounce-stairs.ts');
 const { stages } = require('../src/data/maps.ts');
@@ -28,6 +29,30 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
   const physics = race.physics,
     B = physics.Box2D,
     random = Math.random;
+  race.prepare(stage, []);
+  const end = new B.b2Vec2();
+  const finishLine = [];
+  const ctx = new Proxy(
+    {},
+    {
+      get: (_, key) => (key === 'moveTo' || key === 'lineTo' ? (x, y) => finishLine.push([x, y]) : () => {}),
+    }
+  );
+  assert.equal(drawGoalArea(ctx, stage, 60), true);
+  assert.deepEqual(finishLine, [
+    [20, stage.goalY],
+    [28, stage.goalY],
+  ]);
+  try {
+    for (const [x, y] of [[4, 80], [44, 80], ...finishLine]) {
+      const inside = x < stage.spawnX ? 1 : -1;
+      end.Set(x - inside * 2, y);
+      const hit = physics.castMapRay(x + inside * 2, y, end, 0, 1);
+      assert.ok(hit && Math.abs(hit.fraction - 0.5) < 0.0001, `visible rail and first collision agree at ${x},${y}`);
+    }
+  } finally {
+    B.destroy(end);
+  }
   const elasticity = new MarbleElasticity();
   let padBodies, marbleBodies, hits;
   const listener = new B.JSContactListener();

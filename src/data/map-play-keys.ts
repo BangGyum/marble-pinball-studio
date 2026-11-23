@@ -19,6 +19,7 @@ export const mapPlayKeys = {
   orbitingGate: 'orbiting-gate',
   shortcutCascade: 'shortcut-cascade',
   oneBounce: 'one-bounce',
+  lastGondola: 'last-gondola',
   launcherLab: 'launcher-lab',
   seesawValley: 'seesaw-valley',
 } as const;

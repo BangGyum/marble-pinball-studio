@@ -84,6 +84,8 @@ const race = {
   state: 'ready',
   balls: [ball(0, 12, '<img src=x onerror=alert(1)>'), ball(1, 28), ball(2, 28), ball(3, 20)],
   arrivals: [],
+  racing: require('../src/race.ts').Race.prototype.racing,
+  stage: { goalY: 100 },
 };
 const panel = new Rankings();
 panel.update(race);
@@ -230,3 +232,12 @@ assert.equal(
   'selection follows marble identity through overtakes'
 );
 console.log('PASS LAN pre-start roster, keyboard/click selection and original live-order UI');
+
+race.stage = { goalArea: { x: 10, y: 10, radius: 1 } };
+race.balls = [ball(0, 29), ball(1, 12)];
+spectator.update(race, 0);
+assert.equal(
+  list.children.at(-1).attributes['aria-pressed'],
+  'true',
+  'the row order agrees with circular-goal tracking'
+);

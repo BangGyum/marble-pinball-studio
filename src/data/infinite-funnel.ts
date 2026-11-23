@@ -4,13 +4,14 @@ import { curve, wall } from './wind-map-shapes';
 
 type Point = [number, number];
 export const funnel = { x: 32, y: 44, outer: 29, inner: 5, turns: 4, halfWidth: 1.7 };
+const radiusAt = (turn: number) => funnel.outer + ((funnel.inner - funnel.outer) * turn) / funnel.turns;
+const spiralPoint = (turn: number, offset: number): Point => {
+  const angle = -Math.PI / 2 + turn * Math.PI * 2,
+    radius = radiusAt(turn) + offset;
+  return [funnel.x + Math.cos(angle) * radius, funnel.y + Math.sin(angle) * radius];
+};
 const spiral = (offset: number): Point[] =>
-  Array.from({ length: 289 }, (_, i) => {
-    const t = i / 288,
-      angle = -Math.PI / 2 + t * Math.PI * 2 * funnel.turns;
-    const radius = funnel.outer + (funnel.inner - funnel.outer) * t + offset;
-    return [funnel.x + Math.cos(angle) * radius, funnel.y + Math.sin(angle) * radius];
-  });
+  Array.from({ length: 289 }, (_, i) => spiralPoint((i / 288) * funnel.turns, offset));
 const inner = spiral(-funnel.halfWidth),
   outer = spiral(funnel.halfWidth);
 const left: Point[] = [
@@ -31,6 +32,28 @@ const rail = (points: Point[], layer: 1 | 2 = 1): MapEntity => {
   entity.shape.hidden = true;
   entity.shape.collisionLayer = layer;
   return entity;
+};
+const ledge = (from: Point, to: Point, layer: 1 | 2, restitution: number): MapEntity => {
+  const dx = to[0] - from[0],
+    dy = to[1] - from[1];
+  return {
+    type: 'static',
+    position: { x: (from[0] + to[0]) / 2, y: (from[1] + to[1]) / 2 },
+    shape: {
+      type: 'box',
+      width: Math.hypot(dx, dy) / 2,
+      height: 0.17,
+      rotation: Math.atan2(dy, dx),
+      collisionLayer: layer,
+      color: '#ffc474',
+    },
+    props: { density: 1, restitution, angularVelocity: 0 },
+  };
+};
+const spiralLedge = (turn: number, depth: number) => {
+  // Lead the tip downstream so a marble on the outer rail deflects toward the open inside lane.
+  const tipTurn = turn + 1.2 / (2 * Math.PI * radiusAt(turn));
+  return ledge(spiralPoint(turn, funnel.halfWidth + 0.03), spiralPoint(tipTurn, funnel.halfWidth - depth), 1, 0.8);
 };
 
 export const infiniteFunnel: StageDef = {
@@ -79,5 +102,11 @@ export const infiniteFunnel: StageDef = {
       ],
       2
     ),
+    spiralLedge(0.38, 1.65),
+    spiralLedge(1.17, 1.3),
+    spiralLedge(2.32, 1.8),
+    spiralLedge(3.68, 1.4),
+    ledge([34.64, 54], [32.3, 55.4], 2, 0.46),
+    ledge([29.36, 69], [31.8, 70.3], 2, 0.5),
   ],
 };

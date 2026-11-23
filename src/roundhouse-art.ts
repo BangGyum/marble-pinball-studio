@@ -3,16 +3,32 @@ import type { StageDef } from './data/maps';
 import { visibleArt, type ViewBounds } from './art-visibility';
 import type { MapEntityState } from './types/map-entity';
 import { yards } from './data/roundhouse';
-import { railGauge, railRadius, trainCars } from './data/roundhouse-train';
+import { trainCars } from './data/roundhouse-train';
 type Ctx = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+type Car = (typeof trainCars)[keyof typeof trainCars];
+function carTransform(corners: [number, number][], car: Car) {
+  const [[x, y], [nextX, nextY]] = corners;
+  const width = car.hull[1][0] - car.hull[0][0];
+  return { x, y, a: (nextX - x) / width, b: (nextY - y) / width };
+}
+function railRadii(stage: StageDef, yardY: number) {
+  const shape = stage.entities?.find(
+    (e) => e.position.y === yardY && e.shape.type === 'polyline' && e.shape.trainCar
+  )?.shape;
+  if (shape?.type !== 'polyline' || !shape.trainCar) return [12.25, 16.6];
+  // Saved maps carry their original wheel positions in the collision hull.
+  const car = trainCars[shape.trainCar];
+  const { x, y, a, b } = carTransform(shape.points, car);
+  const dx = car.axleX + car.wheelbase / 2 - car.hull[0][0];
+  const radius = (dy: number) => Math.hypot(x + a * dx - b * dy, y + b * dx + a * dy);
+  const centerY = car.axleY - car.hull[0][1];
+  return [radius(centerY - car.gauge / 2), radius(centerY + car.gauge / 2)].sort((l, r) => l - r);
+}
 function circle(ctx: Ctx, x: number, y: number, r: number) {
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
 }
 export function drawRoundhouseArt(ctx: Ctx, stage: StageDef) {
-  const fitted = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.trainCar);
-  const inner = fitted ? railRadius - railGauge / 2 : 12.25;
-  const outer = fitted ? railRadius + railGauge / 2 : 16.6;
   ctx.save();
   ctx.fillStyle = sceneColor('#172724');
   ctx.fillRect(20, -3, 8, 15);
@@ -20,6 +36,7 @@ export function drawRoundhouseArt(ctx: Ctx, stage: StageDef) {
   ctx.fillRect(21.8, 88, 4.4, 15);
   for (const [index, yard] of yards.entries()) {
     const { x, y, color } = yard;
+    const [inner, outer] = railRadii(stage, y);
     const surface = ctx.createRadialGradient(x, y, 10, x, y, 19);
     surface.addColorStop(0, sceneColor('#28322c'));
     surface.addColorStop(0.5, sceneColor('#142520'));
@@ -112,10 +129,7 @@ export function drawRoundhouseTrains(ctx: CanvasRenderingContext2D, entities: Ma
       ctx.translate(entity.x, entity.y);
       ctx.rotate(entity.angle);
       if (atlas?.complete && atlas.naturalWidth) {
-        const [x, y] = corners[0];
-        const width = car.hull[1][0] - car.hull[0][0];
-        const a = (corners[1][0] - x) / width;
-        const b = (corners[1][1] - y) / width;
+        const { x, y, a, b } = carTransform(corners, car);
         ctx.transform(a, b, -b, a, x, y);
         ctx.drawImage(
           atlas,

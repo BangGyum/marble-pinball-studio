@@ -4,7 +4,7 @@ import type { IPhysics } from './i-physics';
 import type { StageDef } from './data/maps';
 import { shuffled, type WinnerOrder } from './model';
 import { WallGuard, WALL_GUARD_MAX_SPEED } from './wall-guard';
-import { finishFraction, raceProgress } from './finish';
+import { finishFraction, raceProgress, racingByProgress } from './finish';
 import { dolphinBounce, dolphinContact, validateDolphins, type DolphinSettings } from './dolphin';
 import { animalPoses, animalsEnabled } from './sea-animals';
 import { mantaContact, mantaMouthContains } from './manta-hitbox';
@@ -166,10 +166,10 @@ export class Race {
 
   // Unfinished marbles, closest to the finish first.
   racing() {
-    return this.balls.filter((b) => !b.rank).sort((a, b) => raceProgress(this.stage, b) - raceProgress(this.stage, a));
+    return racingByProgress(this.stage, this.balls);
   }
 
-  // The marble deciding the last winning place. The camera and the finish slow motion follow it.
+  // The marble deciding the last winning place triggers the finish slow motion.
   focusBall(racing = this.racing()): Ball | undefined {
     return racing[Math.min(racing.length - 1, Math.max(0, this.range[1] - this.arrivals.length - 1))];
   }

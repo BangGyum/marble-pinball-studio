@@ -37,6 +37,8 @@ export interface EntityCircleShape extends EntityShapeBase {
 
 export interface EntityPolylineShape extends EntityShapeBase {
   type: 'polyline';
+  // Cable displacement from the boarding station to the unloading station.
+  gondola?: VectorLike;
   solid?: boolean;
   trainCar?: 'engine' | 'tender' | 'coach';
   // Signed collision depth on the right-hand side of the directed wall.

@@ -14,7 +14,7 @@ type Car = {
   hull: Point[];
 };
 
-export const railRadius = 14.7;
+export const railRadius = 15.55;
 export const railGauge = 2.16;
 // Hulls and axle centres are in the approved artwork's original pixel coordinates.
 // The first edge of each hull runs horizontally and registers the sprite to its fixture.

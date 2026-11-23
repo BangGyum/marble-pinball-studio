@@ -48,7 +48,7 @@ const makeScene = (stage, id, dolphins) => ({
   settings: {
     names: names.join(','),
     mapId: stages.indexOf(stage),
-    order: 'desc',
+    order: 'asc',
     picks: 1,
     ...(dolphins ? { dolphins } : {}),
   },
@@ -87,11 +87,13 @@ for (const View of [Game, LanView]) {
       prepare(view, first, ++id);
       view.setZoom(0.35);
       view.manual = { x: 900, y: 900 };
+      view.focusedBallId = 0;
       view.state = 'finished';
       prepare(view, second, ++id);
       assert.equal(view.zoom, 1, `${View.name}: ${first.title} -> ${second.title} resets previous zoom`);
       assert.equal(reported, 1, 'the visible zoom control also resets');
       assert.equal(view.manual, null, 'a previous minimap target cannot override a new race');
+      assert.equal(view.focusedBallId, null, 'reused marble IDs do not carry a selection into a new race');
       view.setZoom(1.7);
       prepare(view, second, ++id);
       assert.equal(view.zoom, 1.7, 'preparing the same map keeps the chosen zoom');
@@ -144,7 +146,7 @@ function render(view, { winners = [], last = false, frameMs = 1000 / 60 } = {}) 
     });
     view.arrivals = view.balls.filter((ball) => ball.rank);
     view.winners = winners.map((id) => view.balls[id]);
-    view.range = [3, 3];
+    view.range = [1, 1];
     view.render();
   } else {
     view.state = 'paused';
@@ -176,25 +178,29 @@ try {
       view.width = width;
       view.height = 600;
       view.zoom = 1;
-      for (let i = 0; i < 60; i++) render(view);
-      const wide = view.viewScale();
-      const startCamera = { ...view.camera };
-      render(view, { winners: [2], last: true });
-      assert.ok(view.viewScale() < Math.min(width / 20, 600 / 13, 70), 'automatic zoom eases into the close view');
-      for (let i = 0; i < 120; i++) render(view, { winners: [2], last: true });
-      assert.ok(view.viewScale() > wide * 2, `${View.name}: final marble becomes visibly larger`);
-      assert.ok(Math.hypot(view.camera.x - 24, view.camera.y - 51) < 0.02, 'the final marble is centered');
-      assert.notDeepEqual(view.camera, startCamera);
-      view.setZoom(1.2);
-      assert.ok(view.viewScale() > wide * 2.2, 'manual zoom remains responsive');
-
-      prepare(view, bowl, 'again');
-      view.setZoom(1);
-      for (let i = 0; i < 60; i++) render(view);
-      view.follow(true);
       for (let i = 0; i < 120; i++) render(view);
-      assert.ok(view.viewScale() > wide * 2, 'Follow exits the whole-map view before the finalists are known');
-      assert.ok(Math.hypot(view.camera.x - 16, view.camera.y - 49) < 0.02, 'Follow targets the trailing participant');
+      const close = Math.min(width / 20, 600 / 13, 70);
+      assert.equal(view.viewScale(), close);
+      const centered = (x, y) => Math.hypot(view.camera.x - x, view.camera.y - y) < 0.02;
+      assert.ok(centered(16, 49), 'auto follows the trailer even for a first-place draw');
+      view.focusedBallId = 1;
+      for (let i = 0; i < 120; i++) render(view);
+      assert.ok(centered(20, 50), 'a selected marble takes priority');
+      view.manual = { x: 3, y: 4 };
+      render(view);
+      assert.deepEqual(view.manual, { x: 3, y: 4 }, 'minimap temporarily takes priority');
+      view.follow();
+      assert.equal(view.focusedBallId, 1, 'leaving the minimap restores the selection');
+      view.focusedBallId = 2;
+      for (let i = 0; i < 120; i++) render(view);
+      assert.ok(centered(24, 51), 'switching selection follows the new marble');
+      view.focusedBallId = null;
+      for (let i = 0; i < 120; i++) render(view);
+      assert.ok(centered(16, 49), 'clearing the selection restores the trailer');
+      for (let i = 0; i < 120; i++) render(view, { winners: [2], last: true });
+      assert.ok(centered(24, 51), 'the last remaining marble is tracked after winners are known');
+      view.setZoom(1.2);
+      assert.equal(view.viewScale(), close * 1.2, 'manual zoom remains responsive');
       const zoom = view.zoom;
       if (view instanceof LanView) view.setScene({ ...view.scene, revision: 2 });
       else view.pause();
@@ -218,7 +224,5 @@ try {
 } finally {
   global.performance = originalPerformance;
 }
-console.log(
-  'PASS circular map opens wide, eases onto the last marble and responds to Follow/zoom at narrow/wide widths'
-);
+console.log('PASS default rear tracking, marble switching, temporary minimap override and zoom in standalone/LAN');
 console.log('PASS final-marble zoom and follow agree at 30/60/120/144Hz in standalone/LAN');

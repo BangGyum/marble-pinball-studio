@@ -3,7 +3,7 @@ import { LanView } from './view';
 import { Rankings } from '../rankings';
 import { Editor } from '../editor';
 import { Recorder } from '../recorder';
-import { stages, hiddenStages, DEFAULT_MAP_INDEX, type StageDef } from '../data/maps';
+import { stages, visibleBuiltins, DEFAULT_MAP_INDEX, type StageDef } from '../data/maps';
 import { parseNames, winningRange, type WinnerOrder } from '../model';
 import { MapLibrary } from '../map-library';
 import { el, toast, message, STALLED_MESSAGE } from '../ui';
@@ -36,7 +36,7 @@ let info: Info,
 let preferredPicks = 2,
   customStage: StageDef | undefined;
 let springPending = false;
-const library = new MapLibrary(stages, hiddenStages);
+const library = new MapLibrary(visibleBuiltins);
 let inputTimer: ReturnType<typeof setTimeout> | undefined, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
 const participantKey = 'marble-pinball.lan-name';

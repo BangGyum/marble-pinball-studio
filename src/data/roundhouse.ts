@@ -4,8 +4,8 @@ import { arc, wall } from './wind-map-shapes';
 import { trainFixtures } from './roundhouse-train';
 
 export const yards = [
-  { x: 24, y: 28, spin: -0.65, color: '#65efcf' },
-  { x: 24, y: 72, spin: 0.7, color: '#ffc268' },
+  { x: 24, y: 28, spin: -0.8, color: '#65efcf' },
+  { x: 24, y: 72, spin: 0.9, color: '#ffc268' },
 ];
 const entities: MapEntity[] = [];
 const edge = (points: [number, number][], depth = 0.6) => {

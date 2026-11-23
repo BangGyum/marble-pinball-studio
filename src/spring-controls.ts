@@ -6,7 +6,12 @@ import type { MapEntityState } from './types/map-entity';
 export function acceptsSpringSpace(event: KeyboardEvent, running: boolean) {
   if (event.code !== 'Space') return false;
   const target = event.target as HTMLElement | null;
-  if (target?.isContentEditable || document.querySelector('dialog[open]')) return false;
+  if (
+    target?.isContentEditable ||
+    target?.getAttribute?.('role') === 'button' ||
+    document.querySelector('dialog[open]')
+  )
+    return false;
   if (running && target?.id === 'panel-toggle') {
     // Reserve Space for gameplay even when there is no spring left to fire.
     event.preventDefault();

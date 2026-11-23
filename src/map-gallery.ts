@@ -1,4 +1,4 @@
-import { DEFAULT_MAP_INDEX, mapPlayKey, type StageDef } from './data/maps';
+import { mapPlayKey, type StageDef } from './data/maps';
 import type { SavedMap } from './model';
 import { drawEntities } from './draw';
 import { drawMapArt, drawMapOverlay, usesGlassRails } from './map-art';
@@ -10,10 +10,16 @@ import { el } from './ui';
 import type { MapPlayKey } from './data/map-play-keys';
 import { getMapPlayCount, refreshMapPlays } from './map-plays';
 import { GalleryIntro } from './gallery-intro';
+import { MapSortControl } from './map-sort-control';
 import { MapTransition } from './map-transition';
 import { getSceneTheme, sceneColor } from './scene-theme';
 
 const details: Record<string, [string, string, string]> = {
+  '막차 곤돌라': [
+    '곤돌라 · 두 자리',
+    '두 자리 막차를 놓쳐도 승부는 계속! 점프대를 건너고 접이식 다리의 지름길을 노려요.',
+    '#85ebbf',
+  ],
   '떠도는 입구': [
     '회전 · 포획',
     '공도 돌고 입구도 돌아요. 움직이는 틈을 통과해 중앙 배수구에 들어가면 도착!',
@@ -21,7 +27,7 @@ const details: Record<string, [string, string, string]> = {
   ],
   '끝없는 나선': [
     '깔때기 · 나선',
-    '큰 깔때기를 네 바퀴 돌아 중심으로! 구슬이 모이면 입체 출구로 빠져나옵니다.',
+    '네 바퀴 나선의 턱에서 튕겨 안쪽으로 추월하세요. 마지막 낙하 통로에도 두 번의 역전 기회가 있어요.',
     '#65efda',
   ],
   '쌍둥이 와류': [
@@ -123,6 +129,9 @@ export class MapGallery {
   private reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   private returnHighlight?: Animation;
   private grid = el('map-grid');
+  private sort = new MapSortControl(el<HTMLSelectElement>('gallery-sort'), this.grid, el('gallery-sort-status'), () =>
+    this.intro.stop()
+  );
   private view = el('map-gallery');
   private pendingThumbnails = new Set<HTMLCanvasElement>();
   private thumbnailFrame = 0;
@@ -237,9 +246,7 @@ export class MapGallery {
     this.grid.setAttribute('aria-label', builtin ? '원래 맵 목록' : '내 맵 목록');
     for (const group of ['builtin', 'custom'] as const)
       el<HTMLButtonElement>(`gallery-filter-${group}`).setAttribute('aria-pressed', String(this.group === group));
-    const defaultId = `builtin-${DEFAULT_MAP_INDEX}`;
-    const ordered = [...maps.filter((map) => map.id === defaultId), ...maps.filter((map) => map.id !== defaultId)];
-    const cards = ordered.map((map, index) => {
+    const cards = maps.map((map) => {
       const custom = !map.id.startsWith('builtin-');
       const [tag, description, color] = custom
         ? ['내 맵', '직접 만든 코스에서 구슬을 굴려보세요.', '#a5baff']
@@ -252,7 +259,6 @@ export class MapGallery {
       if (map.id === this.selectedId) card.setAttribute('aria-current', 'true');
       card.style.setProperty('--map-color', color);
       card.innerHTML = `<span class="map-card-heading"><span class="map-card-number" aria-hidden="true"></span><span class="map-card-title"></span></span><span class="map-preview"><span class="map-card-tag"></span></span><span class="map-card-body"><span class="map-card-description"></span><span class="map-card-play-count" hidden></span><span class="map-card-action">이 맵으로 준비 <span class="map-card-ball" aria-hidden="true"></span></span></span>`;
-      card.querySelector('.map-card-number')!.textContent = String(index + 1).padStart(2, '0');
       card.querySelector('.map-card-tag')!.textContent = tag;
       card.querySelector('.map-card-title')!.textContent = map.stage.title;
       card.querySelector('.map-card-description')!.textContent = description;
@@ -270,9 +276,10 @@ export class MapGallery {
       card.querySelector('.map-preview')!.append(canvas);
       if (canvas.dataset.theme !== getSceneTheme() || canvas.dataset.marbleDesign !== getMarbleDesign())
         canvas.removeAttribute('data-rendered');
-      return card;
+      return { node: card, title: map.stage.title, key };
     });
-    this.grid.replaceChildren(...cards);
+    this.grid.replaceChildren();
+    this.sort.show(this.group, cards);
     if (builtin) {
       this.updatePlayCounts();
       void refreshMapPlays().then(() => this.updatePlayCounts());
@@ -290,6 +297,7 @@ export class MapGallery {
       label.hidden = false;
       label.closest('button')?.setAttribute('aria-description', label.textContent);
     }
+    this.sort.refreshCounts();
   }
 
   focus(id: string, highlight = false) {

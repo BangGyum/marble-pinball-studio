@@ -19,6 +19,7 @@ import {
 } from './marble-launcher';
 import { timedGateAngle } from './timed-gate';
 import { rotorPower } from './rotor-cycle';
+import { GondolaCar } from './gondola';
 import type { IPhysics } from './i-physics';
 import type { EntityBoxShape, MapEntity, MapEntityState } from './types/map-entity';
 import { PERSONAL_SPRING_DURATION, personalSpringExtension } from './personal-spring';
@@ -32,7 +33,7 @@ type PhysicsEntity = {
   timedGate?: MapEntity['props']['timedGate'];
   spinCycle?: MapEntity['props']['spinCycle'];
   spin: number;
-  launcherPiston?: boolean;
+  translates: boolean;
   launcherPart?: boolean;
   sweepPose?: {
     x: number;
@@ -92,6 +93,7 @@ export class Box2dPhysics implements IPhysics {
   private rotators: PhysicsEntity[] = [];
   private boosters: PhysicsEntity[] = [];
   private launchers: Launcher[] = [];
+  private gondolas: GondolaCar[] = [];
   private launcherGuideIds: number[] = [];
   private launcherApproaches = new Float64Array(0);
   private breakables: PhysicsEntity[] = [];
@@ -136,6 +138,8 @@ export class Box2dPhysics implements IPhysics {
     if (this.world && !this.disposed && this.world.GetBodyCount() === 0) this.leaks.freeLeaked();
   }
   clear() {
+    for (const car of this.gondolas) car.reset();
+    this.gondolas = [];
     for (const launcher of this.launchers) {
       launcher.loaded?.body.SetEnabled(true);
       launcher.queued?.SetType(this.Box2D.b2_dynamicBody);
@@ -167,6 +171,7 @@ export class Box2dPhysics implements IPhysics {
     this.releaseWrappers();
   }
   clearMarbles() {
+    for (const car of this.gondolas) car.reset();
     for (const launcher of this.launchers) {
       launcher.loaded = undefined;
       launcher.waiting?.clear();
@@ -326,6 +331,7 @@ export class Box2dPhysics implements IPhysics {
       const state: PhysicsEntity = {
         body,
         moving: entity.type === 'kinematic',
+        translates: !!(entity.props.sliding || (s.type === 'box' && s.spring) || (s.type === 'polyline' && s.gondola)),
         sliding: entity.props.sliding,
         oscillation: entity.props.oscillation,
         timedGate: entity.props.timedGate,
@@ -338,6 +344,8 @@ export class Box2dPhysics implements IPhysics {
         life: entity.props.life ?? -1,
       };
       this.entities.push(state);
+      if (s.type === 'polyline' && s.gondola)
+        this.gondolas.push(new GondolaCar(body, entity.position, s.gondola, this.vector));
       this.entityBodies.set(B.getPointer(body), state);
       if (state.moving) {
         state.sweepRadius =
@@ -384,7 +392,7 @@ export class Box2dPhysics implements IPhysics {
       this.createEntities([launcherPiston(x, y)]);
       const piston = this.entities[index];
       piston.launcherPart = true;
-      piston.launcherPiston = true;
+      piston.translates = true;
       piston.body.SetEnabled(false);
       launcher.piston = piston;
     }
@@ -422,6 +430,7 @@ export class Box2dPhysics implements IPhysics {
   removeMarble(id: number) {
     const body = this.marbleMap[id];
     if (body) {
+      for (const car of this.gondolas) car.remove(body);
       for (const launcher of this.launchers) {
         if (launcher.loaded?.body === body) launcher.loaded = undefined;
         launcher.waiting?.delete(body);
@@ -476,8 +485,7 @@ export class Box2dPhysics implements IPhysics {
     // A breakable obstacle removed in the last step shifts indices; draw that frame unblended.
     const previous = blend < 1 && this.previousCount === this.entities.length ? this.previousPoses : undefined;
     return this.entities.map((e, i) => {
-      const spring = e.shape.type === 'box' && e.shape.spring;
-      const position = e.sliding || spring || e.launcherPiston ? e.body.GetPosition() : undefined;
+      const position = e.translates ? e.body.GetPosition() : undefined;
       let x = position ? position.x : e.x,
         y = position ? position.y : e.y,
         angle = e.moving ? e.body.GetAngle() : 0;
@@ -495,8 +503,7 @@ export class Box2dPhysics implements IPhysics {
     if (this.previousY.length < this.entities.length) this.previousY = new Float64Array(this.entities.length);
     this.entities.forEach((e, i) => {
       if (!e.moving) return;
-      const position =
-        e.sliding || e.launcherPiston || (e.shape.type === 'box' && e.shape.spring) ? e.body.GetPosition() : undefined;
+      const position = e.translates ? e.body.GetPosition() : undefined;
       this.previousY[i] = position ? position.y : e.y;
       this.previousPoses[i * 2] = position ? position.x : e.x;
       this.previousPoses[i * 2 + 1] = e.body.GetAngle();
@@ -1137,6 +1144,7 @@ export class Box2dPhysics implements IPhysics {
       }
     }
     if (this.launchers.length) this.stepLaunchers(seconds);
+    for (const car of this.gondolas) car.step(this.motionTime, bodies);
     if (this.broken.size) {
       for (let i = this.entities.length - 1; i >= 0; i--) {
         const e = this.entities[i];

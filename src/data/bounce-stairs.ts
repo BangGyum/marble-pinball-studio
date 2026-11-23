@@ -14,8 +14,8 @@ const left: Point[] = [
   [20, 146],
 ];
 const right: Point[] = left.map(([x, y]) => [width - x, y]);
-const rail = (points: Point[]): MapEntity => {
-  const entity = wall(points, 0.8);
+const rail = (points: Point[], backing: number): MapEntity => {
+  const entity = wall(points, backing);
   entity.shape.color = '#61dfdd';
   return entity;
 };
@@ -39,8 +39,8 @@ export const bounceStairs: StageDef = {
   randomizeStart: true,
   art: { style: 'bounce-stairs', contours: [[...left, ...right.slice().reverse()]] },
   entities: [
-    rail(left),
-    rail(right),
+    rail(left, -0.8),
+    rail(right, 0.8),
     pad([4, 27], [32, 41]),
     pad([44, 48], [16, 55]),
     pad([4, 69], [32, 76]),

@@ -7,7 +7,7 @@ const { WebSocketServer, WebSocket } = require('ws');
 // This Box2D build loads local WASM through Node's fs path, not global fetch.
 Reflect.deleteProperty(globalThis, 'fetch');
 const { Race } = require('../.lan-build/race.js');
-const { stages, hiddenStages, DEFAULT_MAP_INDEX } = require('../.lan-build/data/maps.js');
+const { stages, visibleBuiltins, DEFAULT_MAP_INDEX } = require('../.lan-build/data/maps.js');
 const { parseNames, winningRange, validateStage } = require('../.lan-build/model.js');
 const { LAN_PORT, MAX_LAN_MESSAGE_BYTES, encodeScene } = require('../.lan-build/lan/protocol.js');
 const { validateDolphins } = require('../.lan-build/dolphin.js');
@@ -81,7 +81,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     allowedHosts().has(req.headers.host) && req.headers.origin === `http://${req.headers.host}`;
   /** @returns {import('../src/lan/protocol').Info} */
   const info = () => ({
-    maps: stages.flatMap((s, id) => (hiddenStages.includes(s) ? [] : [{ id, title: s.title }])),
+    maps: visibleBuiltins.map(({ id, stage }) => ({ id, title: stage.title })),
     addresses: (interfaces.length ? interfaces : [{ name: '이 PC에서만 접속 가능', address: '127.0.0.1' }]).map(
       (i) => ({ name: `${i.name} · ${i.address}`, url: `http://${i.address}:${actualPort}/` })
     ),

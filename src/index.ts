@@ -1,4 +1,4 @@
-import { stages, hiddenStages, DEFAULT_MAP_INDEX, mapPlayKey, type StageDef } from './data/maps';
+import { stages, visibleBuiltins, DEFAULT_MAP_INDEX, mapPlayKey, type StageDef } from './data/maps';
 import { Game } from './game';
 import { parseNames, winningRange, type WinnerOrder } from './model';
 import { MapLibrary } from './map-library';
@@ -16,7 +16,7 @@ import './dolphin.css';
 
 initTheme();
 initMarbleDesign();
-const library = new MapLibrary(stages, hiddenStages);
+const library = new MapLibrary(visibleBuiltins);
 try {
   library.load(localStorage, (count) =>
     toast(`${count}개 맵을 읽지 못했어요. 정상 맵은 불러왔고 기존 데이터는 보존됩니다.`)
@@ -29,7 +29,7 @@ let previewStage: StageDef | undefined;
 const selectableMaps = () => library.list(previewStage);
 const game = new Game(el<HTMLCanvasElement>('game'));
 game.setVisible(false);
-const rankings = new Rankings();
+const rankings = new Rankings((id) => selectBall(game.focusedBallId === id ? null : id), false);
 const rankingList = el('ranking-list');
 const resultLayout = new ResizeObserver(() => {
   const list = rankingList.getBoundingClientRect();
@@ -169,8 +169,13 @@ function updateWinnerCount(count: number) {
   if (!count) winnerCount.add(new Option('0명', '0'));
   winnerCount.value = String(selected);
 }
+function selectBall(id: number | null) {
+  game.focusedBallId = id;
+  game.follow(true);
+  updateStandings();
+}
 function updateStandings() {
-  rankings.update(game);
+  rankings.update(game, game.focusedBallId);
 }
 function lockControls(locked: boolean) {
   dolphinPanel.setLocked(locked);
@@ -228,7 +233,7 @@ mapSelect.addEventListener('change', () => {
   prepare();
 });
 el('speed').addEventListener('change', () => (game.speed = Number(el<HTMLSelectElement>('speed').value)));
-el('follow').addEventListener('click', () => game.follow(true));
+el('follow').addEventListener('click', () => selectBall(null));
 el('pause').addEventListener('click', () => {
   game.pause();
   el('pause').textContent = game.state === 'paused' ? '계속하기' : '일시정지';

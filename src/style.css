@@ -254,6 +254,18 @@ hr {
   color: #fff;
   font-weight: 750;
 }
+.rankings li[role="button"] {
+  cursor: pointer;
+  border-radius: 4px;
+}
+.rankings li[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent) 18%, var(--panel));
+  outline: 1px solid var(--accent);
+}
+.rankings li[role="button"]:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
 .ranking-color {
   width: 11px;
   height: 11px;

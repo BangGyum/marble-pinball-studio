@@ -33,7 +33,8 @@
           <li><time datetime="2026-11-15">11월 15일</time><span>만타가오리에게 잡힌 구슬은 잠시 기절해요.</span></li>
         </ul>
       </details>
-      <div class="gallery-list-heading"><div><h2><span id="gallery-list-title">원래 맵</span> <span id="gallery-count"></span></h2><p id="gallery-list-description">출발부터 결승선까지, 한눈에 살펴보세요.</p></div><div class="gallery-filters" role="group" aria-label="맵 목록 선택"><button id="gallery-filter-builtin" type="button" aria-pressed="true">원래 맵</button><button id="gallery-filter-custom" type="button" aria-pressed="false">내 맵</button></div></div>
+      <div class="gallery-list-heading"><div><h2><span id="gallery-list-title">원래 맵</span> <span id="gallery-count"></span></h2><p id="gallery-list-description">출발부터 결승선까지, 한눈에 살펴보세요.</p></div><select id="gallery-sort" aria-label="맵 정렬"></select><div class="gallery-filters" role="group" aria-label="맵 목록 선택"><button id="gallery-filter-builtin" type="button" aria-pressed="true">원래 맵</button><button id="gallery-filter-custom" type="button" aria-pressed="false">내 맵</button></div></div>
+      <p id="gallery-sort-status" role="status" hidden>플레이 수가 집계되면 순서가 바뀝니다. 현재는 최신순입니다.</p>
       <div id="map-grid" class="map-grid" aria-label="선택할 수 있는 맵"></div>
       <p id="gallery-empty" class="gallery-empty" hidden>저장한 맵이 없어요. 오른쪽 위의 ‘맵 만들기’로 첫 맵을 만들어 보세요.</p>
       <p id="gallery-storage-note" class="gallery-storage-note" hidden>내 맵은 현재 브라우저에 저장됩니다.</p>
@@ -45,7 +46,7 @@
     <div class="race-layout">
       <div class="view-controls"><div class="zoom-controls" role="group" aria-label="화면 배율"><button type="button" id="zoom-out" aria-label="축소" title="축소">−</button><button type="button" id="zoom-reset" aria-label="기본 배율로 돌아가기" title="기본 배율로 돌아가기 · 마우스 휠로 확대·축소">100%</button><button type="button" id="zoom-in" aria-label="확대" title="확대">＋</button></div><button type="button" id="follow" title="구슬 따라가기">◎ 따라가기</button><label>배속 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label><button type="button" id="pause" disabled>일시정지</button></div>
       <div class="play-area"><canvas id="game" tabindex="-1" aria-label="구슬 경주 화면. 왼쪽 미니맵 위에 마우스를 올리면 해당 위치를 따라갑니다. 마우스 휠로 확대하거나 축소할 수 있습니다."></canvas>
-      <ol id="ranking-list" class="rankings" role="list" aria-label="경주 순위. 도착한 구슬은 굵게 표시됩니다." tabindex="0" hidden></ol>
+      <ol id="ranking-list" class="rankings" role="list" aria-label="경주 순위. 이름을 누르면 구슬을 따라가고 다시 누르면 마지막 구슬을 따라갑니다. 도착한 구슬은 굵게 표시됩니다." tabindex="0" hidden></ol>
       </div>
     </div>
     <div class="control-dock">

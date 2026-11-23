@@ -371,6 +371,25 @@ export function validateStage(value: unknown): StageDef {
         throw new Error('반사판 크기나 각도가 올바르지 않아요.');
     } else if (sh.type === 'polyline') {
       if (
+        sh.gondola !== undefined &&
+        (!sh.gondola ||
+          !finite(sh.gondola.x, -100, 100) ||
+          Math.abs(sh.gondola.x) < 2 ||
+          !finite(sh.gondola.y, 0.5, 100) ||
+          !sh.sensor ||
+          sh.hidden ||
+          sh.solid ||
+          sh.rotation !== 0 ||
+          e.type !== 'kinematic' ||
+          e.props.angularVelocity !== 0 ||
+          slide ||
+          gate ||
+          spin ||
+          e.props.oscillation ||
+          (e.props.life ?? -1) !== -1)
+      )
+        throw new Error('곤돌라의 정거장 간 거리와 이동 방향을 확인해 주세요.');
+      if (
         !Array.isArray(sh.points) ||
         sh.points.length < 2 ||
         sh.points.length > 1000 ||

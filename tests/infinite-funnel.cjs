@@ -13,6 +13,19 @@ const { Race } = require('../src/race.ts');
 const { infiniteFunnel: stage, funnel } = require('../src/data/infinite-funnel.ts');
 const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
 
+function recordCrossing(passes, ball, y, time) {
+  if (!passes.has(ball.id) && ball.py < y && ball.y >= y)
+    passes.set(ball.id, time - (ball.y - y) / (ball.y - ball.py) / 60);
+}
+
+function reversedPairs(passes, next) {
+  const order = [...passes.keys()].sort((a, b) => passes.get(a) - passes.get(b));
+  let pairs = 0;
+  for (let i = 0; i < order.length; i++)
+    for (let j = i + 1; j < order.length; j++) if (next.get(order[i]) > next.get(order[j])) pairs++;
+  return pairs;
+}
+
 (async () => {
   assert.deepEqual(validateStage(stage), stage);
   const values = new Map(),
@@ -39,6 +52,8 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
           previous = new Map(),
           bridge = new Set(),
           costs = [];
+        const lapPasses = Array.from({ length: funnel.turns }, () => new Map()),
+          chutePasses = new Map();
         let first = 0,
           escaped = 0;
         const escapeSamples = [];
@@ -52,12 +67,19 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
                 dy = ball.y - funnel.y,
                 r = Math.hypot(dx, dy);
               if (ball.onBridge) {
+                if (count === 20) recordCrossing(chutePasses, ball, 48, race.elapsed);
                 bridge.add(ball.id);
                 if (ball.x < 29.35 || ball.x > 34.65 || ball.y < 41.65) {
                   escaped++;
                   if (escapeSamples.length < 5) escapeSamples.push([ball.id, ball.x, ball.y, 'outlet']);
                 }
               } else {
+                if (count === 20 && dx > 0 && ball.py < funnel.y && ball.y >= funnel.y) {
+                  // Each lap crosses the ray to the right of the centre at a different radius.
+                  const pitch = (funnel.outer - funnel.inner) / funnel.turns;
+                  const lap = Math.round((funnel.outer - r) / pitch - 0.25);
+                  if (lapPasses[lap]) recordCrossing(lapPasses[lap], ball, funnel.y, race.elapsed);
+                }
                 if (r < 30.8 && ball.y > 15) {
                   const a = Math.atan2(dy, dx),
                     before = previous.get(ball.id);
@@ -114,6 +136,18 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
         assert.equal(escaped, 0, 'all marbles stay in the spiral corridor or the isolated outlet');
         assert.ok(result.minTurns > 3.5, 'no shortcut through the spiral walls');
         assert.ok(first > 15 && race.elapsed < 70, 'four turns without an overlong race');
+        if (count === 20) {
+          for (const passes of [...lapPasses, chutePasses]) assert.equal(passes.size, count);
+          const spiralSwaps = lapPasses.slice(1).map((passes, i) => reversedPairs(lapPasses[i], passes));
+          const finishRanks = new Map(race.arrivals.map((ball) => [ball.id, ball.rank]));
+          const chuteSwaps = reversedPairs(chutePasses, finishRanks);
+          console.log(JSON.stringify({ seed: initial, spiralSwaps, chuteSwaps }));
+          assert.ok(
+            spiralSwaps.some((swaps, i) => i > 0 && swaps > 0),
+            'marbles can pass mid-spiral'
+          );
+          assert.ok(chuteSwaps > 0, 'marbles can pass in the descending chute');
+        }
       }
     }
   } finally {

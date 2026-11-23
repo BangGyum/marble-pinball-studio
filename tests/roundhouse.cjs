@@ -66,7 +66,7 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
     contacts = new Map();
   let bodyIndices = new Map(),
     run = '';
-  let trainHits = [new Set(), new Set()];
+  let trainHits, outerHits;
   listener.BeginContact = (pointer) => {
     const contact = B.wrapPointer(pointer, B.b2Contact);
     const a = contact.GetFixtureA().GetBody(),
@@ -78,8 +78,14 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
       const index = bodyIndices.get(B.getPointer(body));
       if (index === undefined || other.GetType() !== B.b2_dynamicBody) continue;
       const entity = stage.entities[index];
-      if (entity.type === 'kinematic' && entity.shape.hidden)
-        trainHits[entity.position.y === 28 ? 0 : 1].add(B.getPointer(other));
+      if (entity.shape.trainCar) {
+        const yard = entity.position.y === 28 ? 0 : 1;
+        const pos = other.GetPosition();
+        trainHits[yard].add(B.getPointer(other));
+        // Within 1.5 marble diameters of the radius-18 outer wall.
+        if (Math.hypot(pos.x - entity.position.x, pos.y - entity.position.y) >= 17.25)
+          outerHits[yard].add(B.getPointer(other));
+      }
       const ids = contacts.get(index) ?? new Set();
       ids.add(run + '/' + B.getPointer(other));
       contacts.set(index, ids);
@@ -107,6 +113,7 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
         bodyIndices = new Map(physics.entities.map((e, i) => [B.getPointer(e.body), i]));
         run = count + '/' + initial;
         trainHits = [new Set(), new Set()];
+        outerHits = [new Set(), new Set()];
         race.startRace([Math.max(1, count - 1), count], 'desc');
         let first = 0,
           escaped = 0,
@@ -139,6 +146,7 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
           finish: +race.elapsed.toFixed(2),
           reason: race.finishReason,
           trainHits: trainHits.map((s) => s.size),
+          outerHits: outerHits.map((s) => s.size),
           arrived: race.arrivals.length,
           escaped,
           lastEscaped,
@@ -179,6 +187,10 @@ const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
           assert.ok(
             hitCount >= measured.length * 20 * 0.5,
             'at least half of marbles meet each train across the fixed seeds'
+          );
+          assert.ok(
+            measured.reduce((sum, r) => sum + r.outerHits[yard], 0) >= measured.length * 20 * 0.4,
+            'each train reaches marbles travelling along the outer wall'
           );
         }
     }

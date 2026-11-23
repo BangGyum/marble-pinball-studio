@@ -174,16 +174,24 @@ async function connect(port, cookie, options = {}) {
       /너무 커서 전송할 수 없어요/,
       'UTF-8 message size is rejected before opening a pending request'
     );
-    assert.equal(app.info().maps[0].title, '네온 잭팟', 'map order must never overwrite a different map title');
-    assert.equal(app.info().maps.length, 21);
+    assert.equal(app.info().maps.find((map) => map.id === 0).title, '네온 잭팟');
+    assert.equal(app.info().maps.length, 19);
     assert.deepEqual(
       app
         .info()
-        .maps.slice(-2)
+        .maps.slice(0, 3)
         .map((map) => map.title),
-      ['구슬 발사 시험장', '원바운드 샷']
+      ['막차 곤돌라', '원바운드 샷', '구슬 발사 시험장']
     );
-    assert.ok(!app.info().maps.some((map) => ['네온 모래시계', '스프링 놀이터', '역전 사다리'].includes(map.title)));
+    const hiddenTitles = [
+      '네온 모래시계',
+      '스프링 놀이터',
+      '역전 사다리',
+      '쌍둥이 와류',
+      '카오스 시계탑',
+      '쌍둥이 소용돌이',
+    ];
+    assert.ok(!app.info().maps.some((map) => hiddenTitles.includes(map.title)));
     assert.ok(
       app.info().maps.every((map) => stages[map.id].title === map.title),
       'hidden maps do not shift the exposed LAN ids'
@@ -483,7 +491,15 @@ async function connect(port, cookie, options = {}) {
       ).ok,
       false
     );
-    for (const title of ['네온 핀볼 폭포', '카오스 시계탑', '오비탈 락', '끝없는 나선', '쌍둥이 와류', '떠도는 입구']) {
+    for (const title of [
+      '네온 핀볼 폭포',
+      '카오스 시계탑',
+      '오비탈 락',
+      '끝없는 나선',
+      '쌍둥이 와류',
+      '떠도는 입구',
+      '막차 곤돌라',
+    ]) {
       // Keep independent map scenarios below the real server's 30 commands/second limit.
       await delay(1050);
       const stage = stages.find((s) => s.title === title),
@@ -503,12 +519,14 @@ async function connect(port, cookie, options = {}) {
         'annular wind boundaries survive scene serialization'
       );
       assert.deepEqual(guest2.scene.stage.goalArea, stage.goalArea, 'central finish reaches spectators intact');
-      const slides = stage.entities.flatMap((e, i) => (e.props.sliding ? [i] : []));
+      const slides = stage.entities.flatMap((e, i) => (e.props.sliding || e.shape.gondola ? [i] : []));
       assert.ok(
         slides.every((i) => !guest2.scene.fixed[i]),
         'moving platforms cannot be statically cached'
       );
       await host.command({ type: 'start' });
+      const gondola = stage.entities.find((e) => e.shape.gondola);
+      if (gondola) app.race.physics.placeMarble(0, gondola.position.x, gondola.position.y + 0.9);
       for (let i = 0; i < 90; i++) app.advance();
       if (stage.exitBridge) {
         while (!app.race.balls.some((b) => b.onBridge) && app.race.elapsed < 60) app.advance();

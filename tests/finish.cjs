@@ -11,7 +11,7 @@ require.extensions['.ts'] = (m, f) =>
 const { finishFraction, raceProgress } = require('../src/finish.ts');
 const { Race } = require('../src/race.ts');
 const { validateStage, saveMaps, readSavedMaps } = require('../src/model.ts');
-const { orbitingGate, orbitingBowl } = require('../src/data/orbiting-gate.ts');
+const { orbitingGate } = require('../src/data/orbiting-gate.ts');
 const { encodeScene, decodeScene } = require('../src/lan/protocol.ts');
 const { drawOrbitingGateMouth } = require('../src/orbiting-gate-art.ts');
 
@@ -136,7 +136,7 @@ console.log(
   'PASS circular/line finish, fast crossings, same-step order, progress, validation, save/reload and LAN encoding'
 );
 
-// The ready screen must show the full starting grid, then the race shows the whole bowl.
+// Fit the ready grid, follow during play, and fit the whole map only for layout editing.
 {
   const { Game } = require('../src/game.ts'),
     { LanView } = require('../src/lan/view.ts');
@@ -207,7 +207,7 @@ console.log(
       view.draw(1000);
       for (const renderer of [game, view]) {
         const scale = renderer.viewScale(),
-          camera = renderer.camera;
+          camera = { ...renderer.camera };
         for (const ball of renderer.balls) {
           const x = width * 0.56 + (ball.x - camera.x) * scale,
             y = height * 0.43 + (ball.y - camera.y) * scale;
@@ -219,15 +219,21 @@ console.log(
         renderer.state = 'running';
         if (renderer === game) game.render();
         else view.draw(1000);
-        assert.equal(renderer.camera.x, orbitingBowl.x, 'the race restores the full bowl overview');
-        const overview = renderer.viewScale();
-        assert.ok(overview * 68 <= width && overview * 76 <= height, 'the racing bowl fits the viewport');
+        assert.equal(
+          renderer.viewScale(),
+          Math.min(width / 20, height / 13, 70),
+          'circular goals use the same follow zoom'
+        );
         renderer.state = 'ready';
         if (renderer === view) renderer.canControl = true;
         renderer.setDolphinPreview(false);
         renderer.setDolphins({ enabled: true, rows: [30], interval: 5 });
         renderer.showDolphinLayout();
-        assert.equal(renderer.viewScale(), overview, 'dolphin layout still shows the whole map before starting');
+        const overview = renderer.viewScale();
+        assert.ok(
+          overview * 68 <= width && overview * 76 <= height,
+          'dolphin layout fits the whole map before starting'
+        );
         renderer.follow(true);
         if (renderer === game) game.render();
         else view.draw(1000);
@@ -236,6 +242,6 @@ console.log(
       }
     }
   console.log(
-    'PASS orbiting ready grids at 1/100/300 marbles, desktop/mobile/short windows, race overview and dolphin layout in Game/LAN'
+    'PASS orbiting ready grids at 1/100/300 marbles, close race tracking and full dolphin layout in Game/LAN'
   );
 }

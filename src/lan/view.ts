@@ -1,6 +1,6 @@
 import { acceptsSpringSpace, SpringControls } from '../spring-controls';
 import { drawEntities } from '../draw';
-import { drawGoalArea, raceProgress } from '../finish';
+import { drawGoalArea, racingByProgress } from '../finish';
 import { bridgeBallOpacity, drawMapArt, drawMapOverlay, usesGlassRails } from '../map-art';
 import { drawWind } from '../wind-render';
 import { drawCelebration } from '../celebration';
@@ -82,8 +82,6 @@ export class LanView {
   private elasticFrameSeq = -1;
   private ctx: CanvasRenderingContext2D;
   private camera = { x: 12.85, y: 4 };
-  private goalScale = 0;
-  private goalFollow = false;
   private manual: { x: number; y: number } | null = null;
   private minimap = { x: 16, y: 26, w: 115, h: 400, scale: 4 };
   private width = 1000;
@@ -304,6 +302,9 @@ export class LanView {
   get arrivals() {
     return this.balls.filter((ball) => ball.rank).sort((a, b) => a.rank! - b.rank!);
   }
+  racing() {
+    return this.scene ? racingByProgress(this.scene.stage, this.balls) : [];
+  }
   beginSpringPlacement() {
     if (!this.scene || !this.springConnected || this.personalSpring?.state !== 'available' || this.state === 'finished')
       return;
@@ -379,7 +380,6 @@ export class LanView {
     this.renderDirty = true;
   }
   follow(closeOverview = false) {
-    if (closeOverview && this.state !== 'ready') this.goalFollow = true;
     if (closeOverview && this.state === 'ready' && this.dolphinOverview) {
       this.dolphinOverview = false;
       this.camera = { ...this.readyCamera };
@@ -436,8 +436,7 @@ export class LanView {
       this.springElapsed = 0;
       this.displayedElapsed = 0;
       if (this.scene && JSON.stringify(this.scene.stage) !== JSON.stringify(scene.stage)) this.setZoom(1);
-      this.goalScale = 0;
-      this.goalFollow = false;
+      this.focusedBallId = null;
       this.lastDraw = 0;
       this.dolphinPreviewElapsed = DOLPHIN_DURATION / 2;
       this.dolphinPreviewLast = 0;
@@ -513,17 +512,11 @@ export class LanView {
   }
   private viewScale() {
     if (this.springPlacement?.active) return Math.min(this.width / 20, this.height / 13, 70) * this.zoom;
-    if (this.scene?.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview)) {
-      const fitted = Math.min(
-        Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.scene.stage.width ?? 26) + 4),
-        Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)
-      );
-      return (this.state !== 'ready' && this.goalScale ? this.goalScale : fitted) * this.zoom;
-    }
     if (this.state === 'ready' && this.dolphinOverview && this.scene)
       return (
         Math.min(
-          Math.max(1, this.width - 180) / ((this.scene.stage.width ?? 26) + 4),
+          Math.max(1, this.width - (this.scene.stage.goalArea && this.width < 600 ? 24 : 180)) /
+            ((this.scene.stage.width ?? 26) + 4),
           Math.max(1, this.height - 45) / (this.scene.stage.goalY + 4)
         ) * this.zoom
       );
@@ -649,36 +642,14 @@ export class LanView {
     }
     const { balls } = this;
     const selected = balls.find((b) => b.id === this.focusedBallId);
-    const active = balls
-      .filter((b) => !b.rank)
-      .sort((a, b) => raceProgress(scene.stage, b) - raceProgress(scene.stage, a));
-    const lastWinningRank = scene.settings.order === 'desc' ? balls.length : scene.settings.picks;
-    const target =
-      selected ??
-      active[Math.min(active.length - 1, Math.max(0, lastWinningRank - (balls.length - active.length) - 1))] ??
-      (scene.stage.goalArea ? balls.find((ball) => ball.rank === balls.length) : undefined);
-    const overview = !shown.winners.length && this.zoom <= 1 && !this.goalFollow && !selected;
+    const active = this.racing();
+    const target = selected ?? active.at(-1) ?? balls.find((ball) => ball.rank === balls.length);
     this.cameraMoving = false;
-    if (scene.stage.goalArea && this.state !== 'ready') {
-      const desired = overview
-        ? Math.min(
-            Math.max(1, w - (w < 600 ? 24 : 180)) / ((scene.stage.width ?? 26) + 4),
-            Math.max(1, h - 45) / (scene.stage.goalY + 4)
-          )
-        : Math.min(w / 20, h / 13, 70);
-      this.goalScale = this.goalScale ? this.goalScale + (desired - this.goalScale) * (1 - 0.9 ** (dt * 60)) : desired;
-      this.cameraMoving = Math.abs(desired - this.goalScale) > 0.01;
-    }
     const scale = this.viewScale();
     if (this.springPlacement?.active) {
       const center = this.state === 'ready' ? this.readyCamera : (target ?? this.camera);
       this.camera = this.manual ?? { x: center.x, y: center.y };
-    } else if (
-      scene.stage.goalArea &&
-      (this.state === 'ready' ? this.dolphinOverview : overview) &&
-      !this.manual &&
-      !selected
-    ) {
+    } else if (scene.stage.goalArea && this.state === 'ready' && this.dolphinOverview && !this.manual && !selected) {
       this.camera = { x: (scene.stage.width ?? 26) / 2, y: scene.stage.goalY / 2 - (h * 0.07) / scale };
     } else if (target && !this.manual && (this.state !== 'ready' || selected)) {
       this.camera.x += (target.x - this.camera.x) * (1 - 0.94 ** (dt * 60));

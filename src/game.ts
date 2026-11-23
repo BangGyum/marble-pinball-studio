@@ -30,6 +30,7 @@ export class Game extends Race {
   private visible = true;
   private fastForward = false;
   zoom = 1;
+  focusedBallId: number | null = null;
   celebrationRightInset = 18;
   onZoomChange: (zoom: number) => void = () => {};
   recording = false;
@@ -49,8 +50,6 @@ export class Game extends Race {
   // Blending needs a step taken since the last start, pause or resume.
   private stepped = false;
   private camera = { x: 12.8, y: 3 };
-  private goalScale = 0;
-  private goalFollow = false;
   private manual: { x: number; y: number } | null = null;
   private width = 1000;
   private height = 600;
@@ -164,8 +163,7 @@ export class Game extends Race {
   prepare(stage: StageDef, names: string[], dolphins?: DolphinSettings) {
     this.launcherDrawing = undefined;
     if (this.stage !== stage) this.setZoom(1);
-    this.goalScale = 0;
-    this.goalFollow = false;
+    this.focusedBallId = null;
     this.lastRender = 0;
     this.dolphinOverview = false;
     this.dolphinPreviewElapsed = DOLPHIN_DURATION / 2;
@@ -250,7 +248,6 @@ export class Game extends Race {
     this.stepped = false;
   }
   follow(closeOverview = false) {
-    if (closeOverview && this.state !== 'ready') this.goalFollow = true;
     if (closeOverview && this.state === 'ready' && this.dolphinOverview) {
       this.dolphinOverview = false;
       this.camera = { ...this.readyCamera };
@@ -275,17 +272,11 @@ export class Game extends Race {
     }
   }
   private viewScale() {
-    if (this.stage.goalArea && (this.state !== 'ready' || this.dolphinOverview)) {
-      const fitted = Math.min(
-        Math.max(1, this.width - (this.width < 600 ? 24 : 180)) / ((this.stage.width ?? 26) + 4),
-        Math.max(1, this.height - 45) / (this.stage.goalY + 4)
-      );
-      return (this.state !== 'ready' && this.goalScale ? this.goalScale : fitted) * this.zoom;
-    }
     if (this.state === 'ready' && this.dolphinOverview)
       return (
         Math.min(
-          Math.max(1, this.width - 180) / ((this.stage.width ?? 26) + 4),
+          Math.max(1, this.width - (this.stage.goalArea && this.width < 600 ? 24 : 180)) /
+            ((this.stage.width ?? 26) + 4),
           Math.max(1, this.height - 45) / (this.stage.goalY + 4)
         ) * this.zoom
       );
@@ -470,21 +461,11 @@ export class Game extends Race {
     const blend = this.state === 'running' && this.stepped ? Math.min(1, this.accumulator * 60) : 1;
     const at = (from: number | undefined, to: number) => (from === undefined ? to : from + (to - from) * blend);
     const active = this.racing();
-    const target = this.focusBall(active) ?? (this.stage.goalArea ? this.arrivals.at(-1) : undefined);
-    const overview = !this.winners.length && this.zoom <= 1 && !this.goalFollow;
+    const selected = this.focusedBallId === null ? undefined : this.balls[this.focusedBallId];
+    const target = selected ?? active.at(-1) ?? this.arrivals.at(-1);
     this.cameraMoving = false;
-    if (this.stage.goalArea && this.state !== 'ready') {
-      const desired = overview
-        ? Math.min(
-            Math.max(1, w - (w < 600 ? 24 : 180)) / ((this.stage.width ?? 26) + 4),
-            Math.max(1, h - 45) / (this.stage.goalY + 4)
-          )
-        : Math.min(w / 20, h / 13, 70);
-      this.goalScale = this.goalScale ? this.goalScale + (desired - this.goalScale) * (1 - 0.9 ** (dt * 60)) : desired;
-      this.cameraMoving = Math.abs(desired - this.goalScale) > 0.01;
-    }
     const scale = this.viewScale();
-    if (this.stage.goalArea && (this.state === 'ready' ? this.dolphinOverview : overview) && !this.manual) {
+    if (this.stage.goalArea && this.state === 'ready' && this.dolphinOverview && !this.manual) {
       this.camera = { x: (this.stage.width ?? 26) / 2, y: this.stage.goalY / 2 - (h * 0.07) / scale };
     } else if (this.state !== 'ready' && target && !this.manual) {
       // Same easing as 0.06 / 0.13 per frame at 60Hz, independent of the display refresh rate.
@@ -665,9 +646,9 @@ export class Game extends Race {
       const x = snap || b.px === undefined ? b.x : b.px + (b.x - b.px) * blend;
       const y = snap || b.py === undefined ? b.y : b.py + (b.y - b.py) * blend;
       ctx.globalAlpha = bridgeBallOpacity(this.stage, { x, y, onBridge: b.onBridge });
-      ctx.fillStyle = b.color;
+      ctx.fillStyle = b.id === this.focusedBallId ? '#fff3a8' : b.color;
       ctx.beginPath();
-      ctx.arc(x, y, Math.max(0.23, 1.4 / scale), 0, Math.PI * 2);
+      ctx.arc(x, y, Math.max(0.23, (b.id === this.focusedBallId ? 2.5 : 1.4) / scale), 0, Math.PI * 2);
       ctx.fill();
       if (getSceneTheme() === 'beige') {
         ctx.strokeStyle = '#705a40';

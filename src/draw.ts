@@ -4,6 +4,28 @@ import { drawLauncher } from './launcher-art';
 import { drawPersonalSpring } from './personal-spring-art';
 import type { MapEntityState } from './types/map-entity';
 type ViewBounds = { left: number; right: number; top: number; bottom: number };
+const railPaths = new WeakMap<[number, number][], { path: Path2D; bounds: ViewBounds; length: number }>();
+
+function railPath(points: [number, number][]) {
+  const cached = railPaths.get(points);
+  if (cached && cached.length === points.length) return cached;
+  const [x, y] = points[0];
+  const path = new Path2D();
+  path.moveTo(x, y);
+  const bounds = { left: x, right: x, top: y, bottom: y };
+  for (let i = 1; i < points.length; i++) {
+    const [px, py] = points[i];
+    path.lineTo(px, py);
+    bounds.left = Math.min(bounds.left, px);
+    bounds.right = Math.max(bounds.right, px);
+    bounds.top = Math.min(bounds.top, py);
+    bounds.bottom = Math.max(bounds.bottom, py);
+  }
+  const rail = { path, bounds, length: points.length };
+  railPaths.set(points, rail);
+  return rail;
+}
+
 export function drawEntities(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   entities: MapEntityState[],
@@ -50,6 +72,21 @@ export function drawEntities(
               );
         if (bounds.left > radius || bounds.right < -radius || bounds.top > radius || bounds.bottom < -radius) return;
       }
+    }
+    let path: Path2D | undefined;
+    if (
+      shape.type === 'polyline' &&
+      !shape.gondola &&
+      !glass &&
+      shape.points.length >= 8 &&
+      typeof Path2D !== 'undefined'
+    ) {
+      const rail = railPath(shape.points);
+      const { left, right, top, bottom } = rail.bounds;
+      if (bounds && (right < bounds.left || left > bounds.right || bottom < bounds.top || top > bounds.bottom)) return;
+      // Partially visible rails retain segment clipping, including its limit on the glow area.
+      if (!bounds || (left >= bounds.left && right <= bounds.right && top >= bounds.top && bottom <= bounds.bottom))
+        path = rail.path;
     }
     ctx.save();
     ctx.translate(e.x, e.y);
@@ -160,6 +197,33 @@ export function drawEntities(
         ctx.arc(0, 0, shape.radius + 0.15, 0, Math.PI * 2);
         ctx.stroke();
       }
+    } else if (shape.gondola) {
+      ctx.shadowBlur = 0;
+      ctx.lineJoin = ctx.lineCap = 'round';
+      ctx.lineWidth = 0.075 + 0.5 / scale;
+      // The carriage tips about its trolley wheel. Keep its open top and both seats visible.
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, 0.42);
+      ctx.lineTo(0.82, 0.66);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.2, 0, Math.PI * 2);
+      ctx.fillStyle = sceneColor('#213c42');
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(...shape.points[0]);
+      for (const p of shape.points.slice(1)) ctx.lineTo(...p);
+      ctx.fillStyle = sceneColor('#396454');
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-0.78, 1.49);
+      ctx.lineTo(0.78, 1.49);
+      ctx.stroke();
+    } else if (path) {
+      ctx.stroke(path);
     } else if (shape.points.length) {
       ctx.beginPath();
       if (glass && shape.solid) {

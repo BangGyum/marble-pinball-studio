@@ -1,11 +1,19 @@
 import type { StageDef } from './stage-def';
+import type { Ball } from './race';
 import { sceneColor } from './scene-theme';
+import { drawBounceStairsFinish } from './bounce-stairs-art';
 
 type Point = { x: number; y: number };
 
 export function raceProgress(stage: StageDef, point: Point) {
   const goal = stage.goalArea;
   return goal ? -Math.hypot(point.x - goal.x, point.y - goal.y) : point.y;
+}
+
+export function racingByProgress(stage: StageDef, balls: Ball[]) {
+  return balls
+    .filter((ball) => !ball.rank)
+    .sort((a, b) => raceProgress(stage, b) - raceProgress(stage, a) || a.id - b.id);
 }
 
 // First crossing within this step, including a fast marble that exits the circle again.
@@ -33,7 +41,7 @@ export function drawGoalArea(
   scale: number
 ) {
   const goal = stage.goalArea;
-  if (!goal) return false;
+  if (!goal) return stage.art?.style === 'bounce-stairs' && drawBounceStairsFinish(ctx, stage, scale);
   ctx.save();
   ctx.shadowBlur = 0;
   ctx.setLineDash([]);
@@ -43,10 +51,15 @@ export function drawGoalArea(
   ctx.arc(goal.x, goal.y, goal.radius, 0, Math.PI * 2);
   ctx.stroke();
   ctx.lineWidth = 0.28;
-  for (let i = 0; i < 16; i++) {
-    ctx.strokeStyle = sceneColor(i % 2 ? '#ffd184' : '#18313b');
+  const rim = goal.radius + 0.36;
+  for (let pass = 0; pass < 2; pass++) {
+    ctx.strokeStyle = sceneColor(pass ? '#ffd184' : '#18313b');
     ctx.beginPath();
-    ctx.arc(goal.x, goal.y, goal.radius + 0.36, (i * Math.PI) / 8, ((i + 1) * Math.PI) / 8);
+    for (let i = pass; i < 16; i += 2) {
+      const start = (i * Math.PI) / 8;
+      ctx.moveTo(goal.x + rim * Math.cos(start), goal.y + rim * Math.sin(start));
+      ctx.arc(goal.x, goal.y, rim, start, ((i + 1) * Math.PI) / 8);
+    }
     ctx.stroke();
   }
   if (goal.radius * scale >= 20) {

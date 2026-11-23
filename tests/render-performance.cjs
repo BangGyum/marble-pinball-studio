@@ -557,6 +557,37 @@ assert.equal(
 );
 console.log('PASS vector roundhouse art, overlay culling and full minimaps');
 
+{
+  const { lastGondola } = require('../src/data/last-gondola.ts');
+  const { shape } = lastGondola.entities.find((e) => e.shape.points?.length > 8);
+  const rail = { x: 0, y: 0, angle: 0, life: -1, shape };
+  const original = global.Path2D;
+  let segments = 0;
+  global.Path2D = class {
+    moveTo() {}
+    lineTo() {
+      segments++;
+    }
+  };
+  try {
+    for (const scale of [10, 40]) {
+      calls.length = 0;
+      drawEntities(ctx, [rail], scale);
+      assert.ok(calls.some(([op, arg]) => op === 'stroke' && arg instanceof global.Path2D));
+    }
+    assert.equal(segments, shape.points.length - 1, 'both zoom levels share the full rail path');
+    calls.length = 0;
+    drawEntities(ctx, [rail], 40, -1, true, { left: 80, right: 100, top: 0, bottom: 20 });
+    assert.equal(calls.length, 0, 'invisible rails submit no canvas work');
+    drawEntities(ctx, [rail], 40, -1, true, { left: 0, right: 3, top: 8, bottom: 11 });
+    const visible = calls.filter(([op]) => op === 'lineTo').length;
+    assert.ok(visible > 0 && visible < segments, 'partially visible rails still clip distant segments');
+  } finally {
+    if (original) global.Path2D = original;
+    else delete global.Path2D;
+  }
+}
+
 for (const type of [Game, LanView]) {
   const renderer = new type(canvas);
   renderer.state = 'ready';
@@ -857,7 +888,9 @@ for (const stage of [infiniteFunnel, twinFunnel]) {
     life: -1,
     shape: e.shape,
   }));
-  const groundRails = stage.entities.filter((e) => e.shape.collisionLayer !== 2).map((e) => e.shape.points);
+  const groundRails = stage.entities
+    .filter((e) => e.shape.type === 'polyline' && e.shape.collisionLayer !== 2)
+    .map((e) => e.shape.points);
   for (const theme of ['dark', 'beige'])
     for (const width of [75, 125])
       for (const cached of [false, true]) {

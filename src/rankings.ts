@@ -1,20 +1,23 @@
 import type { Ball, Game } from './game';
 import { el } from './ui';
 
-type Race = Pick<Game, 'state' | 'balls' | 'arrivals'>;
+type Race = Pick<Game, 'state' | 'balls' | 'arrivals' | 'racing'>;
 
 export function getStandings(game: Race): Ball[] {
   if (game.state === 'ready') return [];
-  return [...game.arrivals, ...game.balls.filter((ball) => !ball.rank).sort((a, b) => b.y - a.y || a.id - b.id)];
+  return [...game.arrivals, ...game.racing()];
 }
 
 export class Rankings {
   private rows = new WeakMap<Ball, HTMLLIElement>();
   private list = el<HTMLOListElement>('ranking-list');
-  constructor(private select?: (id: number) => void) {}
+  constructor(
+    private select?: (id: number) => void,
+    private showReady = !!select
+  ) {}
 
   update(game: Race, selectedId: number | null = null) {
-    const ready = game.state === 'ready' && !!this.select;
+    const ready = game.state === 'ready' && this.showReady;
     const items = (ready ? game.balls : getStandings(game)).map((ball, i) => {
       let item = this.rows.get(ball);
       if (!item) {
@@ -35,7 +38,7 @@ export class Rankings {
           item.addEventListener('keydown', (event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
-              this.select!(ball.id);
+              if (!event.repeat) this.select!(ball.id);
             }
           });
         }

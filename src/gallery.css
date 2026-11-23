@@ -360,6 +360,14 @@
   color: #8293a3;
   font-size: 0.75rem;
 }
+#gallery-sort {
+  width: auto;
+  margin-left: auto;
+}
+#gallery-sort-status {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
 .gallery-filters {
   display: flex;
   gap: 4px;
