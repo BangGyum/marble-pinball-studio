@@ -93,6 +93,11 @@ export function validateStage(value: unknown): StageDef {
     s.entities.length > 2000
   )
     throw new Error('올바른 맵 파일이 아니에요. 맵 이름, 결승선, 장애물을 확인해 주세요.');
+  if (
+    s.bubbleMine !== undefined &&
+    (!s.bubbleMine || !finite(s.bubbleMine.x, 2, (s.width ?? 26) - 19) || !finite(s.bubbleMine.y, 32, s.goalY - 6))
+  )
+    throw new Error('비눗방울과 광산 수레의 이동 경로가 맵 안에 있어야 해요.');
   if (s.goalArea !== undefined) {
     const goal = s.goalArea;
     if (

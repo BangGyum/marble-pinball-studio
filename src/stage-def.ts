@@ -69,6 +69,8 @@ export type StageDef = {
   vortex?: { x: number; y: number; radius: number; speed: number; gust?: number };
   windZones?: WindZone[];
   waterZones?: WaterZone[];
+  // World position of the soap ring at the foot of the mine railway.
+  bubbleMine?: { x: number; y: number };
   // Circular finish; goalY remains the map height used for framing and the minimap.
   goalArea?: { x: number; y: number; radius: number };
   goalY: number;

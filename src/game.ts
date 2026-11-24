@@ -494,7 +494,7 @@ export class Game extends Race {
       this.stage.exitBridge ? entities.filter((e) => e.shape.collisionLayer !== 2) : entities,
       scale,
       -1,
-      true,
+      this.stage.bubbleMine ? 'rail-outline' : true,
       view,
       usesGlassRails(this.stage),
       this.stage.art?.style === 'reversal-ladder'
@@ -515,7 +515,9 @@ export class Game extends Race {
       }
     }
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
-    drawMapOverlay(ctx, this.stage, entities, scale, true, view, this.elapsed);
+    // Keep the bubble and cart on the same interpolated clock as their passenger.
+    const overlayTime = this.stage.bubbleMine ? Math.max(0, this.elapsed - (1 - blend) / 60) : this.elapsed;
+    drawMapOverlay(ctx, this.stage, entities, scale, true, view, overlayTime);
     if (this.state === 'ready') {
       if (this.dolphinPreview) {
         this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale);
@@ -580,7 +582,7 @@ export class Game extends Race {
     if (this.drainCueAt && !this.reducedMotion?.matches)
       drawFunnelEntryCue(ctx, this.stage, (now - this.drainCueAt) / 1000, scale);
     ctx.restore();
-    this.renderMinimap(entities, blend);
+    this.renderMinimap(entities, blend, overlayTime);
     this.dolphinDrag.setView(
       {
         x: w * 0.56 - cam.x * scale,
@@ -624,7 +626,11 @@ export class Game extends Race {
     }
   }
 
-  private renderMinimap(entities: MapEntityState[] = this.physics.getEntities(), blend = 1) {
+  private renderMinimap(
+    entities: MapEntityState[] = this.physics.getEntities(),
+    blend = 1,
+    overlayTime = this.elapsed
+  ) {
     const ctx = this.ctx;
     const mapWidth = this.stage.width ?? 26;
     const scale = Math.min((this.width < 600 ? 75 : 125) / mapWidth, (this.height - 65) / this.stage.goalY);
@@ -640,7 +646,7 @@ export class Game extends Race {
     ctx.fillRect(0, 0, mapWidth, this.stage.goalY);
     this.renderCache.drawMinimap(ctx, this.stage, entities, scale, Math.min(devicePixelRatio, 2));
     drawWind(ctx, this.stage.windZones ?? [], this.elapsed, scale);
-    drawMapOverlay(ctx, this.stage, entities, scale, true, undefined, this.elapsed);
+    drawMapOverlay(ctx, this.stage, entities, scale, true, undefined, overlayTime);
     if (this.state === 'ready' && this.dolphinPreview)
       this.dolphinRenderer.guides(ctx, this.stage, this.dolphins, scale, true);
     for (const b of this.balls) {

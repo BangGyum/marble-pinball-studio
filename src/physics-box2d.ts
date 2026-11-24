@@ -20,6 +20,7 @@ import {
 import { timedGateAngle } from './timed-gate';
 import { rotorPower } from './rotor-cycle';
 import { GondolaCar } from './gondola';
+import { BubbleMineRide } from './bubble-mine';
 import type { IPhysics } from './i-physics';
 import type { EntityBoxShape, MapEntity, MapEntityState } from './types/map-entity';
 import { PERSONAL_SPRING_DURATION, personalSpringExtension } from './personal-spring';
@@ -94,6 +95,7 @@ export class Box2dPhysics implements IPhysics {
   private boosters: PhysicsEntity[] = [];
   private launchers: Launcher[] = [];
   private gondolas: GondolaCar[] = [];
+  private bubbleRide?: BubbleMineRide;
   private launcherGuideIds: number[] = [];
   private launcherApproaches = new Float64Array(0);
   private breakables: PhysicsEntity[] = [];
@@ -139,6 +141,8 @@ export class Box2dPhysics implements IPhysics {
     if (this.world && !this.disposed && this.world.GetBodyCount() === 0) this.leaks.freeLeaked();
   }
   clear() {
+    this.bubbleRide?.clear();
+    this.bubbleRide = undefined;
     for (const car of this.gondolas) car.reset();
     this.gondolas = [];
     for (const launcher of this.launchers) {
@@ -173,6 +177,7 @@ export class Box2dPhysics implements IPhysics {
     this.releaseWrappers();
   }
   clearMarbles() {
+    this.bubbleRide?.clear();
     for (const car of this.gondolas) car.reset();
     for (const launcher of this.launchers) {
       launcher.loaded = undefined;
@@ -189,6 +194,7 @@ export class Box2dPhysics implements IPhysics {
     this.releaseWrappers();
   }
   createStage(stage: StageDef) {
+    this.bubbleRide = stage.bubbleMine ? new BubbleMineRide(stage.bubbleMine, this.vector) : undefined;
     this.motionTime = 0;
     this.vortex = stage.vortex;
     this.windZones = stage.windZones ?? [];
@@ -434,6 +440,7 @@ export class Box2dPhysics implements IPhysics {
     const body = this.marbleMap[id];
     if (body) {
       for (const car of this.gondolas) car.remove(body);
+      if (this.bubbleRide?.passenger === body) this.bubbleRide.clear();
       for (const launcher of this.launchers) {
         if (launcher.loaded?.body === body) launcher.loaded = undefined;
         launcher.waiting?.delete(body);
@@ -480,6 +487,9 @@ export class Box2dPhysics implements IPhysics {
   }
   isMarbleOnBridge(id: number) {
     return this.bridgeBodies.has(this.marbleMap[id]);
+  }
+  isBubblePassenger(id: number) {
+    return !!this.bubbleRide?.passenger && this.bubbleRide.passenger === this.marbleMap[id];
   }
   getLauncherGuideIds(): readonly number[] {
     return this.launcherGuideIds;
@@ -1102,9 +1112,10 @@ export class Box2dPhysics implements IPhysics {
       beforeSubstep?.(dt, i * dt);
       // Check the short solver path: a full-frame chord can skip a thin wall under pressure.
       const guard = !!beforeSubstep && this.entities.length > 0;
-      if (guard) this.recordSweep();
+      if (guard || (this.bubbleRide && !this.bubbleRide.passenger)) this.recordSweep();
       this.world.Step(dt, 8, this.collisionSubsteps === 4 ? 4 : 8);
       if (guard) this.guardMapCrossings();
+      this.bubbleRide?.step(this.motionTime, dt, bodies, this.sweepPositions, MARBLE_RADIUS);
       if (this.exitBridge) {
         for (const body of bodies) {
           const elevated = this.bridgeBodies.has(body);

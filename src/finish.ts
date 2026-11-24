@@ -20,13 +20,14 @@ export function racingByProgress(stage: StageDef, balls: Ball[]) {
 export function finishFraction(stage: StageDef, from: Point, to: Point): number | undefined {
   const goal = stage.goalArea;
   if (!goal) return to.y >= stage.goalY ? (stage.goalY - from.y) / Math.max(0.000001, to.y - from.y) : undefined;
-  const x = from.x - goal.x,
-    y = from.y - goal.y;
-  const c = x * x + y * y - goal.radius * goal.radius;
+  return circleEntryFraction(from.x - goal.x, from.y - goal.y, to.x - from.x, to.y - from.y, goal.radius);
+}
+
+// Entry along a relative displacement (dx, dy) from the circle-centered point (x, y).
+export function circleEntryFraction(x: number, y: number, dx: number, dy: number, radius: number) {
+  const c = x * x + y * y - radius * radius;
   if (c <= 0) return 0;
-  const dx = to.x - from.x,
-    dy = to.y - from.y,
-    a = dx * dx + dy * dy;
+  const a = dx * dx + dy * dy;
   if (!a) return undefined;
   const b = x * dx + y * dy,
     discriminant = b * b - a * c;

@@ -6,6 +6,7 @@ import { twinFunnel } from './twin-funnel';
 import { oneBounce } from './one-bounce';
 import { lastGondola } from './last-gondola';
 import { tidalLocks } from './tidal-locks';
+import { bubbleMine } from './bubble-mine';
 import { launcherLab } from './launcher-lab';
 import { springLab } from './spring-lab';
 import { roundhouse } from './roundhouse';
@@ -54,6 +55,7 @@ const builtins: [id: number, stage: StageDef, playKey?: MapPlayKey][] = [
   [22, oneBounce, mapPlayKeys.oneBounce],
   [23, lastGondola, mapPlayKeys.lastGondola],
   [24, tidalLocks, mapPlayKeys.tidalLocks],
+  [25, bubbleMine, mapPlayKeys.bubbleMine],
 ];
 
 export const stages = [...builtins].sort(([a], [b]) => a - b).map(([, stage]) => stage);

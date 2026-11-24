@@ -199,6 +199,7 @@ export class Race {
       // Changing layers mid-step legitimately passes walls of the other layer.
       if (
         this.walls &&
+        !(this.stage.bubbleMine && this.physics.isBubblePassenger(ball.id)) &&
         onBridge === ball.onBridge &&
         this.walls.crosses(ball.x, ball.y, p.x, p.y, onBridge ? 2 : 1) &&
         this.physics.getMarbleSpeed(ball.id) < WALL_GUARD_MAX_SPEED
@@ -295,6 +296,7 @@ export class Race {
     }
     for (const ball of this.balls) {
       if (ball.rank) continue;
+      if (this.stage.bubbleMine && this.physics.isBubblePassenger(ball.id)) continue;
       const pos = this.physics.getMarblePosition(ball.id);
       const age = ball.mantaCaughtAt === undefined ? Infinity : elapsed - ball.mantaCaughtAt;
       if (age < MANTA_PENALTY_SECONDS) {

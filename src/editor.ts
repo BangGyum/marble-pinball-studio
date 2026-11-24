@@ -658,7 +658,12 @@ export class Editor {
       usesGlassRails(this.stage),
       this.stage.art?.style === 'reversal-ladder'
     );
-    if (liveArt || this.stage.art?.style === 'orbiting-gate' || this.stage.art?.style === 'tidal-locks')
+    if (
+      liveArt ||
+      this.stage.bubbleMine ||
+      this.stage.art?.style === 'orbiting-gate' ||
+      this.stage.art?.style === 'tidal-locks'
+    )
       drawMapOverlay(c, this.stage, entities, SCALE, false);
     drawWind(c, this.stage.windZones ?? [], 0, SCALE);
     if (!drawGoalArea(c, this.stage, SCALE)) {

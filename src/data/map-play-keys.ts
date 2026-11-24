@@ -21,6 +21,7 @@ export const mapPlayKeys = {
   oneBounce: 'one-bounce',
   lastGondola: 'last-gondola',
   tidalLocks: 'tidal-locks',
+  bubbleMine: 'bubble-mine',
   launcherLab: 'launcher-lab',
   seesawValley: 'seesaw-valley',
 } as const;

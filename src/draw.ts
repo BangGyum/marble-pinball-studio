@@ -26,18 +26,32 @@ function railPath(points: [number, number][]) {
   return rail;
 }
 
+function strokeRailHalo(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  scale: number,
+  path?: Path2D
+) {
+  ctx.save();
+  ctx.globalAlpha *= 0.18;
+  ctx.lineWidth += sceneGlow(4) / scale;
+  if (path) ctx.stroke(path);
+  else ctx.stroke();
+  ctx.restore();
+}
+
 export function drawEntities(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   entities: MapEntityState[],
   scale: number,
   selected = -1,
-  glow = true,
+  glow: boolean | 'rail-outline' = true,
   view?: ViewBounds,
   glass = false,
   customDevices = false
 ) {
   // Small distant geometry keeps its bright edges without per-frame shadow filters.
-  glow = glow && scale >= 32;
+  const outlined = glow === 'rail-outline' && scale >= 32;
+  glow = !!glow && scale >= 32;
   entities.forEach((e, i) => {
     const shape = e.shape;
     if (shape.hidden && i !== selected) return;
@@ -96,7 +110,8 @@ export function drawEntities(
     ctx.strokeStyle = sceneColor(color);
     ctx.lineWidth = (i === selected ? 3 : 1.6) / scale;
     ctx.shadowColor = sceneColor(color);
-    ctx.shadowBlur = sceneGlow(glow ? (shape.type === 'polyline' ? 7 : 13) : 0);
+    const railHalo = outlined && shape.type === 'polyline' && !shape.gondola && !glass;
+    ctx.shadowBlur = sceneGlow(glow && !railHalo ? (shape.type === 'polyline' ? 7 : 13) : 0);
     if (shape.type === 'box') {
       ctx.rotate(shape.rotation);
       if (shape.spring) {
@@ -223,6 +238,7 @@ export function drawEntities(
       ctx.lineTo(0.78, 1.49);
       ctx.stroke();
     } else if (path) {
+      if (railHalo) strokeRailHalo(ctx, scale, path);
       ctx.stroke(path);
     } else if (shape.points.length) {
       ctx.beginPath();
@@ -235,6 +251,7 @@ export function drawEntities(
       }
       ctx.beginPath();
       let connected = false;
+      let visibleSegments = false;
       for (let j = 1; j < shape.points.length; j++) {
         const a = shape.points[j - 1],
           b = shape.points[j];
@@ -251,7 +268,13 @@ export function drawEntities(
         if (!connected) ctx.moveTo(...a);
         ctx.lineTo(...b);
         connected = true;
+        visibleSegments = true;
       }
+      if (!visibleSegments) {
+        ctx.restore();
+        return;
+      }
+      if (railHalo) strokeRailHalo(ctx, scale);
       if (glass && i !== selected) {
         ctx.strokeStyle = sceneColor('#2d6077');
         ctx.lineWidth = 0.2;

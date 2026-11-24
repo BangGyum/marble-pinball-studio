@@ -33,6 +33,7 @@ export interface IPhysics {
   placeMarble(id: number, x: number, y: number): void;
 
   isMarbleOnBridge(id: number): boolean;
+  isBubblePassenger(id: number): boolean;
 
   // Includes marbles released at the muzzle during the last step.
   getLauncherGuideIds(): readonly number[];

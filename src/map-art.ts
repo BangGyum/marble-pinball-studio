@@ -15,6 +15,7 @@ import { drawEntities } from './draw';
 import { drawSeesawCabinet, drawSeesaws, drawShortcutDeck } from './seesaw-art';
 import { drawBankShotGuide } from './one-bounce-art';
 import { drawCanalMarks, drawLockSignals } from './tidal-locks-art';
+import { drawMineRail, drawMineRide } from './bubble-mine-art';
 import { drawBounceStairsArt } from './bounce-stairs-art';
 import { drawOrbitingGateArt, drawOrbitingGateMouth } from './orbiting-gate-art';
 import type { MapEntityState } from './types/map-entity';
@@ -35,6 +36,7 @@ export function drawMapOverlay(
   elapsed = 0
 ) {
   if (stage.art?.style === 'tidal-locks') drawLockSignals(ctx, stage, scale, elapsed, view);
+  if (stage.bubbleMine) drawMineRide(ctx, stage, elapsed, scale, cacheBackground, view);
   if (stage.art?.style === 'reversal-ladder') drawLadderDevices(ctx, stage, entities, view);
   if (stage.art?.style === 'seesaw-valley') drawSeesaws(ctx, stage, entities, elapsed, view);
   if (stage.art?.style === 'shortcut-cascade') drawCascadeDevices(ctx, stage, entities);
@@ -108,6 +110,7 @@ export function drawMapArt(
   scale: number,
   cacheBackground = true
 ) {
+  if (stage.bubbleMine) drawMineRail(ctx, stage.bubbleMine);
   if (!stage.art) return;
   if (stage.art.style === 'tidal-locks') {
     drawCanalMarks(ctx, stage, scale);

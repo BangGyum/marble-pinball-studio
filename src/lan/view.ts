@@ -687,7 +687,7 @@ export class LanView {
       scene.stage.exitBridge ? entities.filter((e) => e.shape.collisionLayer !== 2) : entities,
       scale,
       -1,
-      true,
+      scene.stage.bubbleMine ? 'rail-outline' : true,
       view,
       usesGlassRails(scene.stage),
       scene.stage.art?.style === 'reversal-ladder'

@@ -379,6 +379,13 @@ assert.ok(
 );
 console.log('PASS distant-view glow reduction with unchanged geometry and close-view glow');
 
+glowDraws.length = 0;
+drawEntities(zoomContext, [zoomEntities[0]], 55, -1, 'rail-outline');
+assert.deepEqual(glowDraws, [0, 0], 'mine rails draw their halo and core without a live blur');
+glowDraws.length = 0;
+drawEntities(zoomContext, [zoomEntities[0]], 14, -1, 'rail-outline');
+assert.deepEqual(glowDraws, [0], 'distant mine rails only draw the core');
+
 const orbitalEntities = orbitalLock.entities.map((e) => ({
   x: e.position.x,
   y: e.position.y,
