@@ -8,6 +8,18 @@ type Context = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 // Depth marks start at the actual waterline. The chevrons point toward the spillway.
 export function drawCanalMarks(ctx: Context, stage: StageDef, scale: number) {
   ctx.save();
+  // A translucent sheet connects the pools at the wheel. The shorter strokes follow the falling water.
+  ctx.fillStyle = sceneColor('#5dd4ce32');
+  ctx.strokeStyle = sceneColor('#9be4de61');
+  ctx.lineWidth = 0.065;
+  for (const [i, points] of (stage.art?.contours ?? []).entries()) {
+    if (!points.length) continue;
+    ctx.beginPath();
+    ctx.moveTo(...points[0]);
+    for (let j = 1; j < points.length; j++) ctx.lineTo(...points[j]);
+    if (i === 0) ctx.fill();
+    else ctx.stroke();
+  }
   ctx.strokeStyle = sceneColor('#aedbd88c');
   ctx.lineWidth = Math.max(0.055, 0.8 / scale);
   ctx.beginPath();
@@ -27,6 +39,21 @@ export function drawCanalMarks(ctx: Context, stage: StageDef, scale: number) {
     }
   }
   ctx.stroke();
+  // The final spillway and landing have different exits. Keep their markers behind the marbles.
+  ctx.strokeStyle = sceneColor('#ffe2a2');
+  for (const [x, y, angle] of stage.art?.arrows ?? []) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.moveTo(-0.65, 0);
+    ctx.lineTo(0.42, 0);
+    ctx.moveTo(0, -0.3);
+    ctx.lineTo(0.42, 0);
+    ctx.lineTo(0, 0.3);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 }
 

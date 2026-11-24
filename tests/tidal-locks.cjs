@@ -31,10 +31,31 @@ function run(race, count, initial) {
   const passagesAt = gates.map(() => []);
   const lanes = [new Set(), new Set()];
   const lastBends = [new Set(), new Set()];
+  const lastGateAt = new Map();
+  const jet = new Set(),
+    wheel = new Set(),
+    landing = new Set();
+  const physics = race.physics,
+    B = physics.Box2D;
+  const bodyIds = new Map(Object.entries(physics.marbleMap).map(([id, body]) => [B.getPointer(body), Number(id)]));
+  const devices = physics.entities.flatMap((e) => {
+    if (e.shape.boostSpeed) return [[e, jet]];
+    if (e.spin) return [[e, wheel]];
+    if (e.sliding) return [[e, landing]];
+    return [];
+  });
   let first = 0,
     maxSpread = 0;
   while (race.state === 'running' && race.elapsed < 85) {
     race.advance();
+    for (const [e, hits] of devices) {
+      let edge = e.body.GetContactList();
+      while (B.getPointer(edge)) {
+        const id = bodyIds.get(B.getPointer(edge.other));
+        if (id !== undefined && edge.contact.IsTouching()) hits.add(id);
+        edge = edge.next;
+      }
+    }
     if (!first && race.arrivals.length) first = race.elapsed;
     let top = Infinity,
       bottom = -Infinity;
@@ -56,23 +77,31 @@ function run(race, count, initial) {
         maxWait[i] = Math.max(maxWait[i], race.elapsed - since);
         passages[i].add(b.id);
         passagesAt[i].push(race.elapsed);
+        if (i === gates.length - 1) lastGateAt.set(b.id, race.elapsed);
       }
       if (b.px > 24 && b.x <= 24 && b.y > 20 && b.y < 28) {
         const y = b.py + ((b.y - b.py) * (b.px - 24)) / (b.px - b.x);
         lanes[y < 24.3 ? 0 : 1].add(b.id);
       }
       if (b.py < 74.85 && b.y >= 74.85) {
-        assert.ok(b.x < 11.3 && passages[2].has(b.id), 'leaves the upper bend of the S on the left');
+        assert.ok(b.x < 11.3 && lastGateAt.has(b.id), 'leaves the upper bend of the S on the left');
         lastBends[0].add(b.id);
       }
-      if (b.py < 81.85 && b.y >= 81.85) {
-        assert.ok(b.x > 25.7 && lastBends[0].has(b.id), 'leaves the lower bend of the S on the right');
+      if (b.py < 82.2 && b.y >= 82.2) {
+        assert.ok(
+          b.x > 14.7 && lastBends[0].has(b.id),
+          'exits via the gap or the outside landing after the upper bend'
+        );
         lastBends[1].add(b.id);
       }
     }
     if (top >= 9) maxSpread = Math.max(maxSpread, bottom - top);
   }
   const fmt = (n) => n.toFixed(2);
+  // A pass counts only if the overtaken marble cleared the last lock at least a quarter-second earlier.
+  const overtakers = race.arrivals.filter((b, i) =>
+    race.arrivals.slice(i + 1).some((other) => lastGateAt.get(b.id) - lastGateAt.get(other.id) >= 0.25)
+  ).length;
   console.log(
     count,
     initial,
@@ -89,6 +118,8 @@ function run(race, count, initial) {
     maxWait.map(fmt),
     'lanes',
     lanes.map((ids) => ids.size),
+    'jet / wheel / outside landing / final overtakers',
+    [jet.size, wheel.size, landing.size, overtakers],
     'rescues',
     race.rescues
   );
@@ -100,15 +131,19 @@ function run(race, count, initial) {
     maxWait.every((seconds) => seconds < 3.5),
     'no marble lingers at an open lock'
   );
-  assert.ok(maxSpread <= 18, 'pack stays within one and a half reaches after entering the water');
+  assert.ok(maxSpread <= 18, 'pack stays within one and a half reaches after entering the water: ' + maxSpread);
   assert.ok(race.elapsed - first <= 6, 'first/last finish gap');
   assert.ok(first >= 40 && race.elapsed < 55, 'full length course with a bounded finish');
   assert.equal(new Set([...lanes[0], ...lanes[1]]).size, count, 'every marble takes a return lane');
-  if (count >= 100)
+  if (count >= 100) {
+    for (const hits of [jet, wheel, landing])
+      assert.ok(hits.size > 0 && hits.size < count, 'each device has riders and a bypass');
+    assert.ok(overtakers >= count * 0.1, 'the finishing sprint changes the order after the last lock');
     assert.ok(
       lanes.every((ids) => ids.size >= count * 0.1),
       'both sides of the island carry traffic'
     );
+  }
 }
 
 (async () => {
@@ -117,7 +152,8 @@ function run(race, count, initial) {
     originalRandom = Math.random;
   await race.physics.init();
   try {
-    for (const count of [1, 12]) run(race, count, 77);
+    run(race, 1, 77);
+    for (const count of [4, 12]) for (const seed of [77, 527, 1337]) run(race, count, seed);
     for (const count of [100, 300]) for (const seed of [77, 527, 1337, 4242, 9011]) run(race, count, seed);
   } finally {
     Math.random = originalRandom;

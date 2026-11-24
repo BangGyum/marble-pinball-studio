@@ -1,6 +1,6 @@
 import type { StageDef, WaterZone } from '../stage-def';
 import type { MapEntity } from '../types/map-entity';
-import { curve, wall } from './wind-map-shapes';
+import { curve, propeller, wall } from './wind-map-shapes';
 
 type Point = [number, number];
 const seaGlass = '#94d4cd';
@@ -15,6 +15,26 @@ function bank(points: Point[], color = seaGlass) {
 function pool(left: number, right: number, surface: number, bottom: number, current: number): WaterZone {
   return { x: left, y: surface, width: right - left, depth: bottom - surface, current };
 }
+
+// The landing slides below the jump. Even at full travel there is open water under both ends.
+const landing: MapEntity = {
+  type: 'kinematic',
+  position: { x: 20.9, y: 79.55 },
+  shape: {
+    type: 'polyline',
+    solid: true,
+    color: '#ffc887',
+    rotation: 0,
+    points: [
+      [0, 0],
+      [3.6, 2.25],
+      [3.45, 2.53],
+      [-0.15, 0.28],
+      [0, 0],
+    ],
+  },
+  props: { density: 1, restitution: 0.08, angularVelocity: 0, sliding: { amplitude: 1.1, period: 3.2, phase: 0 } },
+};
 
 // The hinge sits behind the right bank. The leaf opens down and parks outside the waterway.
 function sluice(y: number, release: number): MapEntity[] {
@@ -60,7 +80,18 @@ function sluice(y: number, release: number): MapEntity[] {
 
 export const tidalLocks: StageDef = {
   title: '밀물 갑문',
-  art: { style: 'tidal-locks', contours: [] },
+  art: {
+    style: 'tidal-locks',
+    contours: [
+      [
+        ...curve([22, 32.5], [27.3, 32.5], [31.4, 39.8], [33, 44.3]),
+        ...curve([29.4, 44.3], [28, 41.4], [24, 39], [22, 39]),
+      ],
+      curve([22.7, 33.3], [24.7, 33.5], [26.2, 34.8], [27.4, 36.3]),
+      curve([28.6, 39.4], [29.4, 40.3], [30, 41.2], [30.6, 42.5]),
+    ],
+    arrows: [[19.2, 80.4, Math.PI / 2]],
+  },
   width: 38,
   spawnX: 8,
   randomizeStart: true,
@@ -69,11 +100,13 @@ export const tidalLocks: StageDef = {
   waterZones: [
     pool(1, 29.5, 9, 16.3, 7.8),
     pool(8, 37, 21, 28.3, -8.8),
-    pool(1, 29.5, 33, 40.3, 7.6),
-    pool(8, 37, 45, 52.3, -9.5),
+    pool(1, 22, 32.5, 39, 10.5),
+    pool(8, 37, 44.2, 52.3, -8.5),
+    // A plunge pool catches the leaders under the waterfall before the final surge.
+    pool(1, 9, 49.2, 61.6, 0.7),
     pool(1, 29.5, 57, 64.3, 7.8),
     pool(10, 37, 67.8, 74.5, -10),
-    pool(1, 26, 76, 81.5, 10),
+    pool(1, 15.5, 76, 81.5, 10),
   ],
   entities: [
     bank(
@@ -108,13 +141,21 @@ export const tidalLocks: StageDef = {
       ],
       '#9dc6de'
     ),
+    // Only the lower branch passes through the submerged jet.
+    {
+      type: 'static',
+      position: { x: 23.5, y: 26.35 },
+      shape: { type: 'box', width: 1.5, height: 0.42, rotation: Math.PI - 0.09, boostSpeed: 23, color: '#8adce8' },
+      props: { density: 1, restitution: 0, angularVelocity: 0 },
+    },
     bank([
-      [1, 37.1],
-      [8, 38.4],
-      [17, 38.7],
-      [28, 40],
+      [1, 35.8],
+      [8, 37.5],
+      [15, 38.6],
+      [20, 38.3],
     ]),
-    ...sluice(40, 23),
+    // Leave open water around every blade so deflected marbles drop cleanly on either side.
+    ...propeller(26.9, 41.8, 1.95, -1.05),
     bank([
       [37, 48.9],
       [28, 50.3],
@@ -135,9 +176,10 @@ export const tidalLocks: StageDef = {
       [20, 62.7],
       [28, 64],
     ]),
-    ...sluice(64, 38),
-    // The last two banks make a broad S. The outside line rolls back into the current.
+    ...sluice(64, 35),
     bank(curve([37, 69.1], [32, 72.6], [19, 71.4], [11, 74.1])),
-    bank(curve([1, 74.5], [4, 80.4], [15, 77.7], [26, 81.1])),
+    // The inside gap drops directly to the finish. Fast marbles can jump it and ride the outside bend.
+    bank(curve([1, 74.5], [4, 79.6], [10, 79.7], [15, 78.8])),
+    landing,
   ],
 };
