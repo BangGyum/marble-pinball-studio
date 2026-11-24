@@ -5,6 +5,7 @@ import { BARREL_LENGTH, BARREL_TILT, marbleLauncher } from './marble-launcher';
 import { drawEntities } from './draw';
 import { drawMapArt, drawMapOverlay, usesGlassRails } from './map-art';
 import { drawWind } from './wind-render';
+import { drawWater } from './water-render';
 import { drawGoalArea } from './finish';
 import { el, toast, message } from './ui';
 import { getSceneTheme, sceneColor } from './scene-theme';
@@ -612,6 +613,7 @@ export class Editor {
       this.stage.art?.style === 'infinite-funnel' ||
       this.stage.art?.style === 'twin-funnel';
     drawMapArt(c, this.stage, SCALE, !liveArt);
+    if (this.stage.waterZones) drawWater(c, this.stage.waterZones, SCALE);
     c.strokeStyle = sceneColor('#23323d');
     c.lineWidth = 0.5 / SCALE;
     for (let x = 0; x <= (this.stage.width ?? 26); x++) {
@@ -656,7 +658,8 @@ export class Editor {
       usesGlassRails(this.stage),
       this.stage.art?.style === 'reversal-ladder'
     );
-    if (liveArt || this.stage.art?.style === 'orbiting-gate') drawMapOverlay(c, this.stage, entities, SCALE, false);
+    if (liveArt || this.stage.art?.style === 'orbiting-gate' || this.stage.art?.style === 'tidal-locks')
+      drawMapOverlay(c, this.stage, entities, SCALE, false);
     drawWind(c, this.stage.windZones ?? [], 0, SCALE);
     if (!drawGoalArea(c, this.stage, SCALE)) {
       c.setLineDash([0.5, 0.3]);

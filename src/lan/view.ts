@@ -3,6 +3,7 @@ import { drawEntities } from '../draw';
 import { drawGoalArea, racingByProgress } from '../finish';
 import { bridgeBallOpacity, drawMapArt, drawMapOverlay, usesGlassRails } from '../map-art';
 import { drawWind } from '../wind-render';
+import { drawWater } from '../water-render';
 import { drawCelebration } from '../celebration';
 import { drawFunnelEntryCue } from '../funnel-art';
 import { RenderCache } from '../render-cache';
@@ -679,6 +680,8 @@ export class LanView {
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
     drawMapArt(ctx, scene.stage, scale);
+    if (scene.stage.waterZones)
+      drawWater(ctx, scene.stage.waterZones, scale, this.reducedMotion?.matches ? 0 : elapsed, view, balls);
     drawEntities(
       ctx,
       scene.stage.exitBridge ? entities.filter((e) => e.shape.collisionLayer !== 2) : entities,

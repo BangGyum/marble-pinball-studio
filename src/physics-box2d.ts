@@ -103,6 +103,7 @@ export class Box2dPhysics implements IPhysics {
   private randomizeStart = false;
   private vortex: StageDef['vortex'];
   private windZones: WindZone[] = [];
+  private waterZones: NonNullable<StageDef['waterZones']> = [];
   private winds: { wind: WindZone; pulse: number; blend: number; speed: number; radial: number }[] = [];
   private exitBridge: StageDef['exitBridge'];
   private bridgeBodies = new Set<Box2D.b2Body>();
@@ -148,6 +149,7 @@ export class Box2dPhysics implements IPhysics {
     this.launcherGuideIds.length = 0;
     this.vortex = undefined;
     this.windZones = [];
+    this.waterZones = [];
     this.winds = [];
     this.exitBridge = undefined;
     this.bridgeBodies.clear();
@@ -190,6 +192,7 @@ export class Box2dPhysics implements IPhysics {
     this.motionTime = 0;
     this.vortex = stage.vortex;
     this.windZones = stage.windZones ?? [];
+    this.waterZones = stage.waterZones ?? [];
     this.winds = [...(this.vortex ? [{ type: 'vortex' as const, ...this.vortex }] : []), ...this.windZones].map(
       (wind) => ({ wind, pulse: 0, blend: 0, speed: 0, radial: 0 })
     );
@@ -964,6 +967,29 @@ export class Box2dPhysics implements IPhysics {
       launcher.loaded = undefined;
     }
   }
+  private applyWater(dt: number) {
+    const fullBlend = -Math.expm1(-1.8 * dt);
+    for (const body of this.marbleBodies) {
+      if (!body.IsEnabled() || body.GetType() !== this.Box2D.b2_dynamicBody || this.bridgeBodies.has(body)) continue;
+      const { x, y } = body.GetPosition();
+      let wet = 0,
+        flow = 0;
+      for (const zone of this.waterZones) {
+        const edge = Math.min(x - zone.x, zone.x + zone.width - x, y - zone.y, zone.y + zone.depth - y);
+        if (edge <= -MARBLE_RADIUS) continue;
+        const fraction = Math.min(1, (edge + MARBLE_RADIUS) / (2 * MARBLE_RADIUS));
+        wet += fraction;
+        flow += zone.current * fraction;
+      }
+      if (!wet) continue;
+      // Overlapping zones blend currents without doubling drag or buoyancy.
+      const immersed = Math.min(1, wet),
+        blend = immersed === 1 ? fullBlend : -Math.expm1(-1.8 * dt * immersed);
+      const v = body.GetLinearVelocity();
+      this.vector.Set(v.x + (flow / wet - v.x) * blend, v.y * (1 - blend) - 6.5 * immersed * dt);
+      body.SetLinearVelocity(this.vector);
+    }
+  }
   step(seconds: number, beforeSubstep?: (dt: number, offset: number) => void) {
     this.recordPoses();
     const bodies = this.marbleBodies;
@@ -1028,6 +1054,7 @@ export class Box2dPhysics implements IPhysics {
     // Smaller angular increments keep rotating paddles from pushing marbles through thin walls.
     for (let i = 0; i < this.collisionSubsteps; i++) {
       const dt = seconds / this.collisionSubsteps;
+      if (this.waterZones.length) this.applyWater(dt);
       this.motionTime += dt;
       if (this.launchers.length) this.moveLauncherGates(dt);
       for (const e of this.springs)

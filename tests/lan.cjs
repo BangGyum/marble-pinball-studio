@@ -175,13 +175,13 @@ async function connect(port, cookie, options = {}) {
       'UTF-8 message size is rejected before opening a pending request'
     );
     assert.equal(app.info().maps.find((map) => map.id === 0).title, '네온 잭팟');
-    assert.equal(app.info().maps.length, 19);
+    assert.equal(app.info().maps.length, 20);
     assert.deepEqual(
       app
         .info()
         .maps.slice(0, 3)
         .map((map) => map.title),
-      ['막차 곤돌라', '원바운드 샷', '구슬 발사 시험장']
+      ['밀물 갑문', '막차 곤돌라', '원바운드 샷']
     );
     const hiddenTitles = [
       '네온 모래시계',
@@ -499,6 +499,7 @@ async function connect(port, cookie, options = {}) {
       '쌍둥이 와류',
       '떠도는 입구',
       '막차 곤돌라',
+      '밀물 갑문',
     ]) {
       // Keep independent map scenarios below the real server's 30 commands/second limit.
       await delay(1050);
@@ -519,6 +520,7 @@ async function connect(port, cookie, options = {}) {
         'annular wind boundaries survive scene serialization'
       );
       assert.deepEqual(guest2.scene.stage.goalArea, stage.goalArea, 'central finish reaches spectators intact');
+      assert.deepEqual(guest2.scene.stage.waterZones, stage.waterZones, 'water currents reach spectators intact');
       const slides = stage.entities.flatMap((e, i) => (e.props.sliding || e.shape.gondola ? [i] : []));
       assert.ok(
         slides.every((i) => !guest2.scene.fixed[i]),

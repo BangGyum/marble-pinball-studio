@@ -6,6 +6,7 @@ import { drawTwinFunnelArt } from './twin-funnel-art';
 import { drawCanyonArt } from './canyon-art';
 import { drawOrbitingGateArt } from './orbiting-gate-art';
 import { drawGoalArea } from './finish';
+import { drawWater } from './water-render';
 import type { Ball } from './game';
 import type { StageDef } from './data/maps';
 import type { MapEntityState } from './types/map-entity';
@@ -30,6 +31,7 @@ function drawMinimapArt(
   if (stage.art?.style === 'twin-funnel') drawTwinFunnelArt(ctx, stage, 1, false);
   if (stage.art?.style === 'fracture-canyon') drawCanyonArt(ctx, stage, false);
   if (stage.art?.style === 'orbiting-gate') drawOrbitingGateArt(ctx, stage, false);
+  if (stage.waterZones) drawWater(ctx, stage.waterZones, scale);
   drawGoalArea(ctx, stage, scale);
 }
 

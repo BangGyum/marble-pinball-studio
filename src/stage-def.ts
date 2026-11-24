@@ -19,6 +19,7 @@ export const ART_STYLES = [
   'bounce-stairs',
   'orbiting-gate',
   'one-bounce',
+  'tidal-locks',
 ] as const;
 
 type BridgeArea = { x: number; y: number; width: number; height: number };
@@ -54,6 +55,9 @@ export type WindZone = {
     }
 );
 
+// x is the left edge, y is the surface. Current is signed horizontal world units per second.
+export type WaterZone = { x: number; y: number; width: number; depth: number; current: number };
+
 export type StageDef = {
   title: string;
   art?: { style: (typeof ART_STYLES)[number]; contours: [number, number][][]; arrows?: [number, number, number][] };
@@ -64,6 +68,7 @@ export type StageDef = {
   randomizeStart?: boolean;
   vortex?: { x: number; y: number; radius: number; speed: number; gust?: number };
   windZones?: WindZone[];
+  waterZones?: WaterZone[];
   // Circular finish; goalY remains the map height used for framing and the minimap.
   goalArea?: { x: number; y: number; radius: number };
   goalY: number;

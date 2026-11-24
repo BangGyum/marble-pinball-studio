@@ -181,6 +181,19 @@ export function validateStage(value: unknown): StageDef {
       (s.vortex.gust !== undefined && !finite(s.vortex.gust, 0, 1)))
   )
     throw new Error('회전 바람 설정이 올바르지 않아요.');
+  if (s.waterZones !== undefined && (!Array.isArray(s.waterZones) || s.waterZones.length > 30))
+    throw new Error('물 구역은 최대 30개까지 사용할 수 있어요.');
+  for (const water of s.waterZones ?? []) {
+    if (
+      !water ||
+      !finite(water.x, -1000, 1000) ||
+      !finite(water.y, -1000, 1000) ||
+      !finite(water.width, 0.5, 200) ||
+      !finite(water.depth, 0.5, 300) ||
+      !finite(water.current, -20, 20)
+    )
+      throw new Error('물 구역의 위치, 폭, 깊이, 유속을 확인해 주세요.');
+  }
   if (s.windZones !== undefined && (!Array.isArray(s.windZones) || s.windZones.length > 30))
     throw new Error('바람 영역 설정이 올바르지 않아요.');
   for (const wind of s.windZones ?? []) {

@@ -5,6 +5,7 @@ import type { StageDef } from './data/maps';
 import { drawEntities } from './draw';
 import { bridgeBallOpacity, drawMapArt, drawMapOverlay, usesGlassRails } from './map-art';
 import { drawWind } from './wind-render';
+import { drawWater } from './water-render';
 import type { WinnerOrder } from './model';
 import { drawCelebration } from './celebration';
 import { Recorder } from './recorder';
@@ -486,6 +487,8 @@ export class Game extends Race {
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
     ctx.scale(scale, scale);
     drawMapArt(ctx, this.stage, scale);
+    if (this.stage.waterZones)
+      drawWater(ctx, this.stage.waterZones, scale, this.reducedMotion?.matches ? 0 : this.elapsed, view, this.balls);
     drawEntities(
       ctx,
       this.stage.exitBridge ? entities.filter((e) => e.shape.collisionLayer !== 2) : entities,

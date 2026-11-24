@@ -14,6 +14,7 @@ import { drawCanyonArt, drawCanyonDevices } from './canyon-art';
 import { drawEntities } from './draw';
 import { drawSeesawCabinet, drawSeesaws, drawShortcutDeck } from './seesaw-art';
 import { drawBankShotGuide } from './one-bounce-art';
+import { drawCanalMarks, drawLockSignals } from './tidal-locks-art';
 import { drawBounceStairsArt } from './bounce-stairs-art';
 import { drawOrbitingGateArt, drawOrbitingGateMouth } from './orbiting-gate-art';
 import type { MapEntityState } from './types/map-entity';
@@ -33,6 +34,7 @@ export function drawMapOverlay(
   view?: ViewBounds,
   elapsed = 0
 ) {
+  if (stage.art?.style === 'tidal-locks') drawLockSignals(ctx, stage, scale, elapsed, view);
   if (stage.art?.style === 'reversal-ladder') drawLadderDevices(ctx, stage, entities, view);
   if (stage.art?.style === 'seesaw-valley') drawSeesaws(ctx, stage, entities, elapsed, view);
   if (stage.art?.style === 'shortcut-cascade') drawCascadeDevices(ctx, stage, entities);
@@ -107,6 +109,10 @@ export function drawMapArt(
   cacheBackground = true
 ) {
   if (!stage.art) return;
+  if (stage.art.style === 'tidal-locks') {
+    drawCanalMarks(ctx, stage, scale);
+    return;
+  }
   if (stage.art.style === 'one-bounce') {
     drawBankShotGuide(ctx, stage, scale);
     return;

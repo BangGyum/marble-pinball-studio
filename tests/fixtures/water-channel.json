@@ -1,0 +1,110 @@
+{
+  "format": "marble-pinball-map",
+  "version": 1,
+  "stage": {
+    "title": "갑문 수로 시험장",
+    "width": 30,
+    "spawnX": 8,
+    "goalY": 31,
+    "zoomY": 26,
+    "randomizeStart": true,
+    "waterZones": [
+      {
+        "x": 1,
+        "y": 9,
+        "width": 28,
+        "depth": 6,
+        "current": 7
+      },
+      {
+        "x": 1,
+        "y": 18,
+        "width": 28,
+        "depth": 6.6,
+        "current": -7
+      }
+    ],
+    "entities": [
+      {
+        "type": "static",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "shape": {
+          "type": "polyline",
+          "rotation": 0,
+          "points": [[1, 33], [1, -22], [29, -22], [29, 33]],
+          "color": "#80bdb6"
+        },
+        "props": {
+          "density": 1,
+          "restitution": 0.05,
+          "angularVelocity": 0
+        }
+      },
+      {
+        "type": "static",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "shape": {
+          "type": "polyline",
+          "rotation": 0,
+          "points": [[1, 13], [23, 14.8]],
+          "color": "#80bdb6"
+        },
+        "props": {
+          "density": 1,
+          "restitution": 0.05,
+          "angularVelocity": 0
+        }
+      },
+      {
+        "type": "kinematic",
+        "position": {
+          "x": 29,
+          "y": 14.8
+        },
+        "shape": {
+          "type": "polyline",
+          "rotation": 0,
+          "solid": true,
+          "color": "#ffd184",
+          "points": [[0, 0], [-6.05, 0], [-6.05, 0.18], [0, 0.18], [0, 0]]
+        },
+        "props": {
+          "density": 1,
+          "restitution": 0.08,
+          "angularVelocity": 0,
+          "timedGate": {
+            "period": 10,
+            "openFor": 3,
+            "phase": 3,
+            "angle": -1.52,
+            "releaseAfter": 7
+          }
+        }
+      },
+      {
+        "type": "static",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "shape": {
+          "type": "polyline",
+          "rotation": 0,
+          "points": [[7, 24.4], [29, 22.4]],
+          "color": "#80bdb6"
+        },
+        "props": {
+          "density": 1,
+          "restitution": 0.05,
+          "angularVelocity": 0
+        }
+      }
+    ]
+  }
+}

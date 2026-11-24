@@ -1,13 +1,24 @@
 import { Game } from '../src/game';
 import { stages, DEFAULT_MAP_INDEX } from '../src/data/maps';
 import { setSceneTheme } from '../src/scene-theme';
+import { validateStage } from '../src/model';
+import waterChannel from './fixtures/water-channel.json';
 
 const params = new URLSearchParams(location.search);
 const map = document.querySelector<HTMLSelectElement>('#map')!;
 stages.forEach((stage, index) => {
   map.add(new Option(stage.title, String(index)));
 });
-map.value = String(Number(params.get('map') ?? DEFAULT_MAP_INDEX));
+const channel = validateStage(waterChannel.stage);
+map.add(new Option(channel.title, 'water'));
+map.add(new Option(channel.title + ' (물 끔)', 'water-dry'));
+map.value = params.get('map') ?? String(DEFAULT_MAP_INDEX);
+const stage =
+  map.value === 'water'
+    ? channel
+    : map.value === 'water-dry'
+      ? { ...channel, waterZones: [] }
+      : stages[Number(map.value)];
 const count = Math.max(1, Math.min(300, Number(params.get('count') ?? 200)));
 const mode = params.get('mode') ?? 'run';
 const speed = Number(params.get('speed') ?? 1);
@@ -75,7 +86,7 @@ game.physics.getEntities = (blend) => {
 // Parcel dev bundles wrap modules in synchronous functions, so initialize through a Promise.
 game
   .init(
-    stages[Number(map.value)],
+    stage,
     Array.from({ length: count }, (_, i) => '구슬 ' + String(i + 1).padStart(3, '0'))
   )
   .then(() => {
@@ -127,7 +138,7 @@ game
         const duration = intervals.reduce((a, b) => a + b, 0) / 1000;
         const activeSeconds = activeIntervals.reduce((a, b) => a + b, 0) / 1000;
         const output = {
-          map: stages[Number(map.value)].title,
+          map: stage.title,
           count,
           mode,
           speed,

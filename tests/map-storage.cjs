@@ -118,7 +118,7 @@ assert.equal(library.list().length, stages.length - hiddenStages.length);
 console.log('PASS shared library save/re-edit/reload/duplicate titles/preview/removal and failed writes');
 assert.equal(stages[DEFAULT_MAP_INDEX].title, '네온 분기점');
 const builtinIds = library.list().map((m) => m.id);
-assert.deepEqual(builtinIds.slice(0, 3), ['builtin-23', 'builtin-22', 'builtin-21']);
+assert.deepEqual(builtinIds.slice(0, 3), ['builtin-24', 'builtin-23', 'builtin-22']);
 assert.ok(builtinIds.indexOf('builtin-0') < builtinIds.indexOf('builtin-5'));
 console.log('PASS shared initial map is neon junction');
 assert.equal(library.list().find((map) => map.stage.title === '막차 곤돌라')?.id, 'builtin-23');

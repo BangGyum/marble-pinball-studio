@@ -20,6 +20,7 @@ export const mapPlayKeys = {
   shortcutCascade: 'shortcut-cascade',
   oneBounce: 'one-bounce',
   lastGondola: 'last-gondola',
+  tidalLocks: 'tidal-locks',
   launcherLab: 'launcher-lab',
   seesawValley: 'seesaw-valley',
 } as const;

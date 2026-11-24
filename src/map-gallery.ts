@@ -3,6 +3,7 @@ import type { SavedMap } from './model';
 import { drawEntities } from './draw';
 import { drawMapArt, drawMapOverlay, usesGlassRails } from './map-art';
 import { drawWind } from './wind-render';
+import { drawWater } from './water-render';
 import { drawGoalArea } from './finish';
 import { drawMarble } from './marble-art';
 import { getMarbleDesign } from './marble-design';
@@ -15,6 +16,7 @@ import { MapTransition } from './map-transition';
 import { getSceneTheme, sceneColor } from './scene-theme';
 
 const details: Record<string, [string, string, string]> = {
+  '밀물 갑문': ['물살 · 갑문', '세 개의 황동 갑문에서 다시 모이고, 마지막 S자 수로에서 순위를 가려요.', '#77d4c4'],
   '막차 곤돌라': [
     '곤돌라 · 두 자리',
     '두 자리 막차를 놓쳐도 승부는 계속! 점프대를 건너고 접이식 다리의 지름길을 노려요.',
@@ -90,6 +92,7 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
   }));
   // Draw once at thumbnail resolution; keep the full-resolution game caches untouched.
   drawMapArt(ctx, stage, scale, false);
+  if (stage.waterZones) drawWater(ctx, stage.waterZones, scale);
   drawEntities(
     ctx,
     stage.exitBridge ? entities.filter((e) => e.shape.collisionLayer !== 2) : entities,
