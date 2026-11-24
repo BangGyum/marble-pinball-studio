@@ -1,0 +1,408 @@
+#participant-guide {
+  --guide-board: #0c1720;
+  --guide-rail: #78c4bc;
+  --guide-gold: #ffd184;
+  --guide-violet: #c5aeff;
+  width: min(960px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 0;
+  border-radius: 14px;
+}
+.guide-demo {
+  position: relative;
+}
+.guide-demo-header,
+.guide-demo-dock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 16px;
+}
+.guide-demo-header {
+  border-bottom: 1px solid var(--line);
+}
+.guide-demo-header span,
+.guide-demo-dock small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.guide-demo-dock {
+  border-top: 1px solid var(--line);
+}
+.guide-demo-dock small {
+  margin-left: 6px;
+}
+.guide-board {
+  position: relative;
+  height: clamp(398px, 59dvh, 478px);
+  overflow: hidden;
+  background:
+    radial-gradient(#344b5540 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--guide-board);
+}
+.guide-course {
+  position: absolute;
+  top: -94px;
+  left: 18%;
+  width: 64%;
+  height: 520px;
+  opacity: 0.62;
+}
+.guide-water {
+  fill: #2d807c;
+  opacity: 0.43;
+}
+.guide-rails {
+  fill: none;
+  stroke: var(--guide-rail);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.guide-minimap,
+.guide-rankings {
+  position: absolute;
+  top: 14px;
+  width: 101px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 0.75rem;
+  opacity: 0.58;
+}
+.guide-minimap {
+  left: 14px;
+}
+.guide-rankings {
+  right: 14px;
+  width: 120px;
+}
+#participant-guide[data-step="minimap"] .guide-minimap,
+#participant-guide[data-step="ranking"] .guide-rankings {
+  opacity: 1;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px #65efda25;
+}
+.guide-mini-course {
+  position: relative;
+  overflow: hidden;
+  margin-top: 4px;
+  border-radius: 4px;
+  background: var(--guide-board);
+}
+.guide-mini-course svg {
+  display: block;
+  width: 100%;
+  height: 119px;
+}
+.guide-mini-window {
+  position: absolute;
+  top: 24%;
+  left: 6%;
+  width: 88%;
+  height: 22%;
+  border: 1px solid var(--accent);
+  background: #65efda2a;
+}
+.guide-rankings ol {
+  margin: 4px 0 0;
+  padding-left: 23px;
+}
+.guide-rankings li {
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+#participant-guide[data-following] .guide-demo-rank {
+  color: var(--guide-violet);
+  background: #65efda28;
+}
+.guide-demo-status,
+.guide-demo-key {
+  position: absolute;
+  left: 50%;
+  translate: -50%;
+  width: max-content;
+  max-width: calc(100% - 173px);
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 0.75rem;
+  text-align: center;
+}
+.guide-demo-status {
+  top: 14px;
+  color: var(--accent);
+}
+.guide-target {
+  position: absolute;
+  top: 29%;
+  left: 53%;
+  width: 38px;
+  height: 38px;
+  translate: -50% -50%;
+  border: 1px solid var(--accent);
+  outline: 1px solid #65efda40;
+  outline-offset: 6px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+#participant-guide[data-step="ranking"] .guide-target::after,
+.guide-launch-ball {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--guide-violet);
+}
+.guide-spring {
+  position: absolute;
+  top: 28%;
+  left: 53%;
+  translate: -50% -50%;
+  width: 92px;
+  height: 96px;
+  color: var(--guide-gold);
+}
+.guide-spring-direction {
+  position: absolute;
+  bottom: 31px;
+  left: 45px;
+  width: 3px;
+  height: 51px;
+  background: currentColor;
+  transform: rotate(28deg);
+  transform-origin: bottom center;
+}
+.guide-spring-direction::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  top: -2px;
+  left: -3.5px;
+  border: solid currentColor;
+  border-width: 2px 0 0 2px;
+  rotate: 45deg;
+}
+.guide-spring-base,
+.guide-coil {
+  position: absolute;
+  left: 50%;
+  translate: -50%;
+}
+.guide-spring-base {
+  bottom: 2px;
+  width: 60px;
+  height: 7px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  background: var(--panel);
+}
+.guide-coil {
+  bottom: 7px;
+  width: 42px;
+  height: 26px;
+  transform-origin: bottom;
+}
+.guide-launch-ball {
+  position: absolute;
+  left: 39px;
+  bottom: 35px;
+  background: currentColor;
+}
+.guide-demo-key {
+  top: calc(28% + 54px);
+  left: 53%;
+}
+#participant-guide[data-fired] .guide-demo-key kbd {
+  background: var(--accent);
+  color: #102421;
+}
+.guide-place {
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  white-space: nowrap;
+  font-size: 0.75rem;
+}
+#participant-guide[data-placing] .guide-place {
+  border-color: var(--guide-gold);
+  color: var(--guide-gold);
+}
+.guide-pointer-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: clip;
+  pointer-events: none;
+}
+.guide-pointer,
+.guide-click-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.guide-pointer {
+  width: 23px;
+  height: 26px;
+  fill: var(--accent);
+  stroke: #0b1016;
+  stroke-width: 2;
+  filter: drop-shadow(0 1px 3px #000a);
+}
+.guide-click-ring {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--guide-gold);
+  border-radius: 50%;
+  opacity: 0;
+}
+.guide-pointer-hidden,
+.guide-target[hidden],
+.guide-spring[hidden],
+.guide-demo-key[hidden] {
+  display: none;
+}
+.guide-callout {
+  position: absolute;
+  z-index: 1;
+  bottom: 59px;
+  left: 50%;
+  translate: -50%;
+  width: min(550px, calc(100% - 32px));
+  padding: 13px 16px 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 14px 36px #060a1180;
+}
+.guide-callout header,
+.guide-actions,
+.guide-nav,
+.guide-shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.guide-callout header,
+.guide-actions {
+  justify-content: space-between;
+}
+.guide-callout p {
+  margin: 0;
+  font-size: 0.85rem;
+}
+.guide-callout .guide-progress {
+  color: var(--accent);
+  font-weight: 650;
+}
+.guide-progress span {
+  margin-left: 7px;
+  color: var(--muted);
+}
+.guide-callout h2 {
+  margin: 3px 0 5px;
+  font-size: 1.26rem;
+  line-height: 1.3;
+  word-break: keep-all;
+}
+.guide-callout #participant-guide-hint {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.79rem;
+}
+.guide-actions {
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}
+.guide-opt-out {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  font-weight: 650;
+  cursor: pointer;
+}
+.guide-opt-out input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+.guide-nav {
+  margin-left: auto;
+}
+.guide-callout .guide-shortcuts {
+  flex-wrap: wrap;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+#participant-guide kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--guide-board);
+  color: var(--text);
+}
+@media (max-width: 600px), (max-height: 590px) {
+  .guide-board {
+    height: clamp(172px, 30dvh, 231px);
+  }
+  .guide-course {
+    left: 7%;
+    width: 86%;
+    height: 360px;
+  }
+  .guide-minimap {
+    left: 8px;
+    width: 59px;
+    padding: 5px;
+  }
+  .guide-rankings {
+    right: 8px;
+    width: 70px;
+    padding: 5px;
+  }
+  .guide-rankings > span {
+    font-size: 0.6875rem;
+    white-space: nowrap;
+  }
+  .guide-mini-course svg {
+    height: 88px;
+  }
+  .guide-target,
+  .guide-spring {
+    top: 48%;
+  }
+  .guide-demo-key {
+    top: calc(48% + 51px);
+  }
+  .guide-callout {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    translate: none;
+    width: auto;
+    padding: 10px 12px 13px;
+    border-width: 1px 0 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .guide-callout h2 {
+    font-size: 1.125rem;
+  }
+  .guide-demo-header,
+  .guide-demo-dock {
+    padding-inline: 10px;
+  }
+}

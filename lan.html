@@ -36,6 +36,69 @@
     </div>
     <footer><span id="map-caption"></span><span id="focus-status" role="status" class="sr-only"></span><span class="lan-connection"><span id="connection">연결 중</span><details data-host hidden><summary>관람 주소</summary><label for="address">접속할 네트워크</label><select id="address"></select><a id="join-url" target="_blank" rel="noopener" aria-label="선택한 관람 주소 열기"></a><p>같은 네트워크에서 접속 · 입장 코드 없음 · 표시된 스프링 조작 가능</p></details></span><a href="https://github.com/lazygyu/roulette" target="_blank" rel="noopener noreferrer">Original by lazygyu · MIT</a><a href="./licenses.html" target="_blank" rel="noopener noreferrer">오픈소스 라이선스</a></footer>
   </main>
+  <dialog id="participant-guide" aria-labelledby="participant-guide-title" aria-describedby="participant-guide-description">
+    <div class="guide-demo" aria-hidden="true">
+      <header class="guide-demo-header"><strong>바울 핀볼 · 함께 보기</strong><span>조작 미리보기</span></header>
+      <div class="guide-board">
+        <svg class="guide-course" viewBox="0 0 540 400" preserveAspectRatio="none" aria-hidden="true">
+          <path class="guide-water" d="M0 54H348V108H0ZM100 138H540V194H100ZM0 226H300V270H0ZM163 312H540V366H163ZM300 227Q337 227 371 279T417 313L384 313Q353 259 300 270Z" />
+          <path class="guide-rails" d="M0 90L100 95 223 99 330 108M540 172L420 179 267 183 110 194M0 256L108 272 230 278 282 272M540 343L426 355 300 357 176 367M0 0V400M540 0V400" />
+          <path d="M330 108H454" stroke="var(--guide-gold)" stroke-width="3" />
+          <g fill="var(--guide-gold)"><circle cx="198" cy="174" r="4" /><circle cx="335" cy="292" r="4" /></g>
+          <g fill="var(--accent)"><circle cx="218" cy="174" r="4" /><circle cx="300" cy="283" r="4" /></g>
+        </svg>
+        <div class="guide-minimap">
+          <span>미니맵</span>
+          <div class="guide-mini-course">
+            <svg viewBox="0 0 75 125" preserveAspectRatio="none" aria-hidden="true">
+              <path class="guide-rails" d="M5 12H58L70 19 60 29H14L5 36 17 46H60L70 53 58 64H15L5 71 15 83H59L70 90 58 102H20L12 109 26 115H66" />
+              <g fill="var(--guide-gold)"><circle cx="24" cy="69" r="2.5" /><circle cx="17" cy="71" r="2.5" /><circle cx="30" cy="67" r="2.5" /></g>
+            </svg>
+            <span class="guide-mini-window"></span>
+          </div>
+        </div>
+        <div class="guide-rankings">
+          <span>실시간 순위</span>
+          <ol><li>하나</li><li class="guide-demo-rank">둘</li><li>셋</li><li>넷</li></ol>
+        </div>
+        <span class="guide-demo-status"></span>
+        <span class="guide-target"></span>
+        <div class="guide-spring">
+          <span class="guide-spring-direction"></span>
+          <span class="guide-launch-ball"></span>
+          <svg class="guide-coil" viewBox="0 0 42 26" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 25H36L6 18H36L6 11H36L6 4H36M3 3H39" />
+          </svg>
+          <span class="guide-spring-base"></span>
+        </div>
+        <span class="guide-demo-key" hidden><kbd>Space</kbd> 발동</span>
+      </div>
+      <div class="guide-demo-dock"><strong>내 스프링 <small>경기당 1개</small></strong><span class="guide-place">⇧ 스프링 배치</span></div>
+      <div class="guide-pointer-layer">
+        <span class="guide-click-ring"></span>
+        <svg class="guide-pointer guide-pointer-hidden" viewBox="0 0 25 28" aria-hidden="true"><path d="M3 2v21l6-5 4 8 4-2-4-8h8z" /></svg>
+      </div>
+    </div>
+    <section class="guide-callout">
+      <header>
+        <p class="guide-progress">첫 접속 안내 <span id="participant-guide-step">1 / 3</span></p>
+        <button type="button" id="participant-guide-close">닫기</button>
+      </header>
+      <div aria-live="polite">
+        <h2 id="participant-guide-title">미니맵으로 원하는 구간 보기</h2>
+        <p id="participant-guide-description"></p>
+        <p id="participant-guide-hint"></p>
+      </div>
+      <div class="guide-actions">
+        <label class="guide-opt-out"><input type="checkbox" id="participant-guide-skip" /> 다시 보지 않기</label>
+        <div class="guide-nav">
+          <button type="button" id="participant-guide-replay">다시 재생</button>
+          <button type="button" id="participant-guide-next" class="primary" autofocus>다음 →</button>
+        </div>
+      </div>
+      <p class="guide-shortcuts"><span><kbd>Space</kbd> 다음</span><span><kbd>Esc</kbd> 또는 <kbd>Enter</kbd> 닫기</span></p>
+    </section>
+  </dialog>
   <dialog id="participant-join" aria-labelledby="participant-join-title">
     <form id="participant-form">
       <h1 id="participant-join-title">핀볼 참가하기</h1>

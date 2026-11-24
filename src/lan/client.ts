@@ -13,8 +13,10 @@ import { SeaAnimalSettingsPanel } from '../sea-animal-settings';
 import '../dolphin.css';
 import { validateDolphins } from '../dolphin';
 import { initMarbleDesign } from '../marble-design';
+import { createParticipantGuide } from './participant-guide';
 
 initMarbleDesign();
+const showParticipantGuide = createParticipantGuide(el<HTMLDialogElement>('participant-guide'));
 const view = new LanView(el<HTMLCanvasElement>('game'));
 const rankings = new Rankings((id) => selectBall(view.focusedBallId === id ? null : id));
 const rankingList = el('ranking-list'),
@@ -300,6 +302,7 @@ function requestSession(name?: string) {
 }
 async function joinSession(): Promise<Identity> {
   let response = await requestSession();
+  if (!isLocal && (response.ok || response.status === 428)) await showParticipantGuide();
   if (response.status === 428 && !isLocal) {
     let saved: string | null = null;
     try {
