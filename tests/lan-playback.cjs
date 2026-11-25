@@ -517,8 +517,15 @@ assert.equal(interactive.springView.scale, overviewScale, 'choosing the origin k
 tapSpring(springPointer(16, 75, 'touch'));
 assert.equal(placed.length, 1);
 assert.deepEqual(placed[0], { x: 13, y: 75, direction: 0 }, 'two touch taps select position then direction');
+assert.equal(interactive.springPlacement.active, true, 'submitting keeps the draft until the server accepts');
+assert.deepEqual(interactive.springPlacement.origin, { x: 13, y: 75 });
+assert.ok(interactive.manual, 'the camera stays on the selected location');
+interactive.push({ ...frame(0.05, 2), personalSpring: { state: 'available' } });
+assert.ok(interactive.springPlacement.active, 'rejected placement retains the draft for retry');
+interactive.push({ ...frame(0.1, 3), personalSpring: { state: 'placed', id: 'mine' } });
 assert.equal(interactive.springPlacement.active, false);
-assert.equal(interactive.manual, null, 'a viewer resumes automatic tracking after confirming the spring direction');
+assert.equal(interactive.manual, null, 'acceptance resumes automatic tracking');
+interactive.personalSpring = { state: 'available' };
 interactive.beginSpringPlacement();
 windowHandlers.keydown({ key: 'Escape', preventDefault() {}, stopImmediatePropagation() {} });
 assert.equal(interactive.springPlacement.active, false, 'Escape cancels without spending a spring');
@@ -775,6 +782,30 @@ console.log(
   'PASS actual LAN client synchronizes changed winner rules and retains edits during unrelated scene updates'
 );
 
+// A spring snapshot must update the controls even inside the rankings' 200 ms interval.
+let springUpdates = 0;
+Object.assign(rulesUI, {
+  frame: {
+    ...frame(1, 10),
+    raceId: rulesUI.scene.raceId,
+    revision: rulesUI.scene.revision,
+    personalSpring: { state: 'available' },
+  },
+  performance: { now: () => 125 },
+  uiUpdate: 100,
+  updatePersonalSpring: () => springUpdates++,
+  updateRaceUI: () => assert.fail('spring-only updates must not rebuild rankings'),
+});
+rulesUI.view.push = () => {};
+for (const [index, state] of ['placed', 'used'].entries()) {
+  rulesUI.view.springPending = { state };
+  const snapshot = { ...rulesUI.frame, seq: 11 + index, personalSpring: { state, id: 'mine' } };
+  receiveRules({ data: JSON.stringify(snapshot) });
+  assert.equal(rulesUI.view.springPending, undefined);
+  assert.equal(springUpdates, index + 1);
+}
+console.log('PASS spring inventory changes immediately update buttons without refreshing the rankings');
+
 // Confirmation returns to the race view. Interrupted gestures leave the placement view in place.
 interactive.setScene({ ...scene, raceId: 'placement-edge-cases', revision: 1 });
 interactive.state = 'ready';
@@ -790,11 +821,17 @@ interactive.draw(2010);
 const inspectedZoom = interactive.zoom;
 tapSpring(springPointer(13, 75));
 tapSpring(springPointer(13, 72));
+interactive.push({
+  ...frame(0, 2, 'ready'),
+  raceId: 'placement-edge-cases',
+  personalSpring: { state: 'placed', id: 'mine' },
+});
 interactive.draw(2020);
 assert.equal(edgePlacements.length, 1);
 assert.deepEqual(interactive.camera, interactive.readyCamera, 'confirmation in ready returns to the start view');
 assert.equal(interactive.zoom, inspectedZoom, 'confirmation keeps the chosen zoom');
 
+interactive.personalSpring = { state: 'available' };
 interactive.beginSpringPlacement();
 interactive.draw(2030);
 pointerHandlers.pointermove({ ...pointer, clientY: 20 + interactive.minimap.y + interactive.minimap.scale * 75 });
@@ -888,14 +925,15 @@ for (const [mapWidth, goalY, circular] of [
         assert.deepEqual(interactive.camera, beforeUpdate, 'peer placement keeps the chosen view during the draft');
         tapSpring(springPointer(target.x, target.y - 2, 'touch'));
         interactive.draw(3040);
-        assert.equal(interactive.manual, null, 'direction confirmation clears the placement view');
+        assert.ok(interactive.manual, 'submission preserves the inspected location');
         assert.equal(interactive.zoom, zoomBeforeConfirm);
         interactive.push({
           ...cameraFrame,
           seq: 2,
-          revision: 2,
+          revision: cameraScene.revision,
           personalSpring: { state: 'placed', id: 'own-spring' },
         });
+        assert.equal(interactive.manual, null, 'server confirmation clears the placement view');
         for (let i = 1; i <= 100; i++) interactive.draw(3040 + (i * 1000) / 60);
         if (state === 'ready') assert.deepEqual(interactive.camera, interactive.readyCamera);
         else assert.ok(Math.abs(interactive.camera.y - rearY) < 0.001, 'the camera follows the last marble');
@@ -947,3 +985,67 @@ assert.ok(
   'stationary click installs the direction shown before clicking'
 );
 console.log('PASS stationary-cursor wheel zoom preview matches the final installed direction');
+
+for (const primaryFirst of [true, false]) {
+  const primary = { ...springPointer(9, 75, 'touch'), isPrimary: true, pointerId: 1 };
+  const secondary = { ...primary, isPrimary: false, pointerId: 2, clientX: primary.clientX + 45 };
+  const count = edgePlacements.length;
+  interactive.setZoom(1);
+  pointerHandlers.pointerdown(primary);
+  pointerHandlers.pointerdown(secondary);
+  pointerHandlers.pointermove({ ...secondary, clientX: secondary.clientX + 45 });
+  assert.equal(interactive.zoom, 2);
+  const [first, last] = primaryFirst ? [primary, secondary] : [secondary, primary];
+  pointerHandlers.pointerup(first);
+  pointerHandlers.lostpointercapture(first);
+  pointerHandlers.pointerup(last);
+  assert.equal(edgePlacements.length, count, 'pinch release cannot submit a spring');
+  assert.equal(interactive.springPlacement.origin, previewOrigin);
+}
+console.log('PASS pinch zoom preserves the draft in either finger release order');
+
+async function checkPlacementRetry() {
+  const commandSource = clientSource.statements.find((node) => node.name?.getText(clientSource) === 'personalCommand');
+  const errors = [];
+  let attempts = 0;
+  const submit = vm.runInNewContext(
+    ts.transpileModule(commandSource.getText(clientSource) + '\npersonalCommand;', {
+      compilerOptions: { target: ts.ScriptTarget.ES2022 },
+    }).outputText,
+    {
+      view: interactive,
+      updatePersonalSpring() {},
+      message: (error) => error.message,
+      toast: (error) => errors.push(error),
+      async command() {
+        if (++attempts === 1) throw new Error('overlap');
+      },
+    }
+  );
+  const origin = interactive.springPlacement.origin;
+  const center = { ...interactive.manual };
+  let response;
+  interactive.onPlaceSpring = (placement) => {
+    response = submit({ type: 'place-spring', ...placement });
+  };
+  tapSpring(stationaryCursor);
+  await response;
+  assert.deepEqual(errors, ['overlap']);
+  assert.equal(interactive.springPending, undefined);
+  assert.deepEqual(interactive.springPlacement.origin, origin);
+  assert.deepEqual(interactive.manual, center);
+  interactive.beginSpringPlacement();
+  interactive.draw(4500);
+  tapSpring(springPointer(13, 71));
+  tapSpring(springPointer(13, 69));
+  await response;
+  assert.equal(attempts, 2);
+  assert.equal(interactive.springPending.state, 'placed', 'ACK alone does not unlock a second placement');
+  tapSpring(springPointer(13, 69));
+  assert.equal(attempts, 2);
+  console.log('PASS rejected placement preserves the camera and retries once from a new location');
+}
+checkPlacementRetry().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

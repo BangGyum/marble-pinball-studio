@@ -58,7 +58,9 @@ export class LanView {
     minimap: boolean;
     moved: boolean;
   };
-  private springControls: SpringControls;
+  readonly springControls: SpringControls;
+  springPending?: { state: 'placed' | 'used' };
+  private placementTouches = new Map<number, { x: number; y: number }>();
   zoom = 1;
   celebrationRightInset = 18;
   onZoomChange: (zoom: number) => void = () => {};
@@ -130,7 +132,7 @@ export class LanView {
     this.springControls = new SpringControls(
       canvas,
       (index) => this.onSpring(index),
-      () => this.state === 'running'
+      () => this.springConnected && this.state === 'running'
     );
     this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })!;
     window.addEventListener('pinball-marble-design-change', () => {
@@ -163,8 +165,18 @@ export class LanView {
     const release = () => this.onBoost(false);
     canvas.addEventListener('pointerdown', (event) => {
       if (this.springPlacement.active) {
-        if (event.isPrimary === false || (event.button !== 0 && event.pointerType !== 'touch') || !this.springConnected)
-          return;
+        if (this.springPending || !this.springConnected) return;
+        if (event.pointerType === 'touch') {
+          if (event.isPrimary === false && !this.placementTouches.size) return;
+          this.placementTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+          if (this.placementTouches.size > 1) {
+            event.preventDefault();
+            canvas.setPointerCapture(event.pointerId);
+            this.placementDrag = undefined;
+            return;
+          }
+        }
+        if (event.isPrimary === false || (event.button !== 0 && event.pointerType !== 'touch')) return;
         event.preventDefault();
         const center = this.manual ?? this.camera;
         this.placementDrag = {
@@ -180,7 +192,10 @@ export class LanView {
         canvas.setPointerCapture(event.pointerId);
         return;
       }
-      if (this.springControls.select(event)) {
+      const previousSelection = this.springControls.selected;
+      const selected = this.springControls.select(event);
+      if (previousSelection !== this.springControls.selected) this.onPlacementChange();
+      if (selected) {
         release();
         this.renderDirty = true;
         return;
@@ -193,6 +208,36 @@ export class LanView {
     });
     canvas.addEventListener('pointermove', (event) => {
       if (this.springPlacement.active) {
+        if (this.springPending) return;
+        const touch = this.placementTouches.get(event.pointerId);
+        if (touch && this.placementTouches.size > 1) {
+          if (this.placementTouches.size === 2) {
+            const other = [...this.placementTouches.values()].find((point) => point !== touch)!;
+            const before = Math.hypot(touch.x - other.x, touch.y - other.y);
+            const after = Math.hypot(event.clientX - other.x, event.clientY - other.y);
+            if (before > 0 && after > 0) {
+              const scale = this.viewScale(),
+                center = this.manual ?? this.camera;
+              const rect = canvas.getBoundingClientRect();
+              const midX = (other.x + touch.x) / 2 - rect.left - this.width * 0.56;
+              const midY = (other.y + touch.y) / 2 - rect.top - this.height * 0.43;
+              this.setZoom((this.zoom * after) / before);
+              const nextScale = this.viewScale();
+              this.manual = {
+                x: center.x + midX / scale - (midX + (event.clientX - touch.x) / 2) / nextScale,
+                y: center.y + midY / scale - (midY + (event.clientY - touch.y) / 2) / nextScale,
+              };
+            }
+          }
+          touch.x = event.clientX;
+          touch.y = event.clientY;
+          return;
+        }
+        if (touch) {
+          touch.x = event.clientX;
+          touch.y = event.clientY;
+          if (!this.placementDrag) return;
+        }
         if (event.isPrimary === false) return;
         const drag = this.placementDrag,
           point = this.springMinimapPoint(event);
@@ -219,7 +264,8 @@ export class LanView {
     });
     canvas.addEventListener('pointerup', (event) => {
       release();
-      if (event.isPrimary === false) return;
+      this.placementTouches.delete(event.pointerId);
+      if (this.springPending || event.isPrimary === false) return;
       const drag = this.placementDrag;
       if (!drag || drag.id !== event.pointerId) return;
       this.placementDrag = undefined;
@@ -234,7 +280,6 @@ export class LanView {
       try {
         const placement = this.springPlacement.choose(this.springPoint(event), this.placedSprings, this.springElapsed);
         if (placement) {
-          this.cancelSpringPlacement(true);
           this.onPlaceSpring(placement);
         } else this.onPlacementChange();
       } catch (error) {
@@ -242,16 +287,19 @@ export class LanView {
       }
       this.renderDirty = true;
     });
-    canvas.addEventListener('lostpointercapture', () => {
-      this.placementDrag = undefined;
+    canvas.addEventListener('lostpointercapture', (event) => {
+      this.placementTouches.delete(event.pointerId);
+      if (this.placementDrag?.id === event.pointerId) this.placementDrag = undefined;
       release();
     });
-    canvas.addEventListener('pointercancel', () => {
+    canvas.addEventListener('pointercancel', (event) => {
+      this.placementTouches.delete(event.pointerId);
       this.placementDrag = undefined;
       release();
       if (!this.springPlacement.active) this.follow();
     });
     window.addEventListener('blur', () => {
+      this.placementTouches.clear();
       this.placementDrag = undefined;
       release();
     });
@@ -261,7 +309,7 @@ export class LanView {
         if (event.key === 'Escape' && this.springPlacement.active) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          this.cancelSpringPlacement();
+          if (!this.springPending) this.cancelSpringPlacement();
           return;
         }
         if (!acceptsSpringSpace(event, this.state === 'running')) return;
@@ -311,6 +359,8 @@ export class LanView {
   beginSpringPlacement() {
     if (!this.scene || !this.springConnected || this.personalSpring?.state !== 'available' || this.state === 'finished')
       return;
+    if (this.springPending) return;
+    this.placementTouches.clear();
     this.springPlacement.begin(this.scene.stage);
     this.springControls.selected = -1;
     this.dolphinOverview = false;
@@ -320,6 +370,7 @@ export class LanView {
     this.onPlacementChange();
   }
   cancelSpringPlacement(closeOverview = false) {
+    this.placementTouches.clear();
     this.springPlacement.cancel();
     this.placementDrag = undefined;
     if (this.state === 'ready') this.camera = { ...this.readyCamera };
@@ -432,6 +483,8 @@ export class LanView {
       this.elasticFrameSeq = -1;
     }
     if (this.scene?.raceId !== scene.raceId) {
+      this.springPending = undefined;
+      this.placementTouches.clear();
       this.springPlacement?.cancel();
       this.placementDrag = undefined;
       this.personalSpring = undefined;
@@ -504,7 +557,7 @@ export class LanView {
     this.personalSpring = frame.personalSpring;
     this.springElapsed = frame.elapsed;
     if (this.springPlacement?.active && (frame.personalSpring?.state !== 'available' || frame.state === 'finished'))
-      this.cancelSpringPlacement();
+      this.cancelSpringPlacement(frame.personalSpring?.state === 'placed');
     if (frame.state === 'running' && this.state === 'ready' && this.dolphinOverview) {
       this.camera = { ...this.readyCamera };
       this.manual = null;

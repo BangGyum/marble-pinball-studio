@@ -37,7 +37,6 @@ let info: Info,
   uiUpdate = 0;
 let preferredPicks = 2,
   customStage: StageDef | undefined;
-let springPending = false;
 const library = new MapLibrary(visibleBuiltins);
 let inputTimer: ReturnType<typeof setTimeout> | undefined, boostTimer: ReturnType<typeof setInterval> | undefined;
 const namesKey = 'marble-pinball.participant-names';
@@ -140,11 +139,15 @@ function updateControls() {
 function updatePersonalSpring() {
   const state = frame?.personalSpring?.state,
     placing = view.springPlacement.active,
-    enabled = online && !!frame && frame.state !== 'finished' && !springPending;
+    enabled = online && !!frame && frame.state !== 'finished' && !view.springPending;
   const place = el<HTMLButtonElement>('spring-place'),
     back = el<HTMLButtonElement>('spring-back'),
     cancel = el<HTMLButtonElement>('spring-cancel'),
     use = el<HTMLButtonElement>('spring-use');
+  const mapUse = el<HTMLButtonElement>('map-spring-use');
+  mapUse.hidden = view.springControls.selected < 0;
+  mapUse.disabled = !online || !view.springControls.canActivateSelected;
+  use.textContent = mapUse.hidden ? '내 스프링 발동 · SPACE' : '내 스프링 발동';
   place.hidden = state !== 'available' || placing;
   place.disabled = !enabled;
   back.hidden = !placing || !view.springPlacement.origin;
@@ -155,17 +158,19 @@ function updatePersonalSpring() {
   el('personal-spring-status').textContent =
     !online || !frame
       ? '서버 연결 후 배치할 수 있어요.'
-      : springPending
+      : view.springPending
         ? '서버에서 확인 중이에요…'
         : frame.state === 'finished'
           ? '경기가 끝났어요. 다음 경기에서 다시 1개를 받아요.'
           : placing
             ? view.springPlacement.origin
               ? '② 밀어낼 방향을 눌러 확정 · 드래그로 이동 · Esc 취소'
-              : '① 드래그·미니맵으로 이동, 휠/±로 확대 후 위치를 눌러 주세요.'
+              : '① 드래그·미니맵으로 이동, 두 손가락·휠·±로 확대 후 위치를 눌러 주세요.'
             : state === 'placed'
               ? frame.state === 'running'
-                ? '내 스프링 준비 완료 · 버튼 또는 SPACE로 한 번 발동'
+                ? mapUse.hidden
+                  ? '내 스프링 준비 완료 · 버튼 또는 SPACE로 한 번 발동'
+                  : 'SPACE로 선택한 맵 스프링 발동'
                 : '배치 완료 · 경기가 진행 중일 때 한 번 발동할 수 있어요.'
               : state === 'used'
                 ? '이번 경기 사용 완료 · 다음 경기에서 다시 1개를 받아요.'
@@ -174,6 +179,7 @@ function updatePersonalSpring() {
 view.onPlacementChange = updatePersonalSpring;
 function connection(connected: boolean, status: string) {
   online = connected;
+  if (!connected) view.springPending = undefined;
   el('connection').textContent = status;
   el('connection').dataset.offline = String(!connected);
   updateControls();
@@ -220,17 +226,19 @@ function command(input: InputCommand) {
   });
 }
 const run = (input: InputCommand) => command(input).catch((error) => toast(message(error)));
-async function personalCommand(input: InputCommand) {
-  if (springPending) return;
-  springPending = true;
+async function personalCommand(input: Extract<InputCommand, { type: 'place-spring' | 'use-spring' }>) {
+  if (view.springPending) return;
+  const pending = { state: input.type === 'place-spring' ? ('placed' as const) : ('used' as const) };
+  view.springPending = pending;
   updatePersonalSpring();
   try {
     await command(input);
   } catch (error) {
-    toast(message(error));
-  } finally {
-    springPending = false;
-    updatePersonalSpring();
+    if (view.springPending === pending) {
+      view.springPending = undefined;
+      toast(message(error));
+      updatePersonalSpring();
+    }
   }
 }
 view.onPlaceSpring = (placement) => void personalCommand({ type: 'place-spring', ...placement });
@@ -238,6 +246,7 @@ view.onUseSpring = () => void personalCommand({ type: 'use-spring' });
 el('spring-place').addEventListener('click', () => view.beginSpringPlacement());
 el('spring-back').addEventListener('click', () => view.beginSpringPlacement());
 el('spring-cancel').addEventListener('click', () => view.cancelSpringPlacement());
+el('map-spring-use').addEventListener('click', () => view.springControls.activateSelected());
 el('spring-use').addEventListener('click', () => view.onUseSpring());
 function inputSettings(): Settings {
   const count = parseNames(names.value).length,
@@ -412,6 +421,10 @@ async function connect() {
         )
           return;
         const stateChanged = frame?.state !== incoming.state;
+        const springState = incoming.personalSpring?.state;
+        const springChanged = frame?.personalSpring?.state !== springState;
+        if (springState === view.springPending?.state || springState === 'used' || incoming.state === 'finished')
+          view.springPending = undefined;
         frame = incoming;
         view.push(incoming);
         if (stateChanged) {
@@ -421,7 +434,7 @@ async function connect() {
         if (performance.now() - uiUpdate > 200 || stateChanged) {
           updateRaceUI();
           uiUpdate = performance.now();
-        }
+        } else if (springChanged) updatePersonalSpring();
       } else if (incoming.type === 'identity') {
         identity = incoming;
         updateControls();
@@ -515,6 +528,10 @@ el('zoom-reset').addEventListener('click', () => view.setZoom(1));
 el('follow').addEventListener('click', () => {
   view.follow(true);
   selectBall(null);
+});
+rankingList.addEventListener('click', (event) => {
+  if (event.detail > 0 && event.target instanceof Element && event.target.closest('li[role="button"]'))
+    view.canvas.focus({ preventScroll: true });
 });
 document.addEventListener('pointerdown', (event) => {
   if (view.focusedBallId !== null && event.target instanceof Node && !rankingList.contains(event.target))

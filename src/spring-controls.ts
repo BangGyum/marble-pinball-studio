@@ -55,9 +55,15 @@ export class SpringControls {
       )
         return;
       event.preventDefault();
-      const status = this.statuses.get(this.selected);
-      if (!status?.busy && (status?.until ?? 0) <= performance.now()) this.activate(this.selected);
+      this.activateSelected();
     });
+  }
+  get canActivateSelected() {
+    const status = this.statuses.get(this.selected);
+    return this.selected >= 0 && this.running() && !status?.busy && (status?.until ?? 0) <= performance.now();
+  }
+  activateSelected() {
+    if (this.canActivateSelected) this.activate(this.selected);
   }
   reset() {
     this.selected = -1;
