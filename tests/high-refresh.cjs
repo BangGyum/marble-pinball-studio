@@ -146,6 +146,32 @@ assert.equal(busyFrame(10).steps, 1, 'a delayed callback must not increase the 6
 assert.ok(busyFrame(120, 2.8, 4.5).work < 1000 / 120, 'reserve the next step cost before using the render allowance');
 console.log('PASS predictive 60/120/144Hz physics budgets, cheap-step catch-up and delayed-callback limits');
 
+const acceleratedGame = new Game(canvas());
+acceleratedGame.state = 'running';
+acceleratedGame.speed = 4;
+acceleratedGame.last = 1000;
+acceleratedGame.finishSlowdown = () => 1;
+let acceleratedSteps = 0,
+  frameAt = 1000,
+  stepCost = 2.7;
+acceleratedGame.advance = () => {
+  acceleratedSteps++;
+  clock += stepCost;
+};
+acceleratedGame.render = () => {
+  clock += 2.5;
+};
+for (let i = 0; i < 60; i++) {
+  stepCost = i === 25 ? 4.2 : 2.4;
+  frameAt += 1000 / 60;
+  clock = frameAt;
+  acceleratedGame.frame(frameAt);
+  assert.ok(clock - frameAt < 1000 / 60, '4x leaves space to render each 60Hz frame');
+  assert.ok(acceleratedGame.accumulator < 5 / 60, '4x catch-up stays bounded');
+}
+assert.ok(acceleratedSteps >= 239, '4x recovers from one expensive frame without losing whole steps');
+console.log('PASS 4x uses available 60Hz frame time and recovers a short physics backlog');
+
 const jitterGame = new Game(canvas());
 jitterGame.state = 'running';
 jitterGame.last = 1000;

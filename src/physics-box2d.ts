@@ -21,6 +21,7 @@ import { timedGateAngle } from './timed-gate';
 import { rotorPower } from './rotor-cycle';
 import { GondolaCar } from './gondola';
 import { BubbleMineRide } from './bubble-mine';
+import { WallGuard } from './wall-guard';
 import type { IPhysics } from './i-physics';
 import type { EntityBoxShape, MapEntity, MapEntityState } from './types/map-entity';
 import { PERSONAL_SPRING_DURATION, personalSpringExtension } from './personal-spring';
@@ -110,6 +111,7 @@ export class Box2dPhysics implements IPhysics {
   private exitBridge: StageDef['exitBridge'];
   private bridgeBodies = new Set<Box2D.b2Body>();
   private windTime = 0;
+  private reinforcedWalls?: WallGuard;
   private collisionSubsteps = 4;
   private deleteCandidates: Box2D.b2Body[] = [];
   // Moving obstacle poses (x, angle) before the latest step, for drawing between steps.
@@ -156,6 +158,8 @@ export class Box2dPhysics implements IPhysics {
     this.waterZones = [];
     this.winds = [];
     this.exitBridge = undefined;
+    this.reinforcedWalls = undefined;
+    this.collisionSubsteps = 4;
     this.bridgeBodies.clear();
     for (const entity of this.entities) this.world.DestroyBody(entity.body);
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
@@ -205,7 +209,14 @@ export class Box2dPhysics implements IPhysics {
     this.exitBridge = stage.exitBridge;
     this.windTime = 0;
     this.randomizeStart = stage.randomizeStart === true;
-    this.collisionSubsteps = stage.entities?.some((e) => e.shape.type === 'polyline' && e.shape.backing) ? 16 : 4;
+    const backed = (stage.entities ?? []).filter(
+      (e) => e.shape.type === 'polyline' && e.shape.backing && !e.shape.sensor
+    );
+    // The static grid cannot track walls that move or break during play.
+    const needsFineSteps = backed.some((e) => e.type !== 'static' || (e.props.life ?? 0) > 0);
+    const hasMovingDevices = stage.entities?.some((e) => e.type === 'kinematic');
+    this.collisionSubsteps = backed.length && (needsFineSteps || hasMovingDevices) ? 16 : 4;
+    this.reinforcedWalls = !needsFineSteps && backed.length ? new WallGuard({ ...stage, entities: backed }) : undefined;
     this.createEntities(
       (stage.entities ?? []).map((entity) =>
         this.randomizeStart &&
@@ -523,7 +534,7 @@ export class Box2dPhysics implements IPhysics {
     });
     this.previousCount = this.entities.length;
   }
-  private recordSweep() {
+  private recordSweep(movingEntities = true) {
     if (this.sweepPositions.length < this.marbleBodies.length * 2)
       this.sweepPositions = new Float64Array(this.marbleBodies.length * 2);
     this.marbleBodies.forEach((body, i) => {
@@ -531,6 +542,7 @@ export class Box2dPhysics implements IPhysics {
       this.sweepPositions[i * 2] = p.x;
       this.sweepPositions[i * 2 + 1] = p.y;
     });
+    if (!movingEntities) return;
     for (const entity of this.movingEntities) {
       const p = entity.body.GetPosition();
       entity.sweepPose ??= { x: 0, y: 0, cos: 1, sin: 0, nextX: 0, nextY: 0, nextCos: 1, nextSin: 0 };
@@ -541,6 +553,16 @@ export class Box2dPhysics implements IPhysics {
       pose.cos = Math.cos(angle);
       pose.sin = Math.sin(angle);
     }
+  }
+  private guardReinforcedWalls(walls: WallGuard) {
+    this.marbleBodies.forEach((body, i) => {
+      const p = body.GetPosition();
+      const x = this.sweepPositions[i * 2],
+        y = this.sweepPositions[i * 2 + 1];
+      if (!walls.crosses(x, y, p.x, p.y, this.bridgeBodies.has(body) ? 2 : 1)) return;
+      this.vector.Set(x, y);
+      body.SetTransform(this.vector, body.GetAngle());
+    });
   }
   private castMapRay(x: number, y: number, end: Box2D.b2Vec2, body: number, layer: number): SweepHit | undefined {
     const B = this.Box2D;
@@ -714,6 +736,9 @@ export class Box2dPhysics implements IPhysics {
     return true;
   }
   start() {
+    // Preserve the established device motion for smaller races. Select once at kickoff so
+    // the last marbles keep the same physics as the rest of the field.
+    if (this.reinforcedWalls && this.marbleBodies.length >= 100) this.collisionSubsteps = 4;
     for (const body of Object.values(this.marbleMap)) {
       if (this.randomizeStart) {
         this.vector.Set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 2);
@@ -1061,9 +1086,10 @@ export class Box2dPhysics implements IPhysics {
     }
     for (const body of this.deleteCandidates) this.world.DestroyBody(body);
     this.deleteCandidates.length = 0;
-    // Smaller angular increments keep rotating paddles from pushing marbles through thin walls.
-    for (let i = 0; i < this.collisionSubsteps; i++) {
-      const dt = seconds / this.collisionSubsteps;
+    const substeps = this.collisionSubsteps;
+    const reinforced = substeps === 4 && this.reinforcedWalls;
+    const dt = seconds / substeps;
+    for (let i = 0; i < substeps; i++) {
       if (this.waterZones.length) this.applyWater(dt);
       this.motionTime += dt;
       if (this.launchers.length) this.moveLauncherGates(dt);
@@ -1112,10 +1138,13 @@ export class Box2dPhysics implements IPhysics {
       beforeSubstep?.(dt, i * dt);
       // Check the short solver path: a full-frame chord can skip a thin wall under pressure.
       const guard = !!beforeSubstep && this.entities.length > 0;
-      if (guard || (this.bubbleRide && !this.bubbleRide.passenger)) this.recordSweep();
-      this.world.Step(dt, 8, this.collisionSubsteps === 4 ? 4 : 8);
+      const bubbleCapturing = this.bubbleRide?.needsSweep(this.motionTime, dt) ?? false;
+      if (guard || bubbleCapturing || reinforced) this.recordSweep(guard);
+      this.world.Step(dt, 8, substeps === 4 ? 4 : 8);
       if (guard) this.guardMapCrossings();
-      this.bubbleRide?.step(this.motionTime, dt, bodies, this.sweepPositions, MARBLE_RADIUS);
+      // Check reinforced rails at each solver step so a rotor cannot push a marble through between ticks.
+      if (reinforced) this.guardReinforcedWalls(reinforced);
+      this.bubbleRide?.step(this.motionTime, dt, bodies, this.sweepPositions, MARBLE_RADIUS, bubbleCapturing);
       if (this.exitBridge) {
         for (const body of bodies) {
           const elevated = this.bridgeBodies.has(body);

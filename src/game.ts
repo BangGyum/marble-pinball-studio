@@ -44,6 +44,8 @@ export class Game extends Race {
   private recordStop: ReturnType<typeof setTimeout> | undefined;
   private last = 0;
   private lastRender = 0;
+  private renderCost = 0;
+  private frameCadence = 1000 / 60;
   private lastFrameDraw = -Infinity;
   private renderDirty = true;
   private cameraMoving = false;
@@ -309,6 +311,8 @@ export class Game extends Race {
       requestAnimationFrame((t) => this.frame(t));
       return;
     }
+    // Track recent short intervals so a missed high-refresh frame cannot enlarge the budget.
+    if (interval > 0 && interval < 25) this.frameCadence = Math.min(interval, this.frameCadence + 0.15);
     const previewing =
       this.state === 'ready' &&
       this.dolphinPreview &&
@@ -341,7 +345,13 @@ export class Game extends Race {
       this.accumulator += delta * this.speed * (this.fastForward ? 2 : 1) * this.finishSlowdown();
       const physicsStart = performance.now();
       // Leave room for rendering at high refresh rates: 6ms at 60Hz, 3ms at 120Hz.
-      const physicsBudget = Math.min(6, delta * 1000 * 0.36);
+      const baseBudget = Math.min(6, delta * 1000 * 0.36);
+      const accelerated = this.speed === 4 && !this.fastForward && !this.recording;
+      // At 4x, use the rest of the frame when rendering is cheap. Keep headroom for
+      // the next draw and browser work, and cap the allowance to one 60Hz interval.
+      const physicsBudget = accelerated
+        ? Math.max(baseBudget, Math.min(1000 / 60, this.frameCadence) - Math.max(4, this.renderCost + 2))
+        : baseBudget;
       const maxSteps = Math.max(1, Math.ceil(this.speed * (this.fastForward ? 2 : 1) * 2));
       let steps = 0;
       while (
@@ -354,8 +364,10 @@ export class Game extends Race {
         this.accumulator -= 1 / 60;
         steps++;
       }
-      // Retain one pending step for frame jitter; discard larger backlogs to avoid catch-up spikes.
-      if (this.accumulator >= 2 / 60) this.accumulator = 1 / 60 + (this.accumulator % (1 / 60));
+      // Let a short expensive patch catch up during cheaper frames at 4x.
+      const pendingSteps = accelerated ? 4 : 1;
+      if (this.accumulator >= (pendingSteps + 1) / 60)
+        this.accumulator = pendingSteps / 60 + (this.accumulator % (1 / 60));
     }
     if (
       this.state === 'running' ||
@@ -370,7 +382,9 @@ export class Game extends Race {
     ) {
       this.lastFrameDraw = now;
       this.renderDirty = false;
+      const renderStart = performance.now();
       this.render();
+      this.renderCost += (Math.min(1000 / 60, performance.now() - renderStart) - this.renderCost) * 0.2;
     }
     requestAnimationFrame((t) => this.frame(t));
   }

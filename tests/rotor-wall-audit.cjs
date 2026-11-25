@@ -45,6 +45,13 @@ function inside(x, y) {
   const p = new Box2dPhysics();
   await p.init();
   const escapes = [];
+  let ticks = 0;
+  let substeps = 0;
+  const step = p.world.Step.bind(p.world);
+  p.world.Step = (...args) => {
+    substeps++;
+    step(...args);
+  };
   for (let phase = 0; phase < 72; phase++) {
     p.clearMarbles();
     p.clear();
@@ -66,10 +73,14 @@ function inside(x, y) {
     points.forEach(([x, y], i) => {
       p.createMarble(i, x, y);
     });
+    // Select the large-race solver at kickoff, then isolate the marbles at the paddles.
+    for (let id = points.length; id < 100; id++) p.createMarble(id, 13, -10);
     p.start();
+    for (let id = points.length; id < 100; id++) p.removeMarble(id);
     const done = new Set();
     for (let t = 0; t < 3600 && done.size < points.length; t++) {
       p.step(1 / 60);
+      ticks++;
       for (let id = 0; id < points.length; id++) {
         if (done.has(id)) continue;
         const b = p.getMarblePosition(id);
@@ -85,7 +96,8 @@ function inside(x, y) {
     }
   }
   assert.equal(escapes.length, 0, JSON.stringify(escapes.slice(0, 8)));
-  console.log('PASS rotor wall containment: 72 phases, 576 marbles, zero escapes');
+  assert.equal(substeps, 4 * ticks, 'static backed rails stay on the four-step solver');
+  console.log('PASS rotor wall containment: 72 phases, 576 marbles, zero escapes at four substeps');
   p.clearMarbles();
   p.clear();
 })().catch((e) => {

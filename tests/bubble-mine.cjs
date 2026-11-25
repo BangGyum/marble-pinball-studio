@@ -15,6 +15,17 @@ const { minePose } = require('../src/bubble-mine.ts');
 const { validateStage } = require('../src/model.ts');
 const { WallGuard } = require('../src/wall-guard.ts');
 
+const [leftRail, rightRail] = stage.entities.slice(-2).map((entity) => entity.shape.points);
+
+function boundaryX(points, y) {
+  const next = points.findIndex(([, height]) => height >= y);
+  if (next === 0) return points[0][0];
+  if (next === -1) return points.at(-1)[0];
+  const [x0, y0] = points[next - 1];
+  const [x1, y1] = points[next];
+  return x0 + ((x1 - x0) * (y - y0)) / (y1 - y0);
+}
+
 (async () => {
   const race = new Race();
   const random = Math.random;
@@ -46,6 +57,8 @@ const { WallGuard } = require('../src/wall-guard.ts');
       [20, 100],
       [4, 50],
       [48, 12],
+      [100, 5],
+      [300, 5],
     ]) {
       for (let trial = 1; trial <= trials; trial++) {
         let seed = Math.imul(trial, 2654435761) >>> 0;
@@ -71,6 +84,11 @@ const { WallGuard } = require('../src/wall-guard.ts');
           assert.ok(held.length <= 1);
           const ball = held[0];
           for (const b of race.balls) {
+            assert.ok(
+              b.x >= boundaryX(leftRail, b.y) - 0.02 && b.x <= boundaryX(rightRail, b.y) + 0.02 && b.y >= -20,
+              `marble ${b.id} left the mine at (${b.x.toFixed(2)}, ${b.y.toFixed(2)}) in the ${count}-marble race ${trial}`
+            );
+            if (b !== ball && !b.rank) assert.ok(b.stuck < 2, 'a marble in the normal route stopped for 2 seconds');
             if (b === ball || b.rank || pastGate.has(b.id) || b.py >= 21 || b.y < 21) continue;
             pastGate.add(b.id);
             if (b.x >= 8) shortRoute++;
@@ -109,11 +127,11 @@ const { WallGuard } = require('../src/wall-guard.ts');
     assert.ok(rides > 30 && wallPasses > 0);
     assert.ok(shortRoute > 0 && outerRoute > 0, 'both sides of the tipping bridge carry marbles');
     console.log(
-      'PASS 100 x 20 marbles + 50 x 4 marbles + 12 x 48 marbles:',
+      'PASS 100 x 20, 50 x 4, 12 x 48, 5 x 100, and 5 x 300 marbles:',
       rides,
       'captures, centered drops, cart rides and releases;',
       wallPasses,
-      'intentional rail crossings; all finished without rescues. Short/outer route counts:',
+      'intentional rail crossings; all finished without going out or requiring rescue. Short/outer route counts:',
       shortRoute,
       outerRoute
     );

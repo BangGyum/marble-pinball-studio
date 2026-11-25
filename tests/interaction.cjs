@@ -131,12 +131,12 @@ hover.advance = () => {
 };
 hover.frame(1100);
 assert.equal(steps, 1, 'an expensive physics update must yield to rendering before starting another');
-assert.ok(hover.accumulator < 2 / 60);
+assert.ok(hover.accumulator < 5 / 60, '4x retains at most four pending physics steps');
 for (let i = 1; i <= 10; i++) {
   const beforeSteps = steps;
   hover.frame(1100 + i * 100);
   assert.equal(steps - beforeSteps, 1, 'repeated stalls never trigger a physics catch-up burst');
-  assert.ok(hover.accumulator < 2 / 60, 'repeated stalls cannot build an unbounded backlog');
+  assert.ok(hover.accumulator < 5 / 60, 'repeated 4x stalls cannot build an unbounded backlog');
 }
 global.performance = realPerformance;
 hover.render = savedRender;

@@ -15,12 +15,13 @@ const depart = rise + drop,
   release = arrive + tip;
 const period = release + back;
 const smooth = (t: number) => t * t * (3 - 2 * t);
+const cartEntranceX = 11;
 export const bubbleRadius = 0.32;
 
 export function mineRail(origin: VectorLike, t: number) {
   const u = 1 - t;
   return {
-    x: origin.x + 11 + 18 * u * u * t + 28 * u * t * t + 17 * t ** 3,
+    x: origin.x + cartEntranceX * u ** 3 + 3 * 13 * u * u * t + 3 * 16 * u * t * t + 17 * t ** 3,
     y: origin.y - 28 + 3 * u * t * t * 25 + 32 * t ** 3,
   };
 }
@@ -52,7 +53,10 @@ export function minePose(origin: VectorLike, time: number) {
     age,
     cart,
     tilt,
-    bubble: { x: origin.x + 11 * bend + (1 - bend) * 0.85 * Math.sin(ascent * 8), y: origin.y - 29.8 * ascent },
+    bubble: {
+      x: origin.x + cartEntranceX * bend + (1 - bend) * 0.85 * Math.sin(ascent * 8),
+      y: origin.y - 29.8 * ascent,
+    },
     rising: age < rise,
     burst: (age - rise) / 0.35,
     falling: age >= rise && age < depart,
@@ -76,9 +80,21 @@ export class BubbleMineRide {
     this.passenger = undefined;
   }
 
-  step(now: number, dt: number, bodies: Box2D.b2Body[], starts: Float64Array, marbleRadius: number) {
+  needsSweep(now: number, dt: number) {
+    return !this.passenger && (now + 0.1) % period < rise + dt;
+  }
+
+  step(
+    now: number,
+    dt: number,
+    bodies: Box2D.b2Body[],
+    starts: Float64Array,
+    marbleRadius: number,
+    capturing: boolean
+  ) {
+    if (!capturing && !this.passenger) return;
     const pose = minePose(this.origin, now);
-    if (!this.passenger && pose.age < rise + dt) {
+    if (capturing) {
       // Clip the solver step to the bubble's lifetime, including its first/last partial step.
       const from = Math.max(0, 1 - pose.age / dt);
       const to = Math.min(1, 1 + (rise - pose.age) / dt);
