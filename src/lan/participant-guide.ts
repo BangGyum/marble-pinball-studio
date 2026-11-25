@@ -48,7 +48,8 @@ function rememberGuide() {
 }
 
 type Point = [number, number];
-type CursorFrame = [time: number, point: Point, opacity?: number];
+type Anchor = () => Point;
+type CursorFrame = [time: number, anchor: Anchor, opacity?: number];
 
 export function createParticipantGuide(dialog: HTMLDialogElement) {
   const find = <T extends Element = HTMLElement>(selector: string) => dialog.querySelector<T>(selector)!;
@@ -74,11 +75,13 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
   const skip = find<HTMLInputElement>('#participant-guide-skip');
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const animations: Animation[] = [];
+  const layoutUpdates: (() => void)[] = [];
   const timers: ReturnType<typeof setTimeout>[] = [];
   let index = 0;
   let offered = false;
 
   function clearDemo() {
+    layoutUpdates.length = 0;
     for (const animation of animations.splice(0)) animation.cancel();
     for (const timer of timers.splice(0)) clearTimeout(timer);
     delete dialog.dataset.following;
@@ -89,46 +92,57 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
     place.textContent = '⇧ 스프링 배치';
   }
 
-  function animate(element: Element, duration: number, frames: Keyframe[]) {
-    animations.push(element.animate(frames, { duration, fill: 'both' }));
+  function animate(element: Element, duration: number, frames: Keyframe[] | (() => Keyframe[])) {
+    const animation = element.animate(typeof frames === 'function' ? frames() : frames, { duration, fill: 'both' });
+    animations.push(animation);
+    if (typeof frames === 'function') {
+      const effect = animation.effect as KeyframeEffect;
+      layoutUpdates.push(() => effect.setKeyframes(frames()));
+    }
   }
 
   function at(ms: number, action: () => void) {
     timers.push(setTimeout(action, ms));
   }
 
-  function point(element: Element, x = 0.5, y = 0.5): Point {
-    const bounds = element.getBoundingClientRect();
-    const stage = demo.getBoundingClientRect();
-    return [bounds.left - stage.left + bounds.width * x, bounds.top - stage.top + bounds.height * y];
+  function anchor(element: Element, x = 0.5, y = 0.5): Anchor {
+    return () => {
+      const bounds = element.getBoundingClientRect();
+      const stage = demo.getBoundingClientRect();
+      return [bounds.left - stage.left + bounds.width * x, bounds.top - stage.top + bounds.height * y];
+    };
   }
 
   function movePointer(duration: number, frames: CursorFrame[]) {
     pointer.classList.remove('guide-pointer-hidden');
-    animate(
-      pointer,
-      duration,
-      frames.map(([time, [x, y], opacity = 1]) => ({
-        offset: time / duration,
-        transform: `translate(${x - 3}px, ${y - 2}px)`,
-        opacity,
-        easing: 'ease-in-out',
-      }))
+    animate(pointer, duration, () =>
+      frames.map(([time, position, opacity = 1]) => {
+        const [x, y] = position();
+        return {
+          offset: time / duration,
+          transform: `translate(${x - 3}px, ${y - 2}px)`,
+          opacity,
+          easing: 'ease-in-out',
+        };
+      })
     );
   }
 
-  function clickAt([x, y]: Point) {
-    const position = `translate(${x - 12}px, ${y - 12}px)`;
-    animate(ring, 400, [
-      { transform: position + ' scale(.45)', opacity: 1 },
-      { transform: position + ' scale(1.65)', opacity: 0 },
-    ]);
+  function clickAt(position: Anchor) {
+    animate(ring, 400, () => {
+      const [x, y] = position();
+      const transform = `translate(${x - 12}px, ${y - 12}px)`;
+      return [
+        { transform: transform + ' scale(.45)', opacity: 1 },
+        { transform: transform + ' scale(1.65)', opacity: 0 },
+      ];
+    });
   }
 
   function showMinimap() {
-    const start = point(board, 0.37, 0.26);
-    const upper = point(map, 0.62, 0.35);
-    const lower = point(map, 0.62, 0.68);
+    const start = anchor(board, 0.37, 0.26);
+    const upper = anchor(map, 0.62, 0.35);
+    const lower = anchor(map, 0.62, 0.68);
     movePointer(3200, [
       [0, start, 0],
       [240, start],
@@ -162,8 +176,8 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
   }
 
   function showRanking() {
-    const start = point(board, 0.55, 0.32);
-    const selected = point(rank, 0.47);
+    const start = anchor(board, 0.55, 0.32);
+    const selected = anchor(rank, 0.47);
     movePointer(3650, [
       [0, start, 0],
       [220, start],
@@ -189,17 +203,17 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
   }
 
   function showSpring() {
-    const start = point(board, 0.75, 0.28);
-    const button = point(place, 0.68);
-    const origin = point(base);
-    const aimLeft = point(spring, 0.24, 0.2);
-    const aimRight = point(spring, 0.77, 0.19);
+    const start = anchor(board, 0.75, 0.28);
+    const button = anchor(place, 0.68);
+    const origin = anchor(base);
+    const aimLeft = anchor(spring, 0.24, 0.2);
+    const aimRight = anchor(spring, 0.77, 0.19);
     movePointer(5450, [
       [0, start, 0],
       [180, start],
       [850, button],
       [1150, button],
-      [1610, point(board, 0.89, 0.37)],
+      [1610, anchor(board, 0.89, 0.37)],
       [2180, origin],
       [2440, origin],
       [2770, aimLeft],
@@ -309,7 +323,9 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
       const space = event.code === 'Space' || event.key === ' ';
       if (!space && event.key !== 'Escape' && event.key !== 'Enter') return;
       event.stopImmediatePropagation();
-      if (space && event.target === skip) return;
+      // Let the focused control handle Space; elsewhere it advances the walkthrough.
+      if (space && (event.target === skip || (event.target instanceof HTMLButtonElement && event.target !== next)))
+        return;
       event.preventDefault();
       if (event.repeat) return;
       if (space) advance();
@@ -323,7 +339,10 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
     offered = true;
     dialog.showModal();
     showStep();
-    const resize = new ResizeObserver(replay);
+    const resize = new ResizeObserver(() => {
+      for (const update of layoutUpdates) update();
+    });
+    resize.observe(demo);
     resize.observe(board);
     reducedMotion.addEventListener('change', replay);
     await new Promise<void>((resolve) => dialog.addEventListener('close', () => resolve(), { once: true }));

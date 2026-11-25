@@ -228,6 +228,7 @@
   border-radius: 6px;
   white-space: nowrap;
   font-size: 0.75rem;
+  line-height: 1.5;
 }
 #participant-guide[data-placing] .guide-place {
   border-color: var(--guide-gold);
@@ -353,6 +354,14 @@
   border-radius: 4px;
   background: var(--guide-board);
   color: var(--text);
+}
+@media (prefers-reduced-motion: reduce) {
+  #participant-guide[data-step="minimap"] .guide-mini-window {
+    top: 57%;
+  }
+  #participant-guide[data-step="minimap"] .guide-course {
+    transform: translateY(-75px);
+  }
 }
 @media (max-width: 600px), (max-height: 590px) {
   .guide-board {
