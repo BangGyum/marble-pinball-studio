@@ -48,6 +48,9 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
   let sceneMessage;
   let revision = 0,
     seq = 0;
+  /** @type {Set<number>} */
+  const launcherGuides = new Set();
+  let guidesSentAt = -1;
   let accumulator = 0,
     lastTick = simulationNow();
   let speed = 1,
@@ -161,6 +164,8 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     boostOwner = null;
     personalSprings.clear();
     activeSprings.clear();
+    launcherGuides.clear();
+    guidesSentAt = -1;
     race.prepare(settings.stage ?? stages[settings.mapId], parseNames(settings.names), settings.dolphins);
     makeScene();
   }
@@ -196,6 +201,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       balls: race.balls.map((b) => [b.id, round(b.x), round(b.y), round(b.angle), b.rank ?? 0]),
       ...(mantaCaptures.length ? { mantaCaptures } : {}),
       ...(race.stage.exitBridge ? { bridgeIds: race.balls.filter((b) => b.onBridge).map((b) => b.id) } : {}),
+      ...(launcherGuides.size ? { launcherGuides: [...launcherGuides] } : {}),
       ...(race.finishReason === 'stalled' ? { stalled: true } : {}),
       angles: entities.map((e) => round(e.angle)),
       ...(positions.length ? { positions } : {}),
@@ -203,7 +209,9 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     };
   }
   function advance() {
+    if (guidesSentAt === race.elapsed) launcherGuides.clear();
     race.advance();
+    for (const id of race.physics.getLauncherGuideIds()) launcherGuides.add(id);
     for (const [shape, spring] of activeSprings) {
       if (springHasExpired(spring, race.elapsed) || race.state === 'finished') {
         race.physics.removeSpring(shape);
@@ -224,6 +232,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     const entities = mapEntities();
     const snapshot = frame(entities),
       hasSprings = entities.some((e) => e.shape.type === 'box' && e.shape.spring);
+    guidesSentAt = race.elapsed;
     for (const [ws, client] of clients)
       if (ws.bufferedAmount < 256 * 1024)
         send(ws, {
@@ -231,7 +240,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
           ...(hasSprings ? { springs: race.springStatuses(client.session, entities) } : {}),
           personalSpring: personalSpringStatus(client.session),
         });
-    return race.state === 'running' && (hasSprings || personalSprings.size > 0);
+    return race.state === 'running' && (hasSprings || activeSprings.size > 0);
   }
   /** @param {Session} session @returns {NonNullable<Frame['personalSpring']>} */
   function personalSpringStatus(session) {

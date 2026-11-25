@@ -53,6 +53,7 @@ export function decodeScene(wire: WireScene): Scene {
       y: entity.y,
       angle: entity.angle,
       life: entity.life,
+      ...(entity.launcherPart ? { launcherPart: true } : {}),
       shape: entity.shape ?? wire.stage.entities![entity.shapeIndex!].shape,
     })),
   };
@@ -73,6 +74,8 @@ export type Frame = {
   playbackRate: number;
   positions?: [entityIndex: number, x: number, y: number][];
   bridgeIds?: number[];
+  // Marbles guided by a launcher since the previous broadcast.
+  launcherGuides?: number[];
   // Simulation-time capture onset, for matching hold/stun cues and late joins.
   mantaCaptures?: [id: number, caughtAt: number][];
   // Per-recipient real-time cooldown remaining in milliseconds, and physical return lock.

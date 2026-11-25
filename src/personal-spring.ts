@@ -33,6 +33,22 @@ export function personalSpringShape(direction: number): EntityBoxShape {
   };
 }
 
+export function springCollisionLayer(stage: StageDef, { x, y }: Pick<SpringPlacement, 'x' | 'y'>): 1 | 2 {
+  const bridge = stage.exitBridge;
+  if (!bridge) return 1;
+  // Placement targets the visible deck when tracks overlap on screen.
+  for (const { deck } of [bridge, ...(bridge.transfers ?? [])]) {
+    let inside = false;
+    for (let i = 0, j = deck.length - 1; i < deck.length; j = i++) {
+      const [ax, ay] = deck[j];
+      const [bx, by] = deck[i];
+      if (ay > y !== by > y && x < ax + ((bx - ax) * (y - ay)) / (by - ay)) inside = !inside;
+    }
+    if (inside) return 2;
+  }
+  return 1;
+}
+
 export function personalSpringEntity(
   stage: StageDef,
   placement: SpringPlacement
@@ -54,6 +70,7 @@ export function personalSpringEntity(
     Math.max(y - dy * BASE_LENGTH, y + dy * distance) > stage.goalY - ry
   )
     throw new Error('스프링과 발사 방향이 맵 안에 들어오도록 골라 주세요.');
+  if (springCollisionLayer(stage, placement) === 2) shape.collisionLayer = 2;
   shape.spring!.personal = { x, y };
   return {
     position: { x, y },
@@ -90,12 +107,12 @@ export function validatePersonalSpring(
   placement: SpringPlacement,
   others: readonly SpringPlacement[]
 ) {
-  personalSpringEntity(stage, placement);
+  const layer = personalSpringEntity(stage, placement).shape.collisionLayer ?? 1;
   const bounds = sweptBounds(placement);
-  if (others.some((other) => intersects(bounds, sweptBounds(other))))
+  if (others.some((other) => springCollisionLayer(stage, other) === layer && intersects(bounds, sweptBounds(other))))
     throw new Error('다른 스프링의 배치 위치 또는 발동 범위와 겹쳐요.');
   for (const { position, shape } of stage.entities ?? []) {
-    if (shape.type !== 'box' || !shape.spring) continue;
+    if (shape.type !== 'box' || !shape.spring || (shape.collisionLayer ?? 1) !== layer) continue;
     const { direction, distance } = shape.spring,
       offset = distance / 2,
       angle = shape.rotation - direction;

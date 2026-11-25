@@ -21,6 +21,37 @@ async function verifyCrowdedStations() {
   const random = Math.random;
   await physics.init();
   try {
+    const bridge = {
+      entry: { x: 35, y: 7, width: 1.5, height: 1 },
+      deck: [
+        [3, 5],
+        [39, 5],
+        [39, 65],
+        [3, 65],
+      ],
+    };
+    for (const layer of [1, 2]) {
+      const layered = validateStage({
+        title: 'Layered gondola',
+        width: 40,
+        goalY: 70,
+        exitBridge: bridge,
+        entities: [{ ...device, shape: { ...device.shape, collisionLayer: layer } }],
+      });
+      for (const marbleLayer of [1, 2]) {
+        race.prepare(layered, ['rider']);
+        race.startRace([1, 1]);
+        if (marbleLayer === 2) {
+          physics.placeMarble(0, bridge.entry.x, bridge.entry.y);
+          physics.step(1 / 60);
+        }
+        physics.placeMarble(0, device.position.x, device.position.y + 0.95);
+        physics.setMarbleVelocity(0, 0, 0.5);
+        physics.step(1 / 60);
+        assert.equal(!physics.marbleBodies[0].IsEnabled(), layer === marbleLayer);
+      }
+    }
+    console.log('PASS gondolas board marbles only on their own collision layer');
     for (const count of [100, 300]) {
       for (const initial of [77, 527, 1337]) {
         let seed = initial;

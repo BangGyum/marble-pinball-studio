@@ -74,6 +74,31 @@ console.log('PASS two-step placement, invalid coordinates, stroke bounds, cancel
     }
     assert.ok(highest >= 0.25 && highest < 0.26, `upward spring hits the ceiling, highest y = ${highest}`);
     assert.ok(race.balls[0].y > 0, 'the spring-launched marble returns to the track');
+    const orbital = stages.find((map) => map.art?.style === 'orbital-lock');
+    const onDeck = { x: 32, y: 59, direction: -Math.PI / 2 };
+    const exit = orbital.exitBridge.entry;
+    for (const elevated of [false, true]) {
+      race.prepare(orbital, ['deck spring']);
+      race.startRace([1, 1]);
+      const physics = race.physics;
+      if (elevated) {
+        physics.placeMarble(0, exit.x, exit.y);
+        physics.step(1 / 60);
+      }
+      assert.equal(physics.isMarbleOnBridge(0), elevated);
+      physics.placeMarble(0, onDeck.x, onDeck.y - 0.62);
+      const device = personalSpringEntity(orbital, onDeck);
+      assert.equal(device.shape.collisionLayer, 2);
+      physics.createEntities([device]);
+      assert.ok(race.activateSpring(physics.getEntities().findIndex((e) => e.shape === device.shape)));
+      let fastest = 0;
+      for (let i = 0; i < 9; i++) {
+        physics.step(1 / 60);
+        fastest = Math.min(fastest, physics.getMarbleVelocity(0).vy);
+      }
+      assert.equal(fastest < -15, elevated, 'the visible deck spring launches only marbles on its own floor');
+    }
+    console.log('PASS personal spring on the Orbital Lock upper deck hits upper-floor marbles only');
     // Rows staged above the board enter through the one-way top, then collide on the way back.
     race.prepare(
       stage,

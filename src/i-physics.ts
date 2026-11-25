@@ -47,5 +47,6 @@ export interface IPhysics {
 
   start(): void;
 
-  step(deltaSeconds: number, beforeSubstep?: (dt: number, offset: number) => void): void;
+  // Returning false from the substep hook skips its extra wall sweep for that step.
+  step(deltaSeconds: number, beforeSubstep?: (dt: number, offset: number) => boolean | undefined): void;
 }

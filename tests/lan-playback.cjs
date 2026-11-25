@@ -239,6 +239,38 @@ movingView.playback.reset();
 movingView.playback.push(frame(0.4, 3, 'paused'), 400);
 movingView.draw(400);
 assert.equal(movingView.balls[0].onBridge, false, 'omitted bridge state clears stale upper-floor membership');
+const launcherView = new LanView(canvas);
+launcherView.setScene({
+  ...scene,
+  balls: [0, 1, 2].map((id) => ({ id, name: String(id), color: '#fff' })),
+});
+const launcherBefore = {
+  ...frame(3.8, 1),
+  balls: [
+    [0, 27.864, 20.179, 0, 0],
+    [1, 27.688, 19.674, 0, 0],
+    [2, 10, 8, 0, 0],
+  ],
+};
+const launcherAfter = {
+  ...frame(3.85, 2),
+  launcherGuides: [0],
+  balls: [
+    [0, 27.874, 20.603, 0, 0],
+    [1, 28.035, 20.129, 0, 0],
+    [2, 16, 8, 0, 0],
+  ],
+};
+launcherView.playback.sample = () => ({ before: launcherBefore, after: launcherAfter, t: 2 / 3, elapsed: 3.833 });
+launcherView.draw(200);
+const [guided, neighbour, outside] = launcherView.balls;
+assert.equal(guided.y, launcherAfter.balls[0][2]);
+assert.ok(
+  Math.hypot(guided.x - neighbour.x, guided.y - neighbour.y) >= 0.5,
+  'LAN playback must not overlap a loaded marble'
+);
+assert.equal(outside.x, 14, 'marbles outside the loading chamber still interpolate');
+console.log('PASS actual LAN launcher playback keeps the guide clear and still interpolates distant marbles');
 function cameraAt(hz) {
   const view = new LanView(canvas);
   view.setScene(scene);

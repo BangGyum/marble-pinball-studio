@@ -73,14 +73,14 @@ renderer.render = () => {
 };
 const step = game.physics.step.bind(game.physics),
   entities = game.physics.getEntities.bind(game.physics);
-game.physics.step = (dt) => {
+game.physics.step = (dt, beforeSubstep) => {
   const started = performance.now();
-  step(dt);
+  step(dt, beforeSubstep);
   if (measuring) physicsTimes.push(performance.now() - started);
 };
-game.physics.getEntities = (blend) => {
+game.physics.getEntities = (blend, snapLaunchers) => {
   if (measuring) entityReads++;
-  return entities(blend);
+  return entities(blend, snapLaunchers);
 };
 
 // Parcel dev bundles wrap modules in synchronous functions, so initialize through a Promise.

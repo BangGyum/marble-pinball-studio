@@ -14,7 +14,8 @@ export class GondolaCar {
     private cabin: Box2D.b2Body,
     private origin: VectorLike,
     private travel: VectorLike,
-    private vector: Box2D.b2Vec2
+    private vector: Box2D.b2Vec2,
+    private elevated: boolean
   ) {}
 
   remove(body: Box2D.b2Body) {
@@ -30,10 +31,10 @@ export class GondolaCar {
     this.cabin.SetTransform(this.vector, 0);
   }
 
-  step(now: number, marbles: Box2D.b2Body[]) {
+  step(now: number, marbles: Box2D.b2Body[], bridgeBodies: ReadonlySet<Box2D.b2Body>) {
     if (this.departure === undefined || now < this.departure) {
       for (const body of marbles) {
-        if (!body.IsEnabled()) continue;
+        if (!body.IsEnabled() || bridgeBodies.has(body) !== this.elevated) continue;
         const p = body.GetPosition(),
           x = p.x - this.origin.x,
           y = p.y - this.origin.y;

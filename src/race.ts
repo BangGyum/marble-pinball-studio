@@ -34,6 +34,7 @@ export type Ball = {
 };
 
 const STEP = 1 / 60;
+const ANIMAL_IMPACT_GUARD_SECONDS = 5;
 const QUEUE_TOP_LIMIT = -14.75; // Leave room for all 300 starting slots.
 const TRACK_TOP_LIMIT = 0.25; // Keep the entire marble inside the visible board.
 // Only this much improvement in depth or distance to the circular finish counts as progress.
@@ -93,6 +94,7 @@ export class Race {
   elapsed = 0;
   dolphins: DolphinSettings = { enabled: false, rows: [], interval: 5 };
   private dolphinContacts = new Set<string>();
+  private animalGuardUntil = 0;
   private dolphinNextContacts = new Set<string>();
   private mantaCaughtWaves = new Map<number, string>();
   onFinish: (winners: Ball[]) => void = () => {};
@@ -110,6 +112,7 @@ export class Race {
     this.stage = stage;
     this.dolphins = effect;
     this.dolphinContacts = new Set();
+    this.animalGuardUntil = 0;
     this.dolphinNextContacts = new Set();
     this.mantaCaughtWaves = new Map();
     this.arrivals = [];
@@ -292,7 +295,8 @@ export class Race {
     const poses = animalPoses(this.dolphins, this.stage, elapsed, dt);
     if (!poses.length) {
       this.dolphinContacts.clear();
-      if (!this.balls.some((ball) => ball.mantaCaughtAt !== undefined)) return;
+      if (!this.balls.some((ball) => !ball.rank && ball.mantaCaughtAt !== undefined))
+        return elapsed < this.animalGuardUntil;
     }
     for (const ball of this.balls) {
       if (ball.rank) continue;
@@ -337,10 +341,15 @@ export class Race {
         if (!contact) continue;
         // Restitution happens once; inward motion is constrained throughout contact.
         if (contact.hit || alreadyHit) touching.add(key);
-        if (contact.hit) this.physics.setMarbleVelocity(ball.id, contact.vx, contact.vy);
+        if (contact.hit) {
+          this.physics.setMarbleVelocity(ball.id, contact.vx, contact.vy);
+          // Momentum can carry the marble into a wall after the wave leaves.
+          this.animalGuardUntil = elapsed + ANIMAL_IMPACT_GUARD_SECONDS;
+        }
       }
     }
     this.dolphinNextContacts = this.dolphinContacts;
     this.dolphinContacts = touching;
+    return true;
   }
 }

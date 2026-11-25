@@ -4,6 +4,7 @@ import {
   springHasExpired,
   personalSpringExtension,
   personalSpringShape,
+  springCollisionLayer,
   validatePersonalSpring,
   type PlacedSpring,
   type SpringPlacement,
@@ -54,9 +55,10 @@ export class PersonalSpringPlacement {
     );
     return placement;
   }
-  draw(ctx: CanvasRenderingContext2D, scale: number, springs: PlacedSpring[], elapsed: number) {
+  draw(ctx: CanvasRenderingContext2D, scale: number, springs: PlacedSpring[], elapsed: number, layer?: 1 | 2) {
     if (!this.stage || !this.pointer) return;
     const origin = this.origin ?? this.pointer;
+    if (layer !== undefined && springCollisionLayer(this.stage, origin) !== layer) return;
     const placement = {
       ...origin,
       direction: this.origin ? Math.atan2(this.pointer.y - origin.y, this.pointer.x - origin.x) : -Math.PI / 2,
@@ -98,7 +100,8 @@ export function drawPlacedSprings(
   elapsed: number,
   finished: boolean,
   view: ViewBounds,
-  dpr = 1
+  dpr = 1,
+  deck?: { stage: StageDef; layer: 1 | 2 }
 ) {
   let painting = false;
   for (const spring of springs) {
@@ -109,7 +112,8 @@ export function drawPlacedSprings(
       spring.x < view.left - 3 ||
       spring.x > view.right + 3 ||
       spring.y < view.top - 3 ||
-      spring.y > view.bottom + 3
+      spring.y > view.bottom + 3 ||
+      (deck && springCollisionLayer(deck.stage, spring) !== deck.layer)
     )
       continue;
     if (!painting) {

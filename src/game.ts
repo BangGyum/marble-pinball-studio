@@ -22,6 +22,7 @@ import { SeaAnimalRenderer as DolphinRenderer } from './sea-animal-render';
 import type { AnimalKind } from './sea-animals';
 import { DolphinDrag } from './dolphin-drag';
 import type { MapEntityState } from './types/map-entity';
+import { updateLauncherDrawing, type LauncherDrawing } from './launcher-drawing';
 export type { Ball } from './race';
 export class Game extends Race {
   private reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : undefined;
@@ -60,7 +61,7 @@ export class Game extends Race {
   private renderCache = new RenderCache();
   private renderResolution = new RenderResolution();
   private marbleElasticity = new MarbleElasticity();
-  private launcherDrawing?: { snap: Set<number>; round: Set<number> };
+  private launcherDrawing?: LauncherDrawing;
   private springControls: SpringControls;
   private dolphinRenderer = new DolphinRenderer();
   private dolphinDrag: DolphinDrag;
@@ -416,42 +417,7 @@ export class Game extends Race {
       return;
     }
     this.launcherDrawing ??= { snap: new Set(), round: new Set() };
-    const drawing = this.launcherDrawing;
-    drawing.snap.clear();
-    drawing.round.clear();
-    for (const id of guideIds) {
-      const guide = this.balls[id];
-      if (!guide || guide.rank) continue;
-      const previousX = guide.px ?? guide.x,
-        previousY = guide.py ?? guide.y;
-      const nearby = [id];
-      let overlap = false;
-      for (const ball of this.balls) {
-        if (ball === guide || ball.rank || ball.onBridge !== guide.onBridge) continue;
-        const x0 = (ball.px ?? ball.x) - previousX,
-          y0 = (ball.py ?? ball.y) - previousY,
-          x1 = ball.x - guide.x,
-          y1 = ball.y - guide.y;
-        const dx = x1 - x0,
-          dy = y1 - y0;
-        const length = dx * dx + dy * dy;
-        const t = length > 0 ? Math.max(0, Math.min(1, -(x0 * dx + y0 * dy) / length)) : 0;
-        const closest = (x0 + dx * t) ** 2 + (y0 + dy * t) ** 2;
-        // Include balls that could reach the guide after it switches to the current step.
-        const nearCurrent =
-          Math.min(ball.px ?? ball.x, ball.x) <= guide.x + 0.6 &&
-          Math.max(ball.px ?? ball.x, ball.x) >= guide.x - 0.6 &&
-          Math.min(ball.py ?? ball.y, ball.y) <= guide.y + 0.6 &&
-          Math.max(ball.py ?? ball.y, ball.y) >= guide.y - 0.6;
-        if (closest < 0.6 ** 2 || nearCurrent) nearby.push(ball.id);
-        // Allow float32 rounding at contact. A straight blend can cut through a curved separation.
-        if (closest < 0.4999 ** 2) overlap = true;
-      }
-      for (const id of nearby) {
-        drawing.round.add(id);
-        if (overlap) drawing.snap.add(id);
-      }
-    }
+    updateLauncherDrawing(this.launcherDrawing, guideIds, this.balls);
   }
 
   private render() {

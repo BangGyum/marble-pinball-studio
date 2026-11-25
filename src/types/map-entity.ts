@@ -68,6 +68,7 @@ export interface MapEntity {
 }
 
 export interface MapEntityState {
+  launcherPart?: boolean;
   x: number;
   y: number;
   angle: number;

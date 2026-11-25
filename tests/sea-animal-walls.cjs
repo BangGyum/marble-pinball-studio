@@ -35,6 +35,45 @@ const open = (entities) => ({ title: 'Animal wall regression', width: 40, goalY:
     B = physics.Box2D,
     random = Math.random;
   try {
+    const zone = open([
+      {
+        position: { x: 0, y: 0 },
+        type: 'static',
+        shape: edge([
+          [2, 24],
+          [18, 24],
+        ]),
+        props,
+      },
+    ]);
+    const rows = [60];
+    race.prepare(zone, ['quiet wave'], {
+      enabled: false,
+      rows,
+      interval: 20,
+      manta: { enabled: true, rows, interval: 20 },
+    });
+    race.startRace([1, 1]);
+    const guard = physics.guardMapCrossings;
+    let sweeps = 0;
+    physics.guardMapCrossings = function () {
+      sweeps++;
+      return guard.call(this);
+    };
+    try {
+      race.advance();
+      assert.ok(sweeps > 0, 'wall sweep protects the active wave');
+      sweeps = 0;
+      race.elapsed = 6;
+      race.advance();
+      assert.equal(sweeps, 0, 'an empty interval without recent impacts needs no extra wall sweep');
+      race.animalGuardUntil = 8;
+      race.advance();
+      assert.ok(sweeps > 0, 'recent animal momentum still has wall protection');
+    } finally {
+      physics.guardMapCrossings = guard;
+    }
+
     for (const direction of [-1, 1]) {
       physics.clearMarbles();
       physics.clear();

@@ -14,6 +14,7 @@ import { drawMantaPenalty } from '../manta-penalty';
 import { Recorder } from '../recorder';
 import { toast } from '../ui';
 import { SnapshotPlayback } from './playback';
+import { updateLauncherDrawing, type LauncherDrawing } from '../launcher-drawing';
 import type { Scene, Frame, SpringLayout } from './protocol';
 import type { Ball } from '../race';
 import type { StageDef } from '../data/maps';
@@ -44,6 +45,7 @@ export class LanView {
   private placedSprings: PlacedSpring[] = [];
   private springElapsed = 0;
   private displayedElapsed = 0;
+  private launcherInterval?: { before: Frame; after: Frame; drawing: LauncherDrawing };
   springConnected = false;
   private springView = { x: 0, y: 0, scale: 1 };
   private placementDrag?: {
@@ -588,6 +590,30 @@ export class LanView {
     }
     return positions;
   }
+  private launcherDrawing(before: Frame, after: Frame) {
+    if (!before.launcherGuides?.length && !after.launcherGuides?.length) {
+      this.launcherInterval = undefined;
+      return;
+    }
+    if (this.launcherInterval?.before === before && this.launcherInterval.after === after)
+      return this.launcherInterval.drawing;
+    const drawing = this.launcherInterval?.drawing ?? { snap: new Set<number>(), round: new Set<number>() };
+    const guides = [...new Set([...(before.launcherGuides ?? []), ...(after.launcherGuides ?? [])])];
+    const elevated = new Set(after.bridgeIds);
+    const positions = after.balls.map(([id, x, y, , rank], i) => ({
+      id,
+      x,
+      y,
+      rank,
+      onBridge: elevated.has(id),
+      px: before.balls[i][1],
+      py: before.balls[i][2],
+    }));
+    // The server rounds positions to three decimal places.
+    updateLauncherDrawing(drawing, guides, positions, 0.4985);
+    this.launcherInterval = { before, after, drawing };
+    return drawing;
+  }
   private draw(now: number) {
     const { width: w, height: h, scene } = this;
     const ctx = this.ctx;
@@ -626,15 +652,17 @@ export class LanView {
       this.drainCueDone = true;
       if (!this.reducedMotion?.matches) this.drainCueAt = now;
     }
+    const launcherDrawing = this.launcherDrawing(before, after);
     after.balls.forEach((_, i) => {
       const a = before.balls[i],
         b = after.balls[i],
         ball = this.balls[i];
-      ball.x = mix(a[1], b[1]);
-      ball.y = mix(a[2], b[2]);
-      ball.angle = mix(a[3], b[3]);
+      const snap = launcherDrawing?.snap.has(b[0]);
+      ball.x = snap ? b[1] : mix(a[1], b[1]);
+      ball.y = snap ? b[2] : mix(a[2], b[2]);
+      ball.angle = snap ? b[3] : mix(a[3], b[3]);
       ball.rank = (t >= 1 ? b[4] : a[4]) || undefined;
-      ball.onBridge = bridgeIds.has(a[0]);
+      ball.onBridge = snap ? (after.bridgeIds?.includes(b[0]) ?? false) : bridgeIds.has(a[0]);
       ball.mantaCaughtAt = undefined;
     });
     for (const [id, caughtAt] of shown.mantaCaptures ?? []) {
@@ -672,9 +700,10 @@ export class LanView {
       const a = beforePositions.get(i),
         b = afterPositions.get(i),
         origin = scene.entities[i];
-      entity.x = mix(a?.[0] ?? origin.x, b?.[0] ?? origin.x);
-      entity.y = mix(a?.[1] ?? origin.y, b?.[1] ?? origin.y);
-      entity.angle = mix(before.angles[i], after.angles[i]);
+      const snap = entity.launcherPart && launcherDrawing?.snap.size;
+      entity.x = snap ? (b?.[0] ?? origin.x) : mix(a?.[0] ?? origin.x, b?.[0] ?? origin.x);
+      entity.y = snap ? (b?.[1] ?? origin.y) : mix(a?.[1] ?? origin.y, b?.[1] ?? origin.y);
+      entity.angle = snap ? after.angles[i] : mix(before.angles[i], after.angles[i]);
     });
     ctx.save();
     ctx.translate(w * 0.56 - cam.x * scale, h * 0.43 - cam.y * scale);
@@ -706,6 +735,23 @@ export class LanView {
       }
     }
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
+    if (scene.stage.exitBridge) {
+      drawPlacedSprings(
+        ctx,
+        this.placedSprings,
+        this.personalSpring?.id,
+        scale,
+        elapsed,
+        shown.state === 'finished',
+        view,
+        dpr,
+        {
+          stage: scene.stage,
+          layer: 1,
+        }
+      );
+      this.springPlacement?.draw(ctx, scale, this.placedSprings, this.springElapsed, 1);
+    }
     drawMapOverlay(ctx, scene.stage, entities, scale, true, view, elapsed);
     if (scene.stage.art?.style === 'reversal-ladder')
       drawEntities(
@@ -726,9 +772,16 @@ export class LanView {
       elapsed,
       shown.state === 'finished',
       view,
-      dpr
+      dpr,
+      scene.stage.exitBridge ? { stage: scene.stage, layer: 2 } : undefined
     );
-    this.springPlacement?.draw(ctx, scale, this.placedSprings, this.springElapsed);
+    this.springPlacement?.draw(
+      ctx,
+      scale,
+      this.placedSprings,
+      this.springElapsed,
+      scene.stage.exitBridge ? 2 : undefined
+    );
     if (this.state === 'ready') {
       if (this.dolphinPreview) {
         this.dolphinRenderer.guides(ctx, scene.stage, this.dolphins, scale);
@@ -779,16 +832,17 @@ export class LanView {
         ctx.stroke();
       }
       ctx.globalAlpha = bridgeBallOpacity(scene.stage, ball);
-      const squash =
-        drawMantaPenalty(
-          ctx,
-          ball.x,
-          ball.y,
-          ball.mantaCaughtAt,
-          elapsed,
-          scale,
-          this.reducedMotion?.matches ?? false
-        ) ?? this.marbleElasticity.effect(ball.id, now, this.reducedMotion?.matches ?? false);
+      const squash = launcherDrawing?.round.has(ball.id)
+        ? undefined
+        : (drawMantaPenalty(
+            ctx,
+            ball.x,
+            ball.y,
+            ball.mantaCaughtAt,
+            elapsed,
+            scale,
+            this.reducedMotion?.matches ?? false
+          ) ?? this.marbleElasticity.effect(ball.id, now, this.reducedMotion?.matches ?? false));
       if (!this.cache.drawBall(ctx, ball, scale, dpr, ball.x, ball.y, squash)) {
         drawMarble(ctx, ball.x, ball.y, 0.25, ball.color, squash);
         drawMarbleLabel(ctx, ball.name, ball.color, ball.x, ball.y, scale);

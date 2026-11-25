@@ -36,7 +36,6 @@ type PhysicsEntity = {
   spinCycle?: MapEntity['props']['spinCycle'];
   spin: number;
   translates: boolean;
-  launcherPart?: boolean;
   sweepPose?: {
     x: number;
     y: number;
@@ -63,6 +62,7 @@ type Launcher = {
   loaded?: { body: Box2D.b2Body; at: number; x: number; y: number; id?: number };
 };
 const MARBLE_RADIUS = 0.25;
+const DENSE_FIELD_SIZE = 64;
 // Leave a small margin when recovering onto a hit face.
 const SWEEP_CLEARANCE = 0.255;
 const RECOVERY_DIRECTIONS = Array.from({ length: 128 }, (_, i) => [
@@ -365,7 +365,7 @@ export class Box2dPhysics implements IPhysics {
       };
       this.entities.push(state);
       if (s.type === 'polyline' && s.gondola)
-        this.gondolas.push(new GondolaCar(body, entity.position, s.gondola, this.vector));
+        this.gondolas.push(new GondolaCar(body, entity.position, s.gondola, this.vector, s.collisionLayer === 2));
       this.entityBodies.set(B.getPointer(body), state);
       if (state.moving) {
         state.sweepRadius =
@@ -518,7 +518,7 @@ export class Box2dPhysics implements IPhysics {
         y = this.previousY[i] + (y - this.previousY[i]) * blend;
         angle = previous[i * 2 + 1] + (angle - previous[i * 2 + 1]) * blend;
       }
-      return { x, y, angle, shape: e.shape, life: e.life };
+      return { x, y, angle, shape: e.shape, life: e.life, ...(e.launcherPart ? { launcherPart: true } : {}) };
     });
   }
   private recordPoses() {
@@ -736,9 +736,8 @@ export class Box2dPhysics implements IPhysics {
     return true;
   }
   start() {
-    // Preserve the established device motion for smaller races. Select once at kickoff so
-    // the last marbles keep the same physics as the rest of the field.
-    if (this.reinforcedWalls && this.marbleBodies.length >= 100) this.collisionSubsteps = 4;
+    // Use the guarded four-step solver for dense fields; smaller races retain tuned device timing.
+    if (this.reinforcedWalls && this.marbleBodies.length >= DENSE_FIELD_SIZE) this.collisionSubsteps = 4;
     for (const body of Object.values(this.marbleMap)) {
       if (this.randomizeStart) {
         this.vector.Set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 2);
@@ -1025,7 +1024,7 @@ export class Box2dPhysics implements IPhysics {
       body.SetLinearVelocity(this.vector);
     }
   }
-  step(seconds: number, beforeSubstep?: (dt: number, offset: number) => void) {
+  step(seconds: number, beforeSubstep?: (dt: number, offset: number) => boolean | undefined) {
     this.recordPoses();
     const bodies = this.marbleBodies;
     if (this.launchers.some(({ gate, waiting, loaded }) => waiting || (gate && !loaded)))
@@ -1135,9 +1134,9 @@ export class Box2dPhysics implements IPhysics {
             e.spinCycle.idleSpeed + (e.spin - e.spinCycle.idleSpeed) * rotorPower(e.spinCycle, this.motionTime)
           );
         }
-      beforeSubstep?.(dt, i * dt);
-      // Check the short solver path: a full-frame chord can skip a thin wall under pressure.
-      const guard = !!beforeSubstep && this.entities.length > 0;
+      const needsSweep = beforeSubstep?.(dt, i * dt);
+      // Check the short solver path while the effect is present or its impulse still needs protection.
+      const guard = !!beforeSubstep && needsSweep !== false && this.entities.length > 0;
       const bubbleCapturing = this.bubbleRide?.needsSweep(this.motionTime, dt) ?? false;
       if (guard || bubbleCapturing || reinforced) this.recordSweep(guard);
       this.world.Step(dt, 8, substeps === 4 ? 4 : 8);
@@ -1147,6 +1146,7 @@ export class Box2dPhysics implements IPhysics {
       this.bubbleRide?.step(this.motionTime, dt, bodies, this.sweepPositions, MARBLE_RADIUS, bubbleCapturing);
       if (this.exitBridge) {
         for (const body of bodies) {
+          if (!body.IsEnabled()) continue;
           const elevated = this.bridgeBodies.has(body);
           if (elevated && !this.exitBridge.transfers?.length) continue;
           const p = body.GetPosition();
@@ -1211,7 +1211,7 @@ export class Box2dPhysics implements IPhysics {
       }
     }
     if (this.launchers.length) this.stepLaunchers(seconds);
-    for (const car of this.gondolas) car.step(this.motionTime, bodies);
+    for (const car of this.gondolas) car.step(this.motionTime, bodies, this.bridgeBodies);
     if (this.broken.size) {
       for (let i = this.entities.length - 1; i >= 0; i--) {
         const e = this.entities[i];

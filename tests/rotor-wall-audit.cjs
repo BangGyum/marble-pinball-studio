@@ -73,10 +73,10 @@ function inside(x, y) {
     points.forEach(([x, y], i) => {
       p.createMarble(i, x, y);
     });
-    // Select the large-race solver at kickoff, then isolate the marbles at the paddles.
-    for (let id = points.length; id < 100; id++) p.createMarble(id, 13, -10);
+    // Start below the old 100-marble cutoff, then isolate the containment cases.
+    for (let id = points.length; id < 99; id++) p.createMarble(id, 13, -10);
     p.start();
-    for (let id = points.length; id < 100; id++) p.removeMarble(id);
+    for (let id = points.length; id < 99; id++) p.removeMarble(id);
     const done = new Set();
     for (let t = 0; t < 3600 && done.size < points.length; t++) {
       p.step(1 / 60);
