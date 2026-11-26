@@ -39,7 +39,7 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
   listener.EndContact = listener.PreSolve = listener.PostSolve = () => {};
   physics.world.SetContactListener(listener);
   try {
-    for (const count of [1, 8, 20, 40, 300]) {
+    for (const count of [1, 8, 20, 40, 100, 300]) {
       let direct = 0,
         bank = 0,
         total = 0,
@@ -62,7 +62,7 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
           Object.entries(physics.marbleMap).map(([id, body]) => [box.getPointer(body), Number(id)])
         );
         const clearedFeed = new Set();
-        const timeLimit = count === 300 ? 370 : 155;
+        const timeLimit = count === 300 ? 265 : count === 100 ? 125 : 155;
         while (race.state === 'running' && race.elapsed < timeLimit) {
           const launcher = physics.launchers[0],
             held = launcher.loaded?.body;
@@ -89,7 +89,7 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
           }
         }
         if (count === 300) assert.ok(clearedFeed.size >= 195, 'crowded marbles keep flowing through the upper ramps');
-        assert.equal(race.finishReason, 'arrived');
+        assert.equal(race.finishReason, 'arrived', count + ' marbles must finish within ' + timeLimit + 's');
         assert.equal(race.rescues, 0, 'even misses must return under their own physics');
         assert.equal(shots.size, count, 'all marbles must use the launcher');
         for (const shot of shots.values()) {

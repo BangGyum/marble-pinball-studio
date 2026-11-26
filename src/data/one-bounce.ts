@@ -13,6 +13,8 @@ const rail = (points: Point[], color: string): MapEntity => {
   return entity;
 };
 const launcher = marbleLauncher(28, 21.5, 'funnel');
+// Keep the upper arc below the feed ramp.
+launcher.props.oscillation!.amplitude = 0.265;
 const funnel = launcherFunnel(launcher.position);
 
 const enclosure = rail(
@@ -25,17 +27,17 @@ const enclosure = rail(
   returnRail
 );
 
-// Keep the left edge clear of marbles falling out of the feed ramp before a shot.
+// Catch low shots while leaving falling feed marbles clear of the pad.
 export const reboundPad: MapEntity = {
   type: 'static',
-  position: { x: 13.45, y: 22.5 },
-  shape: { type: 'box', width: 2.45, height: 0.23, rotation: 0.03, color: '#65efda' },
-  props: { density: 1, restitution: 1.55, angularVelocity: 0 },
+  position: { x: 14.9, y: 21.32 },
+  shape: { type: 'box', width: 3.05, height: 0.23, rotation: 0.08, color: '#65efda' },
+  props: { density: 1, restitution: 1.42, angularVelocity: 0 },
 };
 export const oneBounce: StageDef = {
   title: '원바운드 샷',
   width: 34,
-  spawnX: 6.2,
+  spawnX: 7.2,
   goalY: 40,
   zoomY: 35,
   randomizeStart: true,
@@ -45,21 +47,20 @@ export const oneBounce: StageDef = {
     enclosure,
     rail([...curve([0.8, 17], [0.9, 18.83], [2.65, 19.17], [2.65, 22]), [2.65, 40]], cup),
     rail([...curve([7.2, 19.7], [6.86, 20.39], [4.5, 20.7], [4.05, 22]), [4.05, 40]], cup),
-    // The crescent openings leave room for several marbles to drain side by side.
-    rail(curve([0.8, 3.15], [2.6, 5.7], [3.9, 6.1], [6.15, 6.85]), feed),
-    rail(curve([8.55, 6.77], [9.2, 6.4], [9.75, 6.13], [10.15, 5.4]), feed),
-    rail(curve([5.15, 7.75], [6.45, 9], [8, 9.3], [9.75, 10]), feed),
-    rail(curve([13.55, 9.94], [14.05, 9.55], [14.8, 9.15], [15.25, 8.75]), feed),
+    // The two lips meet the starting grid at the same height.
+    rail(curve([0.8, 3.1], [2.15, 4.65], [3.5, 6.2], [5.9, 7.05]), feed),
+    rail([[13.6, -21], [13.6, 3.1], ...curve([13.6, 3.1], [12.25, 4.65], [10.9, 6.2], [8.5, 7.05]).slice(1)], feed),
     rail(
       [
         ...curve([0.8, 8.2], [3.1, 9.1], [6.8, 10.2], [8.5, 10.66]),
         ...curve([8.5, 10.66], [11, 11.3], [13.8, 12.55], [17, 13.4]).slice(1),
-        ...curve([17, 13.4], [19, 13.88], [20.05, 14.22], [21.4, 15.18]).slice(1),
+        // A continuous descent into the funnel avoids a pocket between overlapping rails.
+        ...curve([17, 13.4], [19.25, 13.85], [22.75, 15.5], [24.7, 17.1]).slice(1),
+        ...funnel.left,
       ],
       feed
     ),
-    rail([...curve([24.6, 15.13], [25.1, 14.85], [25.6, 14.7], [26.15, 15.6]), [27.45, 17.9]], feed),
-    rail([[19.25, 15.75], [24.5, 17.35], ...funnel.left], feed),
+    rail([...curve([24.15, 14.45], [24.85, 14.58], [25.48, 14.84], [26.15, 15.6]), [27.45, 17.9]], feed),
     {
       type: 'kinematic',
       position: { x: 16.6, y: 11.62 },
@@ -90,6 +91,10 @@ export const oneBounce: StageDef = {
     ),
   ],
   windZones: [
+    // Carry loose marbles down the shallow rail before turning them into the throat.
+    { type: 'directional', x: 8, y: 9.7, width: 5.6, height: 2.2, velocityX: 6, velocityY: 2.4, strength: 2.4 },
+    { type: 'directional', x: 13, y: 11.55, width: 5, height: 2.1, velocityX: 6.4, velocityY: 2.75, strength: 2.6 },
+    { type: 'directional', x: 28.5, y: 18.55, width: 3.4, height: 2.4, velocityX: -2, velocityY: 4.5, strength: 4.8 },
     { type: 'directional', x: 32, y: 25.85, width: 2.9, height: 21.8, velocityX: 0, velocityY: -10, strength: 6 },
     { type: 'directional', x: 30.95, y: 15.6, width: 5.4, height: 4.8, velocityX: -7, velocityY: 0, strength: 6 },
   ],
