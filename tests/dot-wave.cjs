@@ -41,7 +41,10 @@ async function main() {
   const auditSeed = Math.imul(121, 0x9e3779b9) >>> 0;
   try {
     for (const count of [100, 300]) {
-      for (const seed of [11, 37, 79, 127, 193, auditSeed]) {
+      const seeds = [11, 37, 79, 127, 193, auditSeed];
+      // This seed previously held a 300-marble pack at the second right-side bend.
+      if (count === 300) seeds.push(2329671447);
+      for (const seed of seeds) {
         shakes = 0;
         let state = seed;
         Math.random = () => {
@@ -57,6 +60,7 @@ async function main() {
         const anchors = race.balls.map((b) => ({ x: b.x, y: b.y, at: 0 }));
         const atMidfield = [];
         let longest = 0;
+        let rightDelay = 0;
         while (race.state === 'running' && race.elapsed < 90) {
           race.advance();
           for (const b of race.balls) {
@@ -68,7 +72,9 @@ async function main() {
               a.y = b.y;
               a.at = race.elapsed;
             }
-            longest = Math.max(longest, race.elapsed - a.at);
+            const delay = race.elapsed - a.at;
+            longest = Math.max(longest, delay);
+            if (a.x >= 32 && a.y >= 28 && a.y < 46) rightDelay = Math.max(rightDelay, delay);
           }
         }
         const label = count + ' marbles, seed ' + seed;
@@ -92,6 +98,7 @@ async function main() {
         const leaderX = atMidfield[race.arrivals[0].id];
         assert.ok(leaderX >= 3.8 && leaderX < 34.2, label + ': the winner should pass through the waves');
         assert.ok(longest < 3, label + ': a marble should clear the pins on its own');
+        if (count === 300) assert.ok(rightDelay < 1.2, label + ': marbles should clear the right bends promptly');
       }
     }
   } finally {

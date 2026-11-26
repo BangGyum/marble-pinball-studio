@@ -22,9 +22,14 @@ function pin(x: number, y: number, radius = pinRadius, bumper = false): MapEntit
 
 type Point = [number, number];
 const leftBank: Point[] = [[0.8, -20]];
-// Bring marbles off the outer rail before they can skip the waves.
-for (const y of [22, 34, 46, 57]) {
-  leftBank.push([0.8, y - 4], [6.2, y - 0.8], [6.7, y + 0.5], [6.35, y + 1.9], [0.8, y + 5]);
+// Gradual entries divert the pack inward without collecting it at a sharp bend.
+for (const y of [22, 34, 46, 58]) {
+  const crest = y + 0.55;
+  const entryY = Math.max(y - 7.4, leftBank.at(-1)![1] + 0.1);
+  leftBank.push(
+    ...curve([0.8, entryY], [0.8, y - 4.8], [6.5, crest - 2.55], [6.5, crest]),
+    ...curve([6.5, crest], [6.5, crest + 1.45], [0.8, y + 4.5], [0.8, y + 5.3]).slice(1)
+  );
 }
 leftBank.push([0.8, 64]);
 const reflect = ([x, y]: Point): Point => [width - x, y];
@@ -50,27 +55,32 @@ const pins: MapEntity[] = [];
 // Slight offsets and narrower pins keep the starting pack from stacking in straight columns.
 for (let row = 0; row < 6; row++) {
   for (let col = 0; col <= row + 2; col++) {
+    // Open the middle at the mouth and catch marbles on both shoulders.
+    if (row === 0 && col === 1) continue;
     const x = center + (col - (row + 2) / 2) * 2.16;
     const offset = Math.sin(x * 1.2 + (8 + row * 1.85) * 0.4) * 0.33;
-    pins.push(pin(x + offset, 8.2 + row * 1.95, 0.18));
+    const spread = row === 0 ? Math.sign(x - center) * 0.72 : 0;
+    pins.push(pin(x + offset + spread, 8.2 + row * 1.95, row === 0 ? 0.34 : 0.18));
   }
 }
 
 for (let row = 0; row < 12; row++) {
   for (let col = 0; col < 16; col++) {
+    const belowFanCenter = row === 0 && col === 8;
     const x = 2.1 + (col + (row % 2) / 2) * 2.12;
     const y = 20.8 + row * 2.35 + 1.55 * Math.sin(x * 0.24 + row * 0.35);
     // Two curved gaps give the crowded middle of the wave room to pass.
-    const lane = 4.8 + 1.6 * Math.sin((y - 20) * 0.21);
+    const lane = 4 + 1.5 * Math.sin((y - 20) * 0.21);
     // Give marbles rebounding off the side bumpers an open landing below them.
     const landing = y > 44 && y < 46 && Math.abs(Math.abs(x - center) - 9.6) < 0.5;
     if (
       !landing &&
-      Math.abs(Math.abs(x - center) - lane) > 1.25 &&
+      Math.abs(Math.abs(x - center) - lane) > 1.45 &&
       clearsBank(x, y) &&
       bumpers.every(([bx, by]) => Math.hypot(x - bx, y - by) > 2.65)
     )
-      pins.push(pin(x, y));
+      // Offset the first center pin to give marbles room to separate after the fan.
+      pins.push(belowFanCenter ? pin(x - 0.53, y + 0.68, 0.19) : pin(x, y));
   }
 }
 for (const [x, y] of bumpers) pins.push(pin(x, y, 1.05, true));
