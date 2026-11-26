@@ -22,7 +22,7 @@ import type { MapEntityState } from './types/map-entity';
 import type { ViewBounds } from './art-visibility';
 
 export function usesGlassRails(stage: StageDef) {
-  return !!stage.art && stage.art.style !== 'one-bounce';
+  return !!stage.art && stage.art.style !== 'one-bounce' && stage.art.style !== 'dot-wave';
 }
 
 // Draw the elevated exit after the ground-level rings, including on both minimaps.
@@ -112,6 +112,18 @@ export function drawMapArt(
 ) {
   if (stage.bubbleMine) drawMineRail(ctx, stage.bubbleMine);
   if (!stage.art) return;
+  if (stage.art.style === 'dot-wave') {
+    const contour = stage.art.contours[0];
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(...contour[0]);
+    for (let i = 1; i < contour.length; i++) ctx.lineTo(...contour[i]);
+    ctx.closePath();
+    ctx.fillStyle = sceneColor('#10232f');
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
   if (stage.art.style === 'tidal-locks') {
     drawCanalMarks(ctx, stage, scale);
     return;

@@ -16,6 +16,11 @@ import { MapTransition } from './map-transition';
 import { getSceneTheme, sceneColor } from './scene-theme';
 
 const details: Record<string, [string, string, string]> = {
+  '도트 파도': [
+    '물결 핀 · 범퍼',
+    '민트색 핀과 금색 범퍼 사이를 지나요. 굽은 측벽은 구슬을 안쪽으로 돌려보내고, 하단은 핀 간격이 넓어요.',
+    '#64f4e0',
+  ],
   '밀물 갑문': [
     '수차 · 점프',
     '섬 아래 급류로 추월하고 폭포 수차를 통과하세요. 마지막 점프는 배수구와 움직이는 착지대로 갈려요.',

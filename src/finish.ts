@@ -1,7 +1,6 @@
 import type { StageDef } from './stage-def';
 import type { Ball } from './race';
 import { sceneColor } from './scene-theme';
-import { drawBounceStairsFinish } from './bounce-stairs-art';
 
 type Point = { x: number; y: number };
 
@@ -42,7 +41,11 @@ export function drawGoalArea(
   scale: number
 ) {
   const goal = stage.goalArea;
-  if (!goal) return stage.art?.style === 'bounce-stairs' && drawBounceStairsFinish(ctx, stage, scale);
+  if (!goal)
+    return (
+      (stage.art?.style === 'bounce-stairs' || stage.art?.style === 'dot-wave') &&
+      drawCheckeredFinish(ctx, stage, scale)
+    );
   ctx.save();
   ctx.shadowBlur = 0;
   ctx.setLineDash([]);
@@ -69,6 +72,52 @@ export function drawGoalArea(
     ctx.textBaseline = 'middle';
     ctx.font = `${Math.min(goal.radius * 0.45, 12 / scale)}px system-ui`;
     ctx.fillText('GOAL', goal.x, goal.y);
+  }
+  ctx.restore();
+  return true;
+}
+
+function drawCheckeredFinish(
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
+  stage: StageDef,
+  scale: number
+) {
+  const contour = stage.art!.contours[0];
+  const y = stage.goalY;
+  let left = Infinity,
+    right = -Infinity;
+  for (let i = 0, j = contour.length - 1; i < contour.length; j = i++) {
+    const [ax, ay] = contour[j],
+      [bx, by] = contour[i];
+    if (ay > y === by > y) continue;
+    const x = ax + ((y - ay) * (bx - ax)) / (by - ay);
+    left = Math.min(left, x);
+    right = Math.max(right, x);
+  }
+  if (left >= right) return false;
+
+  ctx.save();
+  ctx.shadowBlur = 0;
+  const columns = stage.art?.style === 'dot-wave' ? 32 : 10;
+  const cell = (right - left) / columns;
+  for (let row = 0; row < 2; row++)
+    for (let col = 0; col < columns; col++) {
+      ctx.fillStyle = sceneColor((row + col) % 2 ? '#17212b' : '#e8faf3');
+      ctx.fillRect(left + col * cell, y - 2 * cell + row * cell, cell, cell);
+    }
+  ctx.strokeStyle = sceneColor('#65efda');
+  ctx.lineWidth = 2 / scale;
+  ctx.setLineDash([0.35, 0.3]);
+  ctx.beginPath();
+  ctx.moveTo(left, y);
+  ctx.lineTo(right, y);
+  ctx.stroke();
+  if ((right - left) * scale >= 48) {
+    ctx.fillStyle = sceneColor('#65efda');
+    ctx.font = `${12 / scale}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('FINISH', (left + right) / 2, y - 2 * cell);
   }
   ctx.restore();
   return true;

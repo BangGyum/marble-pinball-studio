@@ -22,6 +22,7 @@ export const mapPlayKeys = {
   lastGondola: 'last-gondola',
   tidalLocks: 'tidal-locks',
   bubbleMine: 'bubble-mine',
+  dotWave: 'dot-wave',
   launcherLab: 'launcher-lab',
   seesawValley: 'seesaw-valley',
 } as const;

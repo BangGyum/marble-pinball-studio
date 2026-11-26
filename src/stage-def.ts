@@ -20,6 +20,7 @@ export const ART_STYLES = [
   'orbiting-gate',
   'one-bounce',
   'tidal-locks',
+  'dot-wave',
 ] as const;
 
 type BridgeArea = { x: number; y: number; width: number; height: number };

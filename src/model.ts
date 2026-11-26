@@ -116,7 +116,7 @@ export function validateStage(value: unknown): StageDef {
       !(ART_STYLES as readonly string[]).includes(s.art.style) ||
       !Array.isArray(s.art.contours) ||
       (s.art.contours.length === 0 &&
-        ['crossway', 'fracture-canyon', 'bounce-stairs', 'orbiting-gate'].includes(s.art.style)) ||
+        ['crossway', 'fracture-canyon', 'bounce-stairs', 'orbiting-gate', 'dot-wave'].includes(s.art.style)) ||
       s.art.contours.length > 20 ||
       s.art.contours.some(
         (points) =>

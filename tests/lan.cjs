@@ -175,13 +175,13 @@ async function connect(port, cookie, options = {}) {
       'UTF-8 message size is rejected before opening a pending request'
     );
     assert.equal(app.info().maps.find((map) => map.id === 0).title, '네온 잭팟');
-    assert.equal(app.info().maps.length, 21);
+    assert.equal(app.info().maps.length, 22);
     assert.deepEqual(
       app
         .info()
         .maps.slice(0, 3)
         .map((map) => map.title),
-      ['방울 광산선', '밀물 갑문', '막차 곤돌라']
+      ['도트 파도', '방울 광산선', '밀물 갑문']
     );
     const hiddenTitles = [
       '네온 모래시계',
@@ -501,6 +501,7 @@ async function connect(port, cookie, options = {}) {
       '막차 곤돌라',
       '밀물 갑문',
       '방울 광산선',
+      '도트 파도',
     ]) {
       // Keep independent map scenarios below the real server's 30 commands/second limit.
       await delay(1050);
