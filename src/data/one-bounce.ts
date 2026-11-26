@@ -1,4 +1,4 @@
-import { funnelSide, launcherFunnel, marbleLauncher } from '../marble-launcher';
+import { launcherFunnel, marbleLauncher } from '../marble-launcher';
 import type { StageDef } from '../stage-def';
 import type { MapEntity } from '../types/map-entity';
 import { curve, wall } from './wind-map-shapes';
@@ -13,9 +13,22 @@ const rail = (points: Point[], color: string): MapEntity => {
   return entity;
 };
 const launcher = marbleLauncher(28, 21.5, 'funnel');
-// Keep the upper arc below the feed ramp.
-launcher.props.oscillation!.amplitude = 0.265;
+// Keep high shots below the feed ramp and vary the angle after a return lap.
+launcher.props.oscillation = { amplitude: 0.265, period: 2.59 };
 const funnel = launcherFunnel(launcher.position);
+const guidePivot = { x: 28.52, y: 20.43 };
+// Swing the upper guide away from the pack while keeping the loading throat steady.
+const funnelGuide: MapEntity = {
+  type: 'kinematic',
+  position: guidePivot,
+  shape: {
+    type: 'polyline',
+    rotation: 0,
+    points: [[30.42, 18.5], ...funnel.right.slice(1)].map(([x, y]): Point => [x - guidePivot.x, y - guidePivot.y]),
+    color: returnRail,
+  },
+  props: { density: 1, restitution: 0, angularVelocity: 0, oscillation: { amplitude: 0.48, period: 1.1 } },
+};
 
 const enclosure = rail(
   [
@@ -67,7 +80,7 @@ export const oneBounce: StageDef = {
       shape: { type: 'box', width: 0.22, height: 1.15, rotation: 0, color: '#ba9cff' },
       props: { density: 1, restitution: 0.32, angularVelocity: 0, oscillation: { amplitude: 0.85, period: 2.5 } },
     },
-    funnelSide(funnel.right, returnRail),
+    funnelGuide,
     launcher,
     reboundPad,
     rail(
@@ -94,7 +107,16 @@ export const oneBounce: StageDef = {
     // Carry loose marbles down the shallow rail before turning them into the throat.
     { type: 'directional', x: 8, y: 9.7, width: 5.6, height: 2.2, velocityX: 6, velocityY: 2.4, strength: 2.4 },
     { type: 'directional', x: 13, y: 11.55, width: 5, height: 2.1, velocityX: 6.4, velocityY: 2.75, strength: 2.6 },
-    { type: 'directional', x: 28.5, y: 18.55, width: 3.4, height: 2.4, velocityX: -2, velocityY: 4.5, strength: 4.8 },
+    {
+      type: 'directional',
+      x: 28.65,
+      y: 18.55,
+      width: 3.7,
+      height: 2.4,
+      velocityX: -2.15,
+      velocityY: 4.15,
+      strength: 5,
+    },
     { type: 'directional', x: 32, y: 25.85, width: 2.9, height: 21.8, velocityX: 0, velocityY: -10, strength: 6 },
     { type: 'directional', x: 30.95, y: 15.6, width: 5.4, height: 4.8, velocityX: -7, velocityY: 0, strength: 6 },
   ],

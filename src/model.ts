@@ -382,6 +382,12 @@ export function validateStage(value: unknown): StageDef {
     ) {
       throw new Error('구슬 발사기에는 고정된 회전축과 장전 영역(반지름 0.25~1.8)이 필요해요.');
     }
+    if (
+      'launcherCycleScale' in sh &&
+      (sh.type !== 'circle' || sh.launcher !== 'funnel' || !finite(sh.launcherCycleScale, 0.65, 1))
+    ) {
+      throw new Error('깔때기 발사기의 장전 시간 배율은 0.65~1이어야 해요.');
+    }
     if (sh.type === 'circle') {
       if (!finite(sh.radius, 0.05, 30)) throw new Error('핀 크기가 올바르지 않아요.');
     } else if (sh.type === 'box') {

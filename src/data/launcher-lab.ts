@@ -1,6 +1,7 @@
+import { launcherFunnel, marbleLauncher } from '../marble-launcher';
 import type { StageDef } from '../stage-def';
-import { funnelSide, launcherFunnel, marbleLauncher } from '../marble-launcher';
-import { wall } from './wind-map-shapes';
+import type { MapEntity } from '../types/map-entity';
+import { curve, wall } from './wind-map-shapes';
 
 const rail = (points: [number, number][], color: string) => {
   const e = wall(points, 0);
@@ -11,8 +12,25 @@ const feed = '#79d5cf',
   brass = '#ffc675',
   lift = '#82a9c4';
 const launcher = marbleLauncher(28, 21.5, 'funnel');
-const funnel = launcherFunnel(launcher.position);
 launcher.props.oscillation!.amplitude = 0.12;
+launcher.shape.launcherCycleScale = 0.72;
+const funnel = launcherFunnel(launcher.position);
+// Let the shoulder sweep the queue while the bottom stays centered on the intake.
+const guidePivot = { x: 28.52, y: 20.43 };
+const guide: MapEntity = {
+  type: 'kinematic',
+  position: guidePivot,
+  shape: {
+    type: 'polyline',
+    rotation: 0,
+    points: [[30.42, 18.5], ...funnel.right.slice(1)].map(([x, y]): [number, number] => [
+      x - guidePivot.x,
+      y - guidePivot.y,
+    ]),
+    color: brass,
+  },
+  props: { density: 1, restitution: 0, angularVelocity: 0, oscillation: { amplitude: 0.48, period: 1.1 } },
+};
 
 export const launcherLab: StageDef = {
   title: '구슬 발사 시험장',
@@ -40,27 +58,8 @@ export const launcherLab: StageDef = {
       ],
       brass
     ),
-    rail(
-      [
-        [1, 8],
-        [12, 10.2],
-      ],
-      feed
-    ),
-    rail(
-      [
-        [19, 9],
-        [17, 10.7],
-        [13.2, 12.1],
-      ],
-      feed
-    ),
-    {
-      type: 'kinematic',
-      position: { x: 15.1, y: 13.25 },
-      shape: { type: 'box', width: 1.65, height: 0.15, rotation: 0.18, color: brass },
-      props: { density: 1, restitution: 0.25, angularVelocity: 0, oscillation: { amplitude: 0.58, period: 1.9 } },
-    },
+    rail(curve([1, 6.8], [3.8, 7.6], [5.75, 9.4], [7.75, 10.2]), feed),
+    rail([[19, -20], [19, 6.8], ...curve([19, 6.8], [16.2, 7.6], [14.25, 9.4], [12.25, 10.2]).slice(1)], feed),
     rail([[1, 12], [14, 15.2], [22, 17.1], ...funnel.left], feed),
     rail(
       [
@@ -70,7 +69,7 @@ export const launcherLab: StageDef = {
       ],
       brass
     ),
-    funnelSide(funnel.right, brass),
+    guide,
     launcher,
     rail(
       [

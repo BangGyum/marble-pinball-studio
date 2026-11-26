@@ -21,7 +21,7 @@ export function marbleLauncher(
   x: number,
   y: number,
   launcher: NonNullable<EntityCircleShape['launcher']> = true
-): MapEntity {
+): MapEntity & { shape: EntityCircleShape } {
   return {
     type: 'kinematic',
     position: { x, y },
@@ -47,15 +47,6 @@ export function launcherFunnel({ x, y }: MapEntity['position']) {
       [0.42, -1.12],
       [0.42, 0.2],
     ]),
-  };
-}
-
-export function funnelSide(points: [number, number][], color: string): MapEntity {
-  return {
-    position: { x: 0, y: 0 },
-    type: 'kinematic',
-    shape: { type: 'polyline', rotation: 0, points, color },
-    props: { density: 1, restitution: 0, angularVelocity: 0, sliding: { amplitude: 0.11, period: 1.05, phase: 0 } },
   };
 }
 

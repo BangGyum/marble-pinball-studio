@@ -23,7 +23,17 @@ const { validateStage } = require('../src/model.ts');
     const stage = { title: 'launcher', goalY: 40, zoomY: 35, entities: [device] };
     assert.deepEqual(validateStage(JSON.parse(JSON.stringify(stage))), stage);
     assert.throws(() => validateStage({ ...stage, entities: [{ ...device, type: 'static' }] }));
-    assert.deepEqual(validateStage(launcherLab), launcherLab);
+    assert.deepEqual(validateStage(JSON.parse(JSON.stringify(launcherLab))), launcherLab);
+    assert.throws(
+      () =>
+        validateStage({ ...stage, entities: [{ ...device, shape: { ...device.shape, launcherCycleScale: 0.72 } }] }),
+      /장전 시간 배율/
+    );
+    const funnel = marbleLauncher(18, 16, 'funnel');
+    for (const invalid of [0, 1.1, '0.72']) {
+      funnel.shape.launcherCycleScale = invalid;
+      assert.throws(() => validateStage({ ...stage, entities: [funnel] }), /장전 시간 배율/);
+    }
     const physics = race.physics;
     for (const phase of [0, 61, 100]) {
       race.prepare(stage, ['probe']);

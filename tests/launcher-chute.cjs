@@ -142,11 +142,13 @@ async function verifyFunnel() {
       shape: { type: 'polyline', rotation: 0, points },
       props: { density: 1, restitution: 0, angularVelocity: 0 },
     });
+    const device = marbleLauncher(x, y, 'funnel');
+    device.shape.launcherCycleScale = 0.72;
     const stage = {
       title: 'Funnel probe',
       goalY: 40,
       zoomY: 35,
-      entities: [rail(sides.left), rail(sides.right), marbleLauncher(x, y, 'funnel')],
+      entities: [rail(sides.left), rail(sides.right), device],
     };
     race.prepare(stage, ['side entry']);
     race.startRace([1, 1]);
@@ -259,7 +261,8 @@ async function verifyDenseRaces() {
           assert.equal(race.arrivals.length, count, diagnosis);
           assert.equal(released.size, count, diagnosis + ' all marbles must leave the muzzle');
           assert.equal(race.rescues, 0, diagnosis);
-          assert.ok(longestLoad < 0.45, diagnosis + ' a marble cannot stall in the barrel');
+          const maxLoadTime = stage === launcherLab ? 0.33 : 0.45;
+          assert.ok(longestLoad < maxLoadTime, diagnosis + ' a marble cannot stall in the barrel');
           assert.ok(longestReloadWait < 2, diagnosis + ' the funnel must clear an occupied throat');
           console.log(
             'PASS',

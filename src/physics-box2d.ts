@@ -52,6 +52,7 @@ type PhysicsEntity = {
 type SweepHit = { entity: PhysicsEntity; fraction: number; nx: number; ny: number };
 type Launcher = {
   entity: PhysicsEntity;
+  cycleScale: number;
   gate?: PhysicsEntity;
   piston?: PhysicsEntity;
   waiting?: Set<Box2D.b2Body>;
@@ -381,7 +382,7 @@ export class Box2dPhysics implements IPhysics {
       if (state.moving) this.leaks.recordLeak(body.GetPosition());
       if (s.type === 'box' && s.spring) this.springs.push(state);
       if (s.type === 'circle' && s.launcher) {
-        const launcher: Launcher = { entity: state };
+        const launcher: Launcher = { entity: state, cycleScale: s.launcherCycleScale ?? 1 };
         this.launchers.push(launcher);
         if (s.launcher !== true) {
           state.launcherPart = true;
@@ -973,7 +974,7 @@ export class Box2dPhysics implements IPhysics {
         }
       }
       const ball = launcher.loaded;
-      const age = ball ? this.motionTime - ball.at : 0;
+      const age = ball ? (this.motionTime - ball.at) / launcher.cycleScale : 0;
       const angle = BARREL_TILT + e.body.GetAngle();
       const travel = Math.max(0, (age - (launcher.piston ? 0.195 : 0.32)) * LAUNCH_SPEED);
       const distance = Math.min(BARREL_LENGTH, travel);

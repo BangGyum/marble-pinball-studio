@@ -33,6 +33,8 @@ export interface EntityCircleShape extends EntityShapeBase {
   type: 'circle';
   radius: number;
   launcher?: true | 'chute' | 'funnel';
+  // Multiplier for the funnel launcher's seating and piston animation time.
+  launcherCycleScale?: number;
 }
 
 export interface EntityPolylineShape extends EntityShapeBase {

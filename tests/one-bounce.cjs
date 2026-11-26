@@ -62,6 +62,8 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
           Object.entries(physics.marbleMap).map(([id, body]) => [box.getPointer(body), Number(id)])
         );
         const clearedFeed = new Set();
+        const funnelSamples = race.balls.map((b) => ({ x: b.x, y: b.y, movedAt: 0 }));
+        let longestFunnelPause = 0;
         const timeLimit = count === 300 ? 265 : count === 100 ? 125 : 155;
         while (race.state === 'running' && race.elapsed < timeLimit) {
           const launcher = physics.launchers[0],
@@ -75,6 +77,17 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
           }
           for (const ball of race.balls) {
             if (count === 300 && race.elapsed < 90 && ball.y >= 15.5) clearedFeed.add(ball.id);
+            if ((count === 100 || count === 300) && !ball.rank) {
+              const sample = funnelSamples[ball.id];
+              if (Math.hypot(ball.x - sample.x, ball.y - sample.y) > 0.5) {
+                sample.x = ball.x;
+                sample.y = ball.y;
+                sample.movedAt = race.elapsed;
+              }
+              // Jitter against the right guide can keep the engine's exact stillness timer at zero.
+              if (sample.x > 25 && sample.x < 31 && sample.y > 16 && sample.y < 20.5)
+                longestFunnelPause = Math.max(longestFunnelPause, race.elapsed - sample.movedAt);
+            }
             const shot = shots.get(ball.id);
             if (
               shot &&
@@ -92,6 +105,7 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
         assert.equal(race.finishReason, 'arrived', count + ' marbles must finish within ' + timeLimit + 's');
         assert.equal(race.rescues, 0, 'even misses must return under their own physics');
         assert.equal(shots.size, count, 'all marbles must use the launcher');
+        assert.ok(longestFunnelPause < 30, 'the guide must keep queued marbles moving');
         for (const shot of shots.values()) {
           assert.ok(shot.inCup, 'every final shot passes through the receiver mouth');
           if (shot.hits.length === 1 && shot.hits[0] === pad && shot.angle < 15) bank++;
