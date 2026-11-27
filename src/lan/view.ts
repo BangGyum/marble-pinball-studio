@@ -71,6 +71,7 @@ export class LanView {
   private scene?: Scene;
   private minimapStage?: StageDef;
   private playback = new SnapshotPlayback();
+  private firstSpringStroke?: number;
   private lastDraw = 0;
   private lastFrameDraw = -Infinity;
   private visible = true;
@@ -488,6 +489,7 @@ export class LanView {
       this.springPlacement?.cancel();
       this.placementDrag = undefined;
       this.personalSpring = undefined;
+      this.firstSpringStroke = undefined;
       this.placedSprings = [];
       this.springElapsed = 0;
       this.displayedElapsed = 0;
@@ -535,6 +537,10 @@ export class LanView {
   }
   setSpringLayout({ raceId, springs }: SpringLayout) {
     if (raceId !== this.scene?.raceId) return;
+    if (this.personalSpring?.state === 'placed') {
+      const own = springs.find((spring) => spring.id === this.personalSpring?.id);
+      if (own?.activatedAt !== undefined) this.firstSpringStroke = own.activatedAt + 1 / 60;
+    }
     // Another player's layout can arrive before the buffered canvas finishes a return stroke.
     const ids = new Set(springs.map((spring) => spring.id));
     const returning = this.placedSprings.filter(
@@ -678,10 +684,11 @@ export class LanView {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = '#070a0e';
     ctx.fillRect(0, 0, w, h);
-    const sample = this.playback.sample(now);
+    const sample = this.playback.sample(now, this.firstSpringStroke);
     if (!scene || !sample) return;
     const { before, after, t, elapsed } = sample,
       shown = t >= 1 ? after : before;
+    if (this.firstSpringStroke !== undefined && elapsed >= this.firstSpringStroke) this.firstSpringStroke = undefined;
     this.displayedElapsed = elapsed;
     if (this.state === 'running' && before.seq !== this.elasticFrameSeq) {
       this.elasticFrameSeq = before.seq;

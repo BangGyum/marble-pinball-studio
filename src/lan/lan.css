@@ -120,28 +120,38 @@ body[data-role="viewer"] #game-view {
   gap: 8px 24px;
 }
 #lan-results {
-  flex: none;
-  padding: 8px 18px;
-  border-top: 1px solid var(--line);
-  background: var(--panel);
+  position: absolute;
+  top: 50%;
+  right: var(--results-inset, 18px);
+  width: min(19rem, calc(100% - var(--results-inset, 18px) - 12px));
+  max-height: calc(50% - 34px);
+  display: flex;
+  justify-content: flex-end;
+  text-align: right;
+  pointer-events: none;
 }
 #winner-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: 4px 12px;
-  margin: 4px 0 0;
-  padding: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 0 0 4px;
   list-style: none;
   overflow-y: auto;
-  max-height: 18dvh;
+  overscroll-behavior: contain;
   overflow-wrap: anywhere;
+  scrollbar-width: thin;
+  text-shadow:
+    0 1px 3px #000,
+    0 0 5px #000;
+  pointer-events: auto;
 }
 #winner-list li {
   padding: 2px 0;
+  font-weight: 700;
 }
 #winner-list small {
-  display: block;
   color: var(--accent);
+  margin-right: 6px;
+  white-space: nowrap;
 }
 #ranking-toggle {
   display: none;

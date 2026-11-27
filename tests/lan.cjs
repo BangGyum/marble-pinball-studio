@@ -771,27 +771,38 @@ async function connect(port, cookie, options = {}) {
         assert.equal(client.frame.personalSpring.state, 'placed', 'each participant keeps their placed spring');
       }
     }
+    assert.equal((await guest2.command({ type: 'configure', settings: rulesSettings, shuffle: true })).ok, false);
+    assert.equal((await host.command({ type: 'configure', settings: rulesSettings, shuffle: true })).ok, true);
+    const shuffledRaceId = host.scene.raceId;
+    assert.notEqual(shuffledRaceId, rulesRaceId);
+    assert.notEqual(app.race.balls, preparedRulesBalls);
+    for (const client of [host, resumed, guest2]) {
+      await client.until(() => client.frame.raceId === shuffledRaceId);
+      assert.deepEqual(client.placedSprings, placedRulesSprings, 'shuffle keeps every installed spring');
+      assert.equal(client.frame.personalSpring.state, 'placed');
+    }
+    const shuffledBalls = app.race.balls;
     assert.equal((await host.command({ type: 'start' })).ok, true);
     assert.equal(
       (await guest2.command({ type: 'use-spring' })).ok,
       true,
       'a preserved spring remains usable after start'
     );
-    for (const ball of preparedRulesBalls) {
+    for (const ball of shuffledBalls) {
       app.race.physics.placeMarble(ball.id, 13, 61);
       app.advance();
     }
     await resumed.until(() => resumed.frame.state === 'finished');
     assert.deepEqual(
       resumed.frame.winners,
-      preparedRulesBalls.slice(-3).map((ball) => ball.id),
+      shuffledBalls.slice(-3).map((ball) => ball.id),
       'the actual race applies the changed DESC three-winner rule'
     );
     assert.equal((await host.command({ type: 'reset' })).ok, true);
     await guest2.until(() => guest2.frame.personalSpring.state === 'available');
-    assert.notEqual(host.scene.raceId, rulesRaceId, 'reset still prepares a new race');
+    assert.notEqual(host.scene.raceId, shuffledRaceId, 'reset still prepares a new race');
     assert.equal(host.placedSprings.length, 0);
-    for (const change of [{ names: '가,나,다,라,마' }, { stage: { ...rulesStage, goalY: 65 } }, {}]) {
+    for (const change of [{ names: '가,나,다,라,마' }, { stage: { ...rulesStage, goalY: 65 } }]) {
       assert.equal((await guest2.command({ type: 'place-spring', x: 13, y: 20, direction: 0 })).ok, true);
       const beforeReset = host.scene.raceId;
       rulesSettings = { ...rulesSettings, ...change };
@@ -799,7 +810,7 @@ async function connect(port, cookie, options = {}) {
       await guest2.until(
         () => guest2.scene.raceId === host.scene.raceId && guest2.frame.revision === guest2.scene.revision
       );
-      assert.notEqual(host.scene.raceId, beforeReset, 'roster/map edits and an explicit identical shuffle still reset');
+      assert.notEqual(host.scene.raceId, beforeReset, 'roster and map edits still prepare a new race');
       assert.equal(guest2.placedSprings.length, 0);
       assert.equal(guest2.frame.personalSpring.state, 'available');
     }

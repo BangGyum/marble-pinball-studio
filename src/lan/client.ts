@@ -21,7 +21,8 @@ const view = new LanView(el<HTMLCanvasElement>('game'));
 const rankings = new Rankings((id) => selectBall(view.focusedBallId === id ? null : id));
 const rankingList = el('ranking-list'),
   gameView = el('game-view'),
-  panel = el('control-panel');
+  panel = el('control-panel'),
+  results = el('lan-results');
 const names = el<HTMLTextAreaElement>('names'),
   mapSelect = el<HTMLSelectElement>('map-select');
 const order = el<HTMLSelectElement>('winner-mode'),
@@ -109,6 +110,7 @@ const resultLayout = new ResizeObserver(() => {
   view.celebrationRightInset = list.width
     ? Math.max(18, view.canvas.getBoundingClientRect().right - list.left + 20)
     : 18;
+  results.style.setProperty('--results-inset', view.celebrationRightInset + 'px');
 });
 resultLayout.observe(rankingList);
 resultLayout.observe(view.canvas);
@@ -193,7 +195,7 @@ function connection(connected: boolean, status: string) {
 function updateWinners(scene: Scene, frame: Frame) {
   const winners = scene.settings.order === 'desc' ? [...frame.winners].reverse() : frame.winners;
   const winnerList = el('winner-list');
-  el('lan-results').hidden = !winners.length;
+  results.hidden = !winners.length || view.recording;
   winners.forEach((id, i) => {
     let row = winnerList.children.item(i);
     if (!row) {
@@ -291,7 +293,7 @@ function inputSettings(): Settings {
 }
 let prepareQueue = Promise.resolve(),
   pendingPreparations = 0;
-async function prepare(force = false) {
+async function prepare(force = false, shuffle = false) {
   clearTimeout(inputTimer);
   inputTimer = undefined;
   const settings = inputSettings();
@@ -300,7 +302,7 @@ async function prepare(force = false) {
     .catch(() => {})
     .then(async () => {
       if (force || JSON.stringify(settings) !== JSON.stringify(scene?.settings))
-        await command({ type: 'configure', settings });
+        await command({ type: 'configure', settings, ...(shuffle ? { shuffle: true as const } : {}) });
     });
   prepareQueue = request;
   try {
@@ -315,8 +317,8 @@ async function prepare(force = false) {
     pendingPreparations--;
   }
 }
-const prepareUI = (force = false) =>
-  prepare(force).catch((error) => {
+const prepareUI = (force = false, shuffle = false) =>
+  prepare(force, shuffle).catch((error) => {
     el('count').textContent = message(error);
     toast(message(error));
   });
@@ -501,7 +503,7 @@ picks.addEventListener('change', () => {
   preferredPicks = Number(picks.value) || 2;
   void prepareUI();
 });
-el('shuffle').addEventListener('click', () => void prepareUI(true));
+el('shuffle').addEventListener('click', () => void prepareUI(true, true));
 el('reset').addEventListener('click', () => {
   void command({ type: 'reset' })
     .then(() => prepare())

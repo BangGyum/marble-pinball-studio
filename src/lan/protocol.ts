@@ -87,7 +87,7 @@ export type Frame = {
 export type Identity = { type: 'identity'; role: 'host' | 'viewer'; name: string };
 export type Info = { maps: { id: number; title: string }[]; addresses: { name: string; url: string }[] };
 export type Command = { requestId: string; raceId: string } & (
-  | { type: 'configure'; settings: Settings }
+  | { type: 'configure'; settings: Settings; shuffle?: true }
   | { type: 'start' | 'pause' | 'reset' }
   | { type: 'speed'; value: number }
   | { type: 'boost'; active: boolean }

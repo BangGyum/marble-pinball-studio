@@ -39,7 +39,7 @@ export class SnapshotPlayback {
     if (this.frames.length > 20) this.frames.shift();
     this.received = now;
   }
-  sample(now = performance.now()) {
+  sample(now = performance.now(), minimumElapsed?: number) {
     const latest = this.frames.at(-1),
       first = this.frames[0];
     if (!latest) return;
@@ -62,6 +62,7 @@ export class SnapshotPlayback {
       }
       this.cursor = clamp(this.cursor + dt * baseRate * this.rate, first.elapsed, latest.elapsed);
     }
+    if (minimumElapsed !== undefined) this.cursor = Math.max(this.cursor, Math.min(minimumElapsed, latest.elapsed));
     let before = first,
       after = latest;
     for (const frame of this.frames) {

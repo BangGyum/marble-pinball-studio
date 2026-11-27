@@ -14,9 +14,9 @@
       <div class="play-area"><canvas id="game" tabindex="-1" aria-label="구슬 경주 화면. 왼쪽 미니맵 위에 마우스를 올리면 해당 위치를 따라갑니다. 마우스 휠로 확대하거나 축소할 수 있습니다."></canvas>
       <button type="button" id="ranking-toggle" aria-expanded="false" aria-controls="ranking-list">전체 순위</button>
       <ol id="ranking-list" class="rankings" role="list" aria-label="경주 순위. 구슬을 누르면 따라갑니다. 목록 바깥 클릭 또는 Esc로 해제합니다. 도착한 구슬은 굵게 표시됩니다." tabindex="0" hidden></ol>
+      <section id="lan-results" aria-label="당첨 결과" hidden><ol id="winner-list" tabindex="0" aria-label="당첨 순위와 이름"></ol></section>
       </div>
     </div>
-    <section id="lan-results" aria-label="당첨 결과" hidden><strong>당첨 결과</strong><ol id="winner-list" tabindex="0" aria-label="당첨 순위와 이름"></ol></section>
     <section class="personal-spring" aria-label="내 일회용 스프링">
       <div><strong>내 스프링 <small>경기당 1개</small></strong><p id="personal-spring-status" role="status">서버 연결 후 배치할 수 있어요.</p></div>
       <div class="personal-spring-actions"><button type="button" id="spring-place" disabled>⇧ 스프링 배치</button><button type="button" id="spring-back" hidden>위치 다시 선택</button><button type="button" id="spring-cancel" hidden>취소</button><button type="button" id="spring-use" class="primary" hidden disabled>내 스프링 발동 · SPACE</button><button type="button" id="map-spring-use" hidden disabled>선택한 맵 스프링 발동</button></div>
@@ -108,7 +108,7 @@
       <h1 id="participant-join-title">핀볼 참가하기</h1>
       <label for="participant-name">이름</label>
       <input id="participant-name" type="text" maxlength="24" required autofocus aria-describedby="participant-hint" />
-      <p id="participant-hint">입장 후 이 브라우저에 이름이 저장되며, 설치한 스프링에 표시돼요.</p>
+      <p id="participant-hint">입장 후 이 브라우저에 이름이 저장돼요. (스프링 이름에만 적용됩니다)</p>
       <p id="participant-error" role="status" hidden></p>
       <button type="submit" class="primary">입장</button>
     </form>

@@ -139,6 +139,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     springs: currentSprings(),
   });
   let springLayoutDirty = false;
+  let springStrokePending = false;
   /** @type {NodeJS.Immediate | undefined} */
   let springBroadcast;
   function makeScene(entities = mapEntities()) {
@@ -158,11 +159,13 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     sceneMessage = JSON.stringify(encodeScene(scene));
     for (const ws of clients.keys()) send(ws, sceneMessage);
   }
-  function prepare() {
+  function prepare(preservePlacements = false) {
     raceId = randomUUID();
     accumulator = 0;
     boostOwner = null;
-    personalSprings.clear();
+    if (!preservePlacements) personalSprings.clear();
+    springLayoutDirty = preservePlacements && personalSprings.size > 0;
+    springStrokePending = false;
     activeSprings.clear();
     launcherGuides.clear();
     guidesSentAt = -1;
@@ -211,6 +214,10 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
   function advance() {
     if (guidesSentAt === race.elapsed) launcherGuides.clear();
     race.advance();
+    if (springStrokePending) {
+      springStrokePending = false;
+      springBroadcast ??= setImmediate(broadcast);
+    }
     for (const id of race.physics.getLauncherGuideIds()) launcherGuides.add(id);
     for (const [shape, spring] of activeSprings) {
       if (springHasExpired(spring, race.elapsed) || race.state === 'finished') {
@@ -257,7 +264,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     );
     /** @satisfies {{ [Type in Command['type']]: (keyof (Command & { type: Type }))[] }} */
     const keys = {
-      configure: ['settings'],
+      configure: ['settings', 'shuffle'],
       start: [],
       pause: [],
       reset: [],
@@ -300,6 +307,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       spring.activatedAt = race.elapsed;
       activeSprings.set(entity.shape, spring);
       springLayoutDirty = true;
+      springStrokePending = true;
       return;
     }
     if (msg.type === 'spring') {
@@ -324,6 +332,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       const s = msg.settings;
       requireThat(
         allowedKeys(s, ['names', 'mapId', 'order', 'picks', 'stage', 'dolphins']) &&
+          (msg.shuffle === undefined || msg.shuffle === true) &&
           typeof s.names === 'string' &&
           s.names.length <= 15000 &&
           Number.isInteger(s.mapId) &&
@@ -336,11 +345,14 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       const stage = s.stage !== undefined ? validateStage(s.stage) : stages[s.mapId];
       const dolphins = s.dolphins === undefined ? {} : { dolphins: validateDolphins(s.dolphins, stage) };
       const next = { ...s, ...dolphins, ...(s.stage !== undefined ? { stage } : {}) };
-      const preserveReadyRace =
+      const sameReadyMap =
         race.state === 'ready' &&
-        next.names === settings.names &&
         next.mapId === settings.mapId &&
-        JSON.stringify(next.stage) === JSON.stringify(settings.stage) &&
+        JSON.stringify(next.stage) === JSON.stringify(settings.stage);
+      const preserveReadyRace =
+        sameReadyMap &&
+        !msg.shuffle &&
+        next.names === settings.names &&
         (next.order !== settings.order ||
           next.picks !== settings.picks ||
           JSON.stringify(next.dolphins) !== JSON.stringify(settings.dolphins));
@@ -348,7 +360,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       if (preserveReadyRace) {
         race.dolphins = validateDolphins(settings.dolphins, race.stage);
         makeScene();
-      } else prepare();
+      } else prepare(msg.shuffle === true && sameReadyMap);
     } else if (msg.type === 'start') {
       requireThat(race.state === 'ready', '다시 준비한 뒤 시작해 주세요.');
       race.startRace(winningRange(settings.order, race.balls.length, settings.picks), settings.order);

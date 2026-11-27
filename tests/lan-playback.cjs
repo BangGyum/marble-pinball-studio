@@ -106,6 +106,15 @@ for (let tick = 0; tick <= 360; tick++) {
 }
 assert.ok(quantile(springDelays, 0.95) < 0.06, 'steady spring playback stays within 60 ms of server time');
 
+const firstStroke = new SnapshotPlayback();
+firstStroke.push(frame(0, 1), 0);
+firstStroke.push(frame(3 / 60, 2), 50);
+assert.ok(firstStroke.sample(50).elapsed < 3 / 60, 'ordinary playback is buffered');
+assert.equal(firstStroke.sample(51, 4 / 60).elapsed, 3 / 60, 'hold at the last authoritative pose before a stroke');
+firstStroke.push(frame(4 / 60, 3), 67);
+assert.equal(firstStroke.sample(67, 4 / 60).elapsed, 4 / 60, 'the owner sees the first stroke as soon as it arrives');
+assert.equal(firstStroke.sample(68).elapsed, 4 / 60, 'ordinary playback cannot rewind after the stroke');
+
 const changing = new SnapshotPlayback(),
   changes = [1, 4, 0.45, 2, 8, 1],
   packets = [];
