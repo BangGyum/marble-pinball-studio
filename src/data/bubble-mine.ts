@@ -1,4 +1,5 @@
 import type { StageDef } from '../stage-def';
+import type { MapEntity } from '../types/map-entity';
 import { curve, wall } from './wind-map-shapes';
 
 const rail = (points: [number, number][], color = '#9abaca') => {
@@ -6,6 +7,33 @@ const rail = (points: [number, number][], color = '#9abaca') => {
   entity.shape.color = color;
   return entity;
 };
+const crossingHub = { x: 8.8, y: 23.8 };
+const brass = '#edb66d';
+const arm: [number, number][] = [
+  [-3.48, -0.18],
+  [3.48, -0.18],
+  [3.48, 0.18],
+  [-3.48, 0.18],
+  [-3.48, -0.18],
+];
+// Solid polygons retain their relative angle when the starting layout is randomized.
+const crossingArms = [0.3, Math.PI / 2 + 0.3].map(
+  (angle): MapEntity => ({
+    type: 'kinematic',
+    position: crossingHub,
+    shape: {
+      type: 'polyline',
+      solid: true,
+      rotation: 0,
+      points: arm.map(([x, y]) => [
+        x * Math.cos(angle) - y * Math.sin(angle),
+        x * Math.sin(angle) + y * Math.cos(angle),
+      ]),
+      color: brass,
+    },
+    props: { density: 1, restitution: 0.16, angularVelocity: -1.9 },
+  })
+);
 
 export const bubbleMine: StageDef = {
   title: '방울 광산선',
@@ -47,7 +75,7 @@ export const bubbleMine: StageDef = {
         type: 'polyline',
         solid: true,
         rotation: 0,
-        color: '#edb66d',
+        color: brass,
         points: [
           [0, 0],
           [-3.9, 1.4],
@@ -64,7 +92,15 @@ export const bubbleMine: StageDef = {
       },
     },
     rail([[11.3, 17.3], ...curve([9.4, 18.1], [7, 19.7], [5.8, 20.2], [3.8, 20.25])]),
-    rail([...curve([0.7, 21.3], [2.7, 24.9], [7.1, 25.3], [10.4, 25.55]), [11.65, 25.9]]),
+    // The four arms sweep toward the left switchback; the open right side drops onto the lower rail.
+    rail(curve([0.7, 23.2], [1.6, 25.7], [4, 26.2], [6.4, 27.25])),
+    ...crossingArms,
+    {
+      type: 'static',
+      position: crossingHub,
+      shape: { type: 'circle', radius: 0.28, color: '#ffda93' },
+      props: { density: 1, restitution: 0.08, angularVelocity: 0 },
+    },
     rail([
       [20.4, 27],
       [17.2, 28.15],

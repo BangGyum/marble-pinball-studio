@@ -16,6 +16,33 @@ const { validateStage } = require('../src/model.ts');
 const { WallGuard } = require('../src/wall-guard.ts');
 
 const [leftRail, rightRail] = stage.entities.slice(-2).map((entity) => entity.shape.points);
+const arms = stage.entities.filter((entity) => entity.shape.type === 'polyline' && entity.props.angularVelocity);
+const hub = arms[0].position;
+const armRadius = Math.max(...arms.flatMap(({ shape }) => shape.points.map(([x, y]) => Math.hypot(x, y))));
+
+function checkRotorClearance() {
+  const { x, y } = hub;
+  for (const { type, shape } of stage.entities) {
+    if (type !== 'static' || shape.type !== 'polyline') continue;
+    for (let i = 1; i < shape.points.length; i++) {
+      const [ax, ay] = shape.points[i - 1],
+        [bx, by] = shape.points[i];
+      const dx = bx - ax,
+        dy = by - ay;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)));
+      assert.ok(
+        Math.hypot(x - ax - t * dx, y - ay - t * dy) - armRadius > 0.5,
+        'every rail clears the swept arms by a marble diameter'
+      );
+    }
+  }
+}
+
+function downCrossing(ball, y, elapsed) {
+  if (ball.py >= y || ball.y < y) return;
+  const fraction = (y - ball.py) / (ball.y - ball.py);
+  return { time: elapsed - (1 - fraction) / 60, x: ball.px + (ball.x - ball.px) * fraction };
+}
 
 function boundaryX(points, y) {
   const next = points.findIndex(([, height]) => height >= y);
@@ -32,6 +59,7 @@ function boundaryX(points, y) {
   await race.physics.init();
   try {
     assert.deepEqual(validateStage(JSON.parse(JSON.stringify(stage))), stage);
+    checkRotorClearance();
     race.prepare(stage, ['fast', 'first']);
     race.startRace([1, 1]);
     const physics = race.physics;
@@ -76,6 +104,10 @@ function boundaryX(points, y) {
           passengers = new Set(),
           seated = new Set(),
           unloaded = new Set();
+        const entry = [],
+          split = [],
+          exit = [],
+          rotorTracks = [];
         let rider;
         while (race.state === 'running' && race.elapsed < 50) {
           race.advance();
@@ -89,6 +121,25 @@ function boundaryX(points, y) {
               `marble ${b.id} left the mine at (${b.x.toFixed(2)}, ${b.y.toFixed(2)}) in the ${count}-marble race ${trial}`
             );
             if (b !== ball && !b.rank) assert.ok(b.stuck < 2, 'a marble in the normal route stopped for 2 seconds');
+            if (count >= 100 && b !== ball && !b.rank) {
+              entry[b.id] ??= downCrossing(b, 20.7, race.elapsed);
+              split[b.id] ??= downCrossing(b, 26.5, race.elapsed);
+              exit[b.id] ??= downCrossing(b, 34.4, race.elapsed);
+              const nearRotor = Math.hypot(b.x - hub.x, b.y - hub.y) < armRadius + 0.45;
+              const track = rotorTracks[b.id];
+              if (nearRotor) {
+                if (!track || Math.hypot(b.x - track.x, b.y - track.y) > 0.5) {
+                  rotorTracks[b.id] = { x: b.x, y: b.y, time: race.elapsed };
+                } else {
+                  assert.ok(
+                    race.elapsed - track.time < 2,
+                    'a marble stayed near the crossing rotor without moving a diameter'
+                  );
+                }
+              } else if (track) {
+                track.time = race.elapsed;
+              }
+            }
             if (b === ball || b.rank || pastGate.has(b.id) || b.py >= 21 || b.y < 21) continue;
             pastGate.add(b.id);
             if (b.x >= 8) shortRoute++;
@@ -116,6 +167,20 @@ function boundaryX(points, y) {
         assert.equal(race.finishReason, 'arrived');
         assert.equal(race.arrivals.length, count);
         assert.equal(race.rescues, 0);
+        if (count >= 100) {
+          const routes = race.balls.filter((b) => rotorTracks[b.id] && entry[b.id] && split[b.id] && exit[b.id]);
+          assert.ok(
+            routes.some(
+              ({ id: slow }) =>
+                split[slow].x < 6.3 &&
+                routes.some(
+                  ({ id: fast }) =>
+                    split[fast].x >= 6.3 && entry[slow].time < entry[fast].time && exit[fast].time < exit[slow].time
+                )
+            ),
+            `a later marble must overtake an earlier marble via the right branch in the ${count}-marble race ${trial}`
+          );
+        }
         assert.deepEqual(drops, passengers);
         assert.deepEqual(seated, passengers);
         assert.deepEqual(unloaded, passengers);
