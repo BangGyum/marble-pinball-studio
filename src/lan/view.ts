@@ -307,7 +307,7 @@ export class LanView {
     window.addEventListener(
       'keydown',
       (event) => {
-        if (event.key === 'Escape' && this.springPlacement.active) {
+        if (event.key === 'Escape' && this.visible && this.springPlacement.active) {
           event.preventDefault();
           event.stopImmediatePropagation();
           if (!this.springPending) this.cancelSpringPlacement();

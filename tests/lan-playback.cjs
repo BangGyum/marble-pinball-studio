@@ -541,6 +541,14 @@ assert.equal(interactive.springPlacement.active, false);
 assert.equal(interactive.manual, null, 'acceptance resumes automatic tracking');
 interactive.personalSpring = { state: 'available' };
 interactive.beginSpringPlacement();
+interactive.setVisible(false);
+windowHandlers.keydown({
+  key: 'Escape',
+  preventDefault: () => assert.fail('the hidden game must leave Escape to the dialog'),
+  stopImmediatePropagation: () => assert.fail('the dialog must receive Escape'),
+});
+assert.equal(interactive.springPlacement.active, true, 'opening a dialog preserves the spring draft');
+interactive.setVisible(true);
 windowHandlers.keydown({ key: 'Escape', preventDefault() {}, stopImmediatePropagation() {} });
 assert.equal(interactive.springPlacement.active, false, 'Escape cancels without spending a spring');
 interactive.personalSpring = { state: 'placed', id: 'mine' };

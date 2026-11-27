@@ -6,6 +6,7 @@ import { Recorder } from '../recorder';
 import { stages, visibleBuiltins, DEFAULT_MAP_INDEX, type StageDef } from '../data/maps';
 import { parseNames, winningRange, type WinnerOrder } from '../model';
 import { MapLibrary } from '../map-library';
+import { MapGalleryList } from '../map-gallery';
 import { el, toast, message, STALLED_MESSAGE } from '../ui';
 import type { Command, Frame, Identity, Info, Scene, ServerMessage, Settings } from './protocol';
 import { decodeScene, serializeCommand } from './protocol';
@@ -31,7 +32,8 @@ const rankingList = el('ranking-list'),
   panel = el('control-panel'),
   results = el('lan-results');
 const names = el<HTMLTextAreaElement>('names'),
-  mapSelect = el<HTMLSelectElement>('map-select');
+  mapSelect = el<HTMLButtonElement>('map-select'),
+  mapDialog = el<HTMLDialogElement>('lan-map-dialog');
 const order = el<HTMLSelectElement>('winner-mode'),
   picks = el<HTMLSelectElement>('winner-count'),
   record = el<HTMLInputElement>('record');
@@ -76,17 +78,31 @@ try {
   toast('저장된 맵을 읽지 못했어요.');
 }
 const allMaps = () => library.list(customStage);
+const mapGallery = new MapGalleryList(mapDialog, (id) => {
+  if (mapSelect.disabled) return;
+  mapDialog.close();
+  if (id === mapSelect.value) return;
+  refreshMaps(id);
+  void prepare().catch((error) => {
+    if (scene && mapSelect.value === id) {
+      refreshSceneMap(scene);
+      dolphinPanel.setStage(scene.stage, scene.settings.dolphins ?? validateDolphins(undefined, scene.stage));
+    }
+    showPreparationError(error);
+  });
+});
 function refreshMaps(selected = mapSelect.value) {
-  mapSelect.replaceChildren(
-    ...allMaps().map(
-      (m) =>
-        new Option(
-          (m.id.startsWith('builtin-') ? '' : m.id === 'preview' ? '미리보기 · ' : '내 맵 · ') + m.stage.title,
-          m.id
-        )
-    )
-  );
-  if (allMaps().some((m) => m.id === selected)) mapSelect.value = selected;
+  const maps = allMaps();
+  const map = maps.find((entry) => entry.id === selected) ?? maps[0];
+  mapSelect.value = map.id;
+  el('current-map-title').textContent =
+    (map.id.startsWith('builtin-') ? '' : map.id === 'preview' ? '미리보기 · ' : '내 맵 · ') + map.stage.title;
+  if (mapDialog.open) mapGallery.refresh(maps, map.id);
+}
+function refreshSceneMap(active: Scene) {
+  customStage = active.settings.stage;
+  const match = customStage && allMaps().find((map) => JSON.stringify(map.stage) === JSON.stringify(customStage));
+  refreshMaps(customStage ? (match?.id ?? 'preview') : 'builtin-' + active.settings.mapId);
 }
 function updatePicks(count: number, preferred = preferredPicks) {
   picks.replaceChildren(...Array.from({ length: count }, (_, i) => new Option(i + 1 + '명', String(i + 1))));
@@ -109,7 +125,7 @@ function updateStandings() {
   rankings.update(view, view.focusedBallId);
   const selected = view.balls.find((b) => b.id === view.focusedBallId);
   el('focus-status').textContent = selected
-    ? selected.name + ' 추적 중 · 목록 바깥 클릭 또는 Esc로 해제'
+    ? selected.name + ' 추적 중 · 같은 구슬을 다시 누르거나 Esc로 해제'
     : '자동 관전 중';
 }
 const resultLayout = new ResizeObserver(() => {
@@ -144,6 +160,7 @@ function updateControls() {
     'editor-open',
   ])
     (el(id) as HTMLInputElement).disabled = !hosting || !online || !!playing;
+  if (mapSelect.disabled && mapDialog.open) mapDialog.close();
   record.disabled ||= !Recorder.supported(view.canvas);
   el<HTMLButtonElement>('start').disabled = !hosting || !online || !!playing || !scene?.balls.length;
   el<HTMLButtonElement>('pause').disabled = !hosting || !online || !playing;
@@ -324,11 +341,12 @@ async function prepare(force = false, shuffle = false) {
     pendingPreparations--;
   }
 }
-const prepareUI = (force = false, shuffle = false) =>
-  prepare(force, shuffle).catch((error) => {
-    el('count').textContent = message(error);
-    toast(message(error));
-  });
+function showPreparationError(error: unknown) {
+  const description = message(error);
+  el('count').textContent = description;
+  toast(description);
+}
+const prepareUI = (force = false, shuffle = false) => prepare(force, shuffle).catch(showPreparationError);
 function setAddress() {
   const address = info.addresses[Number(el<HTMLSelectElement>('address').value)];
   if (address) {
@@ -480,9 +498,7 @@ async function connect() {
             order.value = scene.settings.order;
             preferredPicks = scene.settings.picks || 2;
             updatePicks(scene.balls.length);
-            customStage = scene.settings.stage;
-            const match = customStage && allMaps().find((m) => JSON.stringify(m.stage) === JSON.stringify(customStage));
-            refreshMaps(customStage ? (match?.id ?? 'preview') : 'builtin-' + scene.settings.mapId);
+            refreshSceneMap(scene);
           }
           if (first && identity.role === 'host' && !scene.balls.length && !keepInputs) {
             try {
@@ -559,7 +575,16 @@ names.addEventListener('input', () => {
   clearTimeout(inputTimer);
   inputTimer = setTimeout(() => void prepareUI(), 200);
 });
-mapSelect.addEventListener('change', () => void prepareUI());
+mapSelect.addEventListener('click', () => {
+  mapGallery.refresh(allMaps(), mapSelect.value, true);
+  mapDialog.showModal();
+  view.setVisible(false);
+  mapGallery.focus(mapSelect.value);
+  mapDialog.querySelector('[aria-current="true"]')?.scrollIntoView({ block: 'nearest' });
+});
+mapDialog.addEventListener('close', () => {
+  if (!mapDialog.open) view.setVisible(!el<HTMLDialogElement>('editor-dialog').open);
+});
 order.addEventListener('change', () => void prepareUI());
 picks.addEventListener('change', () => {
   preferredPicks = Number(picks.value) || 2;
@@ -624,14 +649,14 @@ rankingList.addEventListener('click', (event) => {
 document.addEventListener('pointerdown', (event) => {
   if (
     view.focusedBallId !== null &&
-    event.target instanceof Node &&
-    !rankingList.contains(event.target) &&
-    !rankingToggle.contains(event.target)
+    !mapDialog.open &&
+    event.target instanceof Element &&
+    !event.target.closest('#ranking-list, #ranking-toggle, .zoom-controls, .map-setting')
   )
     selectBall(null);
 });
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape') {
+  if (event.key === 'Escape' && !mapDialog.open) {
     view.follow();
     selectBall(null);
   }

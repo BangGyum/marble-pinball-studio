@@ -58,7 +58,8 @@ export class Rankings {
       }
       return item;
     });
-    if (this.list.children.length !== items.length) {
+    const focused = document.activeElement;
+    if (this.list.children.length !== items.length || items.some((item) => item.parentElement !== this.list)) {
       this.list.replaceChildren(...items);
     } else {
       // Move only displaced rows; don't detach the entire list at every overtake.
@@ -68,6 +69,7 @@ export class Rankings {
         else next = next.nextElementSibling;
       }
     }
+    if (focused !== document.activeElement) items.find((item) => item === focused)?.focus({ preventScroll: true });
     if (this.list.hidden !== !items.length) this.list.hidden = !items.length;
   }
 }

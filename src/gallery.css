@@ -967,10 +967,10 @@
   .gallery-list-heading p {
     display: none;
   }
-  #game-view .top-actions {
+  body:has(#map-gallery) #game-view .top-actions {
     gap: 8px;
   }
-  #game-view .top-actions #status {
+  body:has(#map-gallery) #game-view .top-actions #status {
     display: none;
   }
 }
@@ -1052,18 +1052,18 @@
   .gallery-footer {
     padding: 20px 18px;
   }
-  #game-view .topbar {
+  body:has(#map-gallery) #game-view .topbar {
     padding: 0 12px;
     gap: 6px;
   }
-  #game-view .brand {
+  body:has(#map-gallery) #game-view .brand {
     gap: 6px;
   }
-  #game-view .top-actions button {
+  body:has(#map-gallery) #game-view .top-actions button {
     padding: 8px;
     font-size: 0.75rem;
   }
-  #editor-open span {
+  body:has(#map-gallery) #editor-open span {
     margin-left: 4px;
   }
 }

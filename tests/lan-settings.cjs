@@ -31,9 +31,9 @@ const listener = (expression, event) =>
       ts.isCallExpression(node) && node.expression.getText(file) === expression && node.arguments[0]?.text === event
   ).arguments[1];
 const functions = file.statements.filter(
-  (node) => ts.isFunctionDeclaration(node) && ['command', 'prepare'].includes(node.name?.text)
+  (node) => ts.isFunctionDeclaration(node) && ['command', 'prepare', 'refreshSceneMap'].includes(node.name?.text)
 );
-assert.equal(functions.length, 2);
+assert.equal(functions.length, 3);
 const code = ts.transpileModule(
   [
     ...functions.map((node) => node.getText(file)),
@@ -146,6 +146,7 @@ const code = ts.transpileModule(
       order,
       picks,
       mapSelect,
+      customStage: undefined,
       dolphinPanel,
       preferredPicks: 1,
       inputSettings,

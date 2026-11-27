@@ -135,16 +135,11 @@ function drawThumbnail(canvas: HTMLCanvasElement, stage: StageDef) {
 
 const playCountFormat = new Intl.NumberFormat('ko-KR');
 
-export class MapGallery {
-  readonly intro = new GalleryIntro(el('map-gallery'));
-  readonly transition = new MapTransition(el('map-gallery'), el('game-view'));
+export class MapGalleryList {
   private reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   private returnHighlight?: Animation;
   private grid = el('map-grid');
-  private sort = new MapSortControl(el<HTMLSelectElement>('gallery-sort'), this.grid, el('gallery-sort-status'), () =>
-    this.intro.stop()
-  );
-  private view = el('map-gallery');
+  private sort: MapSortControl;
   private pendingThumbnails = new Set<HTMLCanvasElement>();
   private thumbnailFrame = 0;
   private maps: SavedMap[] = [];
@@ -167,17 +162,27 @@ export class MapGallery {
     { rootMargin: '240px' }
   );
 
-  constructor(select: (id: string) => void, reveal: () => void) {
+  constructor(
+    private view: HTMLElement,
+    select: (id: string, card: HTMLButtonElement) => void,
+    beforeChange = () => {}
+  ) {
+    this.sort = new MapSortControl(
+      el<HTMLSelectElement>('gallery-sort'),
+      this.grid,
+      el('gallery-sort-status'),
+      beforeChange
+    );
     for (const group of ['builtin', 'custom'] as const)
       el<HTMLButtonElement>(`gallery-filter-${group}`).addEventListener('click', () => {
         if (this.group === group) return;
-        this.intro.stop();
+        beforeChange();
         this.group = group;
         this.render();
       });
     for (const event of ['pinball-theme-change', 'pinball-marble-design-change'])
       window.addEventListener(event, () => {
-        this.intro.stop();
+        beforeChange();
         this.resetThumbnailQueue();
         for (const canvas of this.grid.querySelectorAll('canvas')) {
           canvas.removeAttribute('data-rendered');
@@ -197,8 +202,7 @@ export class MapGallery {
       if (card) {
         this.returnHighlight?.cancel();
         this.returnHighlight = undefined;
-        this.intro.stop();
-        this.transition.play(card, () => select(card.dataset.mapId!), reveal);
+        select(card.dataset.mapId!, card);
       }
     });
     for (const [id, style] of [
@@ -224,7 +228,7 @@ export class MapGallery {
 
   private paintThumbnail() {
     this.thumbnailFrame = 0;
-    if (this.view.hidden) {
+    if (this.view.hidden || (this.view instanceof HTMLDialogElement && !this.view.open)) {
       this.pendingThumbnails.clear();
       return;
     }
@@ -236,8 +240,9 @@ export class MapGallery {
     if (this.pendingThumbnails.size) this.thumbnailFrame = requestAnimationFrame(() => this.paintThumbnail());
   }
 
-  refresh(maps: SavedMap[], selected: string) {
-    if (this.selectedId !== selected) this.group = selected.startsWith('builtin-') ? 'builtin' : 'custom';
+  refresh(maps: SavedMap[], selected: string, showSelectedGroup = false) {
+    if (showSelectedGroup || this.selectedId !== selected)
+      this.group = selected.startsWith('builtin-') ? 'builtin' : 'custom';
     this.selectedId = selected;
     this.maps = maps;
     this.render();
@@ -332,5 +337,26 @@ export class MapGallery {
     animation.onfinish = () => {
       if (this.returnHighlight === animation) this.returnHighlight = undefined;
     };
+  }
+}
+
+export class MapGallery extends MapGalleryList {
+  readonly intro: GalleryIntro;
+  readonly transition: MapTransition;
+
+  constructor(select: (id: string) => void, reveal: () => void) {
+    const view = el('map-gallery');
+    const intro = new GalleryIntro(view);
+    const transition = new MapTransition(view, el('game-view'));
+    super(
+      view,
+      (id, card) => {
+        intro.stop();
+        transition.play(card, () => select(id), reveal);
+      },
+      () => intro.stop()
+    );
+    this.intro = intro;
+    this.transition = transition;
   }
 }

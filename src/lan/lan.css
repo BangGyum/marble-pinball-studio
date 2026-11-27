@@ -159,6 +159,66 @@ body[data-role="viewer"] #game-view {
   padding: 12px 18px;
   gap: 8px 24px;
 }
+#map-select {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+}
+#current-map-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#map-picker-action {
+  flex: none;
+  color: var(--accent);
+  font-size: 0.75rem;
+}
+.map-setting #edit-current {
+  flex: none;
+}
+#lan-map-dialog {
+  width: min(1120px, calc(100% - 28px));
+  max-width: none;
+  max-height: min(86dvh, 860px);
+  overflow: hidden;
+}
+#lan-map-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+.lan-map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.lan-map-header h1 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+.lan-map-filters {
+  padding: 12px 20px 0;
+}
+.lan-map-filters .gallery-list-heading {
+  margin-bottom: 0;
+  padding-bottom: 10px;
+}
+.lan-map-list {
+  min-height: 0;
+  padding: 16px 20px 22px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.lan-map-list .map-card[aria-current="true"] {
+  border-color: var(--map-accent);
+  background: #19232b;
+}
 #lan-results {
   position: absolute;
   top: 50%;

@@ -51,12 +51,17 @@ class Element {
     this.replacements++;
   }
   insertBefore(item, next) {
+    if (item.parentElement && document.activeElement === item) document.activeElement = null;
     if (item.parentElement) item.parentElement.children.splice(item.parentElement.children.indexOf(item), 1);
     const index = next ? this.children.indexOf(next) : this.children.length;
     assert.ok(index >= 0);
     this.children.splice(index, 0, item);
     item.parentElement = this;
     this.moves++;
+  }
+  focus(options) {
+    this.focusOptions = options;
+    document.activeElement = this;
   }
   setAttribute(key, value) {
     this.attributeWrites++;
@@ -223,9 +228,13 @@ list.children[0].events.keydown({ key: 'Enter', preventDefault() {} });
 spectator.update(race, selected);
 assert.equal(selected, null);
 race.state = 'running';
+const focusedRow = list.children[1];
+focusedRow.focus();
 race.balls[1].y = 10;
 spectator.update(race, 0);
 assert.equal(list.children[0].children[1].textContent, 'B', 'LAN retains original live-order standings');
+assert.equal(document.activeElement, focusedRow, 'an overtake keeps keyboard focus on the moved marble');
+assert.equal(focusedRow.focusOptions.preventScroll, true, 'restoring focus does not jump the standings scroll');
 assert.equal(
   list.children[1].attributes['aria-pressed'],
   'true',
@@ -241,3 +250,4 @@ assert.equal(
   'true',
   'the row order agrees with circular-goal tracking'
 );
+assert.equal(list.children.length, 2, 'changing maps with the same number of marbles removes the old rows immediately');
