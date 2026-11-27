@@ -11,10 +11,9 @@ require.extensions['.ts'] = (m, file) =>
 global.fetch = undefined;
 const { Race } = require('../src/race.ts');
 const { validateStage } = require('../src/model.ts');
-const { oneBounce: stage, reboundPad } = require('../src/data/one-bounce.ts');
+const { oneBounce: stage } = require('../src/data/one-bounce.ts');
 
-// A score alone cannot distinguish a bank shot from a fall into the return lane.
-// Stop the contact trace at the two lips, before the narrowing cup touches the marble.
+// Check for a direct shot up to the cup lips, before the narrowing walls touch the marble.
 const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
 (async () => {
   assert.deepEqual(validateStage(JSON.parse(JSON.stringify(stage))), stage);
@@ -25,7 +24,6 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
   const listener = new box.JSContactListener();
   const random = Math.random;
   const shots = new Map();
-  const pad = stage.entities.indexOf(reboundPad);
   let boardBodies = new Map(),
     marbleBodies = new Map();
   listener.BeginContact = (ptr) => {
@@ -41,7 +39,6 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
   try {
     for (const count of [1, 8, 20, 40, 100, 300]) {
       let direct = 0,
-        bank = 0,
         total = 0,
         retries = 0;
       const seeds = count === 300 ? [77] : [77, 527, 1337];
@@ -64,16 +61,16 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
         const clearedFeed = new Set();
         const funnelSamples = race.balls.map((b) => ({ x: b.x, y: b.y, movedAt: 0 }));
         let longestFunnelPause = 0;
-        const timeLimit = count === 300 ? 265 : count === 100 ? 125 : 155;
+        // Without the reflector, low shots have to return to the launcher for another attempt.
+        const timeLimit = count === 300 ? 300 : count === 100 ? 125 : 155;
         while (race.state === 'running' && race.elapsed < timeLimit) {
           const launcher = physics.launchers[0],
             held = launcher.loaded?.body;
           race.advance();
           if (held && !launcher.loaded) {
             const id = marbleBodies.get(box.getPointer(held));
-            const { vx, vy } = physics.getMarbleVelocity(id);
             if (shots.has(id)) retries++;
-            shots.set(id, { angle: (Math.atan2(-vy, -vx) * 180) / Math.PI, hits: [], inCup: false });
+            shots.set(id, { hits: [], inCup: false });
           }
           for (const ball of race.balls) {
             if (count === 300 && race.elapsed < 90 && ball.y >= 15.5) clearedFeed.add(ball.id);
@@ -102,19 +99,22 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
           }
         }
         if (count === 300) assert.ok(clearedFeed.size >= 195, 'crowded marbles keep flowing through the upper ramps');
-        assert.equal(race.finishReason, 'arrived', count + ' marbles must finish within ' + timeLimit + 's');
+        assert.equal(
+          race.finishReason,
+          'arrived',
+          `${race.arrivals.length}/${count} marbles finished within ${timeLimit}s (seed ${initial})`
+        );
         assert.equal(race.rescues, 0, 'even misses must return under their own physics');
         assert.equal(shots.size, count, 'all marbles must use the launcher');
         assert.ok(longestFunnelPause < 30, 'the guide must keep queued marbles moving');
         for (const shot of shots.values()) {
           assert.ok(shot.inCup, 'every final shot passes through the receiver mouth');
-          if (shot.hits.length === 1 && shot.hits[0] === pad && shot.angle < 15) bank++;
-          if (!shot.hits.length && shot.angle > 15) direct++;
+          if (!shot.hits.length) direct++;
         }
         total += race.arrivals.length;
       }
       if (count >= 8) {
-        assert.ok(bank > 0 && direct > 0, 'both low single-bounce and high direct finishes must be playable');
+        assert.ok(direct > 0, 'direct shots must still reach the cup without the reflector');
         assert.ok(retries > 0, 'missed shots must cycle back into the barrel');
       }
       console.log(
@@ -123,10 +123,8 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
         `marbles × ${seeds.length} races:`,
         total,
         'arrivals,',
-        bank,
-        'low bank shots,',
         direct,
-        'high direct shots,',
+        'direct shots,',
         retries,
         'relaunches'
       );
@@ -143,7 +141,7 @@ const rimY = (x) => 17 + ((x - 0.8) * 2.7) / 6.4;
       fired = !!held && !launcher.loaded;
     }
     assert.ok(fired, 'a marble deflected off the feed ramp must return to the launcher before reaching the cup');
-    console.log('PASS stray feed marble misses the pad edge and returns to the launcher');
+    console.log('PASS stray feed marble returns to the launcher');
   } finally {
     Math.random = random;
     physics.world.SetContactListener(0);

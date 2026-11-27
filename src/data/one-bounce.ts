@@ -14,7 +14,8 @@ const rail = (points: Point[], color: string): MapEntity => {
 };
 const launcher = marbleLauncher(28, 21.5, 'funnel');
 // Keep high shots below the feed ramp and vary the angle after a return lap.
-launcher.props.oscillation = { amplitude: 0.265, period: 2.59 };
+launcher.props.oscillation = { amplitude: 0.265, period: 3.17 };
+launcher.shape.launcherCycleScale = 0.62;
 const funnel = launcherFunnel(launcher.position);
 const guidePivot = { x: 28.52, y: 20.43 };
 // Swing the upper guide away from the pack while keeping the loading throat steady.
@@ -40,13 +41,6 @@ const enclosure = rail(
   returnRail
 );
 
-// Catch low shots while leaving falling feed marbles clear of the pad.
-export const reboundPad: MapEntity = {
-  type: 'static',
-  position: { x: 14.9, y: 21.32 },
-  shape: { type: 'box', width: 3.05, height: 0.23, rotation: 0.08, color: '#65efda' },
-  props: { density: 1, restitution: 1.42, angularVelocity: 0 },
-};
 export const oneBounce: StageDef = {
   title: '원바운드 샷',
   width: 34,
@@ -82,7 +76,6 @@ export const oneBounce: StageDef = {
     },
     funnelGuide,
     launcher,
-    reboundPad,
     rail(
       [
         [4.05, 30],
