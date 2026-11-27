@@ -97,3 +97,75 @@ body[data-role="viewer"] #game-view {
   flex-wrap: wrap;
   gap: 6px;
 }
+
+.lan-options {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.lan-options summary {
+  cursor: pointer;
+  color: var(--accent);
+  width: fit-content;
+  padding: 4px 0;
+}
+.lan-options[open] > :not(summary) {
+  margin-top: 10px;
+}
+.panel-clip:has(.lan-options[open]) {
+  max-height: 52dvh;
+  overflow-y: auto;
+}
+#control-panel {
+  padding: 12px 18px;
+  gap: 8px 24px;
+}
+#lan-results {
+  flex: none;
+  padding: 8px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+#winner-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: 4px 12px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  max-height: 18dvh;
+  overflow-wrap: anywhere;
+}
+#winner-list li {
+  padding: 2px 0;
+}
+#winner-list small {
+  display: block;
+  color: var(--accent);
+}
+#ranking-toggle {
+  display: none;
+}
+@media (max-width: 600px) {
+  #ranking-toggle {
+    display: block;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    background: var(--panel);
+  }
+  #ranking-list {
+    top: 44px;
+    max-height: calc(100% - 76px);
+    background: var(--panel);
+    border-radius: 6px;
+  }
+  #ranking-toggle[aria-expanded="false"] + #ranking-list li:nth-child(n + 4):not([aria-pressed="true"]) {
+    display: none;
+  }
+  #ranking-toggle:has(+ [hidden]) {
+    display: none;
+  }
+}

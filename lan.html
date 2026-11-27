@@ -12,9 +12,11 @@
     <div class="race-layout">
       <div class="view-controls"><div class="zoom-controls" role="group" aria-label="화면 배율"><button type="button" id="zoom-out" aria-label="축소" title="축소">−</button><button type="button" id="zoom-reset" aria-label="기본 배율로 돌아가기" title="기본 배율로 돌아가기 · 마우스 휠로 확대·축소">100%</button><button type="button" id="zoom-in" aria-label="확대" title="확대">＋</button></div><button type="button" id="follow" title="구슬 따라가기">◎ 따라가기</button><label data-host hidden>배속 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label><button type="button" id="pause" data-host hidden disabled>일시정지</button></div>
       <div class="play-area"><canvas id="game" tabindex="-1" aria-label="구슬 경주 화면. 왼쪽 미니맵 위에 마우스를 올리면 해당 위치를 따라갑니다. 마우스 휠로 확대하거나 축소할 수 있습니다."></canvas>
+      <button type="button" id="ranking-toggle" aria-expanded="false" aria-controls="ranking-list">전체 순위</button>
       <ol id="ranking-list" class="rankings" role="list" aria-label="경주 순위. 구슬을 누르면 따라갑니다. 목록 바깥 클릭 또는 Esc로 해제합니다. 도착한 구슬은 굵게 표시됩니다." tabindex="0" hidden></ol>
       </div>
     </div>
+    <section id="lan-results" aria-label="당첨 결과" hidden><strong>당첨 결과</strong><ol id="winner-list" tabindex="0" aria-label="당첨 순위와 이름"></ol></section>
     <section class="personal-spring" aria-label="내 일회용 스프링">
       <div><strong>내 스프링 <small>경기당 1개</small></strong><p id="personal-spring-status" role="status">서버 연결 후 배치할 수 있어요.</p></div>
       <div class="personal-spring-actions"><button type="button" id="spring-place" disabled>⇧ 스프링 배치</button><button type="button" id="spring-back" hidden>위치 다시 선택</button><button type="button" id="spring-cancel" hidden>취소</button><button type="button" id="spring-use" class="primary" hidden disabled>내 스프링 발동 · SPACE</button><button type="button" id="map-spring-use" hidden disabled>선택한 맵 스프링 발동</button></div>
@@ -26,11 +28,13 @@
       <div class="names-panel"><div class="label-row"><label for="names">참가자 이름</label><span id="count">4개의 구슬</span></div><textarea id="names" spellcheck="false" placeholder="하나, 둘, 셋, 넷">하나, 둘, 셋, 넷</textarea><div class="names-footer"><span>콤마로 구분 · 같은 이름을 여러 개 넣으려면 이름*3</span><button type="button" id="shuffle">⇄ 섞기</button></div></div>
       <div class="settings-panel"><div class="setting"><label for="map-select">맵</label><div class="inline"><select id="map-select"></select><button type="button" id="edit-current" title="선택한 맵 편집">편집</button></div></div>
         <div class="setting"><label for="winner-mode">당첨 순위</label><div class="inline"><select id="winner-mode" aria-label="당첨 방향"><option value="asc">ASC(앞)</option><option value="desc" selected>DESC(뒤)</option></select><select id="winner-count" aria-label="뽑을 인원"><option value="1">1명</option><option value="2" selected>2명</option></select></div></div>
-        <div class="setting"><label for="marble-design">공 디자인</label><select id="marble-design"><option value="ceramic" selected>무광 세라믹</option><option value="racing-band">레이싱 밴드</option></select></div>
-        <div class="setting"><label for="record">녹화</label><label class="check"><input id="record" type="checkbox" /> 경기 종료 후 영상 저장</label></div>
         <div class="play-actions"><button type="button" id="reset">다시 준비</button><button type="button" id="start" class="primary" disabled>▶ 시작</button></div>
       </div>
-      <section id="dolphin-settings" aria-label="돌고래·만타가오리 효과 설정"></section>
+      <details class="lan-options"><summary>공 디자인 · 녹화 · 효과</summary>
+        <div class="setting"><label for="marble-design">공 디자인</label><select id="marble-design"><option value="ceramic" selected>무광 세라믹</option><option value="racing-band">레이싱 밴드</option></select></div>
+        <div class="setting"><label for="record">녹화</label><label class="check"><input id="record" type="checkbox" /> 경기 종료 후 영상 저장</label></div>
+        <section id="dolphin-settings" aria-label="돌고래·만타가오리 효과 설정"></section>
+      </details>
     </section>
       </div></div>
     </div>

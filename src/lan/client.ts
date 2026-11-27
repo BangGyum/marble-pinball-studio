@@ -28,6 +28,12 @@ const order = el<HTMLSelectElement>('winner-mode'),
   picks = el<HTMLSelectElement>('winner-count'),
   record = el<HTMLInputElement>('record');
 const isLocal = ['127.0.0.1', 'localhost'].includes(location.hostname);
+const rankingToggle = el('ranking-toggle');
+rankingToggle.addEventListener('click', () => {
+  const expanded = rankingToggle.getAttribute('aria-expanded') !== 'true';
+  rankingToggle.setAttribute('aria-expanded', String(expanded));
+  rankingToggle.textContent = expanded ? '순위 접기' : '전체 순위';
+});
 let socket: WebSocket | undefined, scene: Scene | undefined, frame: Frame | undefined;
 let identity: Identity = { type: 'identity', role: 'viewer', name: '' };
 let info: Info,
@@ -184,8 +190,26 @@ function connection(connected: boolean, status: string) {
   el('connection').dataset.offline = String(!connected);
   updateControls();
 }
+function updateWinners(scene: Scene, frame: Frame) {
+  const winners = scene.settings.order === 'desc' ? [...frame.winners].reverse() : frame.winners;
+  const winnerList = el('winner-list');
+  el('lan-results').hidden = !winners.length;
+  winners.forEach((id, i) => {
+    let row = winnerList.children.item(i);
+    if (!row) {
+      row = winnerList.appendChild(document.createElement('li'));
+      row.append(document.createElement('small'), document.createElement('span'));
+    }
+    const rank = frame.balls[id][4];
+    const rankLabel = rank ? rank + '등' : '당첨';
+    if (row.children[0].textContent !== rankLabel) row.children[0].textContent = rankLabel;
+    if (row.children[1].textContent !== scene.balls[id].name) row.children[1].textContent = scene.balls[id].name;
+  });
+  while (winnerList.children.length > winners.length) winnerList.lastElementChild!.remove();
+}
 function updateRaceUI() {
   if (!scene || !frame) return;
+  updateWinners(scene, frame);
   updateControls();
   updateStandings();
   el('count').textContent = scene.balls.length + '개의 구슬';
@@ -534,7 +558,12 @@ rankingList.addEventListener('click', (event) => {
     view.canvas.focus({ preventScroll: true });
 });
 document.addEventListener('pointerdown', (event) => {
-  if (view.focusedBallId !== null && event.target instanceof Node && !rankingList.contains(event.target))
+  if (
+    view.focusedBallId !== null &&
+    event.target instanceof Node &&
+    !rankingList.contains(event.target) &&
+    !rankingToggle.contains(event.target)
+  )
     selectBall(null);
 });
 document.addEventListener('keydown', (event) => {

@@ -10,13 +10,14 @@ export function drawCelebration(
   width: number,
   height: number,
   reducedMotion: boolean,
-  rightInset = 18
+  rightInset = 18,
+  showNames = true
 ) {
   if (!winners.length) return;
   const ordered = order === 'desc' ? [...winners].reverse() : winners;
   const x = Math.max(20, width - rightInset),
     y = height * 0.5;
-  const maxWidth = Math.max(1, Math.min(260, width * 0.35, x - 16) - 24);
+  const maxWidth = Math.max(1, showNames ? Math.min(260, width * 0.35, x - 16) - 24 : x - 16);
   const visibleCount = Math.max(1, Math.min(5, Math.floor((height * 0.5 - 40) / 24)));
   const shown = ordered.slice(0, visibleCount);
   const beige = getSceneTheme() === 'beige';
@@ -75,6 +76,10 @@ export function drawCelebration(
     'bold ' + Math.min(26, Math.max(18, width * 0.024)) + 'px sans-serif',
     sceneColor('#65efda')
   );
+  if (!showNames) {
+    ctx.restore();
+    return;
+  }
   shown.forEach((ball, i) => {
     label(
       (ball.rank ? ball.rank + '등 · ' : '당첨 · ') + ball.name,

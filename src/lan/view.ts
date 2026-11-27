@@ -867,6 +867,7 @@ export class LanView {
       ctx.fillText(scene.stage.art?.style === 'switchback-express' ? '200 OK' : 'FINISH', 1, scene.stage.goalY - 0.4);
     }
     this.cache.beginFrame();
+    const showLabels = w > 600 || active.length < 40;
     for (const ball of balls) {
       if (ball.rank && ball !== selected) continue;
       const labelMargin = Math.max(1, (ball.name.length * 17) / scale);
@@ -896,12 +897,13 @@ export class LanView {
             scale,
             this.reducedMotion?.matches ?? false
           ) ?? this.marbleElasticity.effect(ball.id, now, this.reducedMotion?.matches ?? false));
-      if (!this.cache.drawBall(ctx, ball, scale, dpr, ball.x, ball.y, squash)) {
+      if (!this.cache.drawBall(ctx, ball, scale, dpr, ball.x, ball.y, squash, showLabels)) {
         drawMarble(ctx, ball.x, ball.y, 0.25, ball.color, squash);
-        drawMarbleLabel(ctx, ball.name, ball.color, ball.x, ball.y, scale);
+        if (showLabels) drawMarbleLabel(ctx, ball.name, ball.color, ball.x, ball.y, scale);
       }
       ctx.globalAlpha = 1;
     }
+    if (!showLabels && target) drawMarbleLabel(ctx, target.name, target.color, target.x, target.y, scale);
     if (this.drainCueAt && !this.reducedMotion?.matches)
       drawFunnelEntryCue(ctx, scene.stage, (now - this.drainCueAt) / 1000, scale);
     ctx.restore();
@@ -944,7 +946,8 @@ export class LanView {
         w,
         h,
         this.reducedMotion?.matches ?? false,
-        this.celebrationRightInset
+        this.celebrationRightInset,
+        this.recording
       );
     }
   }

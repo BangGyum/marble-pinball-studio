@@ -62,7 +62,8 @@ export class RenderCache {
     dpr: number,
     x = ball.x,
     y = ball.y,
-    squash?: MarbleSquash
+    squash?: MarbleSquash,
+    showLabel = true
   ) {
     // Older browsers can keep using the vector renderer.
     if (typeof OffscreenCanvas === 'undefined') return false;
@@ -77,7 +78,7 @@ export class RenderCache {
     // A sharper bitmap remains valid when the camera zooms out or canvas density falls.
     // Keep one bitmap per marble/label, and only replace it for more detail or new content.
     const needsBody = !cached || cached.key !== key || cached.density < resolution * dpr,
-      needsLabel = !label || label.key !== labelKey || label.density < rasterFont * dpr;
+      needsLabel = showLabel && (!label || label.key !== labelKey || label.density < rasterFont * dpr);
     if ((needsBody || needsLabel) && performance.now() >= this.deadline) {
       // Draw the vector fallback now and build the remaining bitmaps on later frames.
       this.warming = true;
@@ -128,6 +129,7 @@ export class RenderCache {
         marble.height / marbleScale
       );
     }
+    if (!showLabel) return true;
     // Labels keep the original 12–17 CSS pixel policy, independently of marble zoom.
     if (!label || needsLabel) {
       const canvas = new OffscreenCanvas(1, 1),
