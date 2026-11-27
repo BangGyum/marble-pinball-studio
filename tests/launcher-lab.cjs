@@ -30,7 +30,7 @@ const { validateStage } = require('../src/model.ts');
       /장전 시간 배율/
     );
     const funnel = marbleLauncher(18, 16, 'funnel');
-    for (const invalid of [0, 1.1, '0.72']) {
+    for (const invalid of [0.49, 1.1, '0.72']) {
       funnel.shape.launcherCycleScale = invalid;
       assert.throws(() => validateStage({ ...stage, entities: [funnel] }), /장전 시간 배율/);
     }

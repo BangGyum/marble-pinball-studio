@@ -12,8 +12,8 @@ const feed = '#79d5cf',
   brass = '#ffc675',
   lift = '#82a9c4';
 const launcher = marbleLauncher(28, 21.5, 'funnel');
-launcher.props.oscillation!.amplitude = 0.12;
-launcher.shape.launcherCycleScale = 0.72;
+launcher.props.oscillation!.amplitude = 0.114;
+launcher.shape.launcherCycleScale = 0.5;
 const funnel = launcherFunnel(launcher.position);
 // Let the shoulder sweep the queue while the bottom stays centered on the intake.
 const guidePivot = { x: 28.52, y: 20.43 };

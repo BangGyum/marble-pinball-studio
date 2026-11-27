@@ -143,7 +143,7 @@ async function verifyFunnel() {
       props: { density: 1, restitution: 0, angularVelocity: 0 },
     });
     const device = marbleLauncher(x, y, 'funnel');
-    device.shape.launcherCycleScale = 0.72;
+    device.shape.launcherCycleScale = 0.5;
     const stage = {
       title: 'Funnel probe',
       goalY: 40,
@@ -261,7 +261,7 @@ async function verifyDenseRaces() {
           assert.equal(race.arrivals.length, count, diagnosis);
           assert.equal(released.size, count, diagnosis + ' all marbles must leave the muzzle');
           assert.equal(race.rescues, 0, diagnosis);
-          const maxLoadTime = stage === launcherLab ? 0.33 : 0.45;
+          const maxLoadTime = stage === launcherLab ? 0.24 : 0.45;
           assert.ok(longestLoad < maxLoadTime, diagnosis + ' a marble cannot stall in the barrel');
           assert.ok(longestReloadWait < 2, diagnosis + ' the funnel must clear an occupied throat');
           console.log(
