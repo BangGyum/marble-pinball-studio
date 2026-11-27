@@ -14,6 +14,13 @@ import '../dolphin.css';
 import { validateDolphins } from '../dolphin';
 import { initMarbleDesign } from '../marble-design';
 import { createParticipantGuide } from './participant-guide';
+import {
+  browserRoomEntry,
+  browserRoomMode,
+  connectBrowserRoom,
+  validRoomName,
+  type BrowserRoomSocket,
+} from './browser-room';
 
 initMarbleDesign();
 const showParticipantGuide = createParticipantGuide(el<HTMLDialogElement>('participant-guide'));
@@ -35,7 +42,7 @@ rankingToggle.addEventListener('click', () => {
   rankingToggle.setAttribute('aria-expanded', String(expanded));
   rankingToggle.textContent = expanded ? '순위 접기' : '전체 순위';
 });
-let socket: WebSocket | undefined, scene: Scene | undefined, frame: Frame | undefined;
+let socket: WebSocket | BrowserRoomSocket | undefined, scene: Scene | undefined, frame: Frame | undefined;
 let identity: Identity = { type: 'identity', role: 'viewer', name: '' };
 let info: Info,
   online = false,
@@ -335,73 +342,124 @@ function requestSession(name?: string) {
     ...(name ? { headers: { 'X-Participant-Name': encodeURIComponent(name) } } : {}),
   });
 }
+function askParticipantName<T>(submitName: (name: string) => Promise<T>): Promise<T> {
+  const dialog = el<HTMLDialogElement>('participant-join'),
+    form = el<HTMLFormElement>('participant-form'),
+    input = el<HTMLInputElement>('participant-name'),
+    error = el('participant-error'),
+    submit = form.querySelector('button')!;
+  dialog.oncancel = (event) => event.preventDefault();
+  return new Promise((resolve) => {
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+      if (submit.disabled) return;
+      submit.disabled = true;
+      error.hidden = true;
+      try {
+        const name = input.value.trim();
+        if (!name) throw new Error('입장할 이름을 입력해 주세요.');
+        const joined = await submitName(name);
+        dialog.close();
+        form.onsubmit = null;
+        resolve(joined);
+      } catch (failure) {
+        error.textContent = message(failure);
+        error.hidden = false;
+      } finally {
+        submit.disabled = false;
+      }
+    };
+    dialog.showModal();
+  });
+}
+function savedParticipantName() {
+  try {
+    return localStorage.getItem(participantKey);
+  } catch {
+    return null;
+  }
+}
+function rememberParticipantName(name: string) {
+  try {
+    localStorage.setItem(participantKey, name);
+  } catch {}
+}
 async function joinSession(): Promise<Identity> {
   let response = await requestSession();
   if (!isLocal && (response.ok || response.status === 428)) await showParticipantGuide();
   if (response.status === 428 && !isLocal) {
-    let saved: string | null = null;
-    try {
-      saved = localStorage.getItem(participantKey);
-    } catch {}
+    const saved = savedParticipantName();
     if (saved) response = await requestSession(saved);
     if (response.status === 428 || response.status === 400) {
-      const dialog = el<HTMLDialogElement>('participant-join'),
-        form = el<HTMLFormElement>('participant-form'),
-        input = el<HTMLInputElement>('participant-name'),
-        error = el('participant-error'),
-        submit = form.querySelector('button')!;
-      dialog.oncancel = (event) => event.preventDefault();
-      response = await new Promise<Response>((resolve) => {
-        form.onsubmit = async (event) => {
-          event.preventDefault();
-          if (submit.disabled) return;
-          submit.disabled = true;
-          error.hidden = true;
-          try {
-            const name = input.value.trim();
-            if (!name) throw new Error('입장할 이름을 입력해 주세요.');
-            const joined = await requestSession(name);
-            if (!joined.ok) throw new Error((await joined.json()).error);
-            dialog.close();
-            form.onsubmit = null;
-            resolve(joined);
-          } catch (failure) {
-            error.textContent = message(failure);
-            error.hidden = false;
-          } finally {
-            submit.disabled = false;
-          }
-        };
-        dialog.showModal();
+      response = await askParticipantName(async (name) => {
+        const joined = await requestSession(name);
+        if (!joined.ok) throw new Error((await joined.json()).error);
+        return joined;
       });
     }
   }
   const data = await response.json();
   if (!response.ok) throw new Error(data.error);
-  if (!isLocal) {
-    try {
-      localStorage.setItem(participantKey, data.name);
-    } catch {}
-  }
+  if (!isLocal) rememberParticipantName(data.name);
   return data;
+}
+let roomName: string | undefined;
+async function browserParticipantName() {
+  if (roomName) return roomName;
+  await showParticipantGuide();
+  const saved = savedParticipantName();
+  roomName =
+    saved && validRoomName(saved)
+      ? saved
+      : await askParticipantName(async (name) => {
+          if (!validRoomName(name)) throw new Error('일반 문자로 이름을 입력해 주세요. 최대 24자까지 쓸 수 있어요.');
+          rememberParticipantName(name);
+          return name;
+        });
+  return roomName;
 }
 async function connect() {
   connection(false, retry ? '재접속 중' : '서버에 연결 중');
   try {
-    identity = await joinSession();
-    info = await (await fetch('/api/info')).json();
+    if (browserRoomMode) {
+      el('room-exit').hidden = false;
+      const entry = await browserRoomEntry();
+      const name = entry.hostKey ? '방장' : await browserParticipantName();
+      ({ identity, info, socket } = await connectBrowserRoom(entry, name));
+      if (entry.hostKey) {
+        el('share-label').textContent = '방 초대';
+        el('address-label').hidden = el('address').hidden = true;
+        el('share-help').textContent =
+          '같은 Wi-Fi에서 참가 링크를 열거나 아래 방 코드를 입력하세요. 방장 창을 열어 두세요.';
+        el('share-code').textContent = entry.code;
+        el('share-code').hidden = false;
+        const copy = el<HTMLButtonElement>('share-copy');
+        copy.hidden = false;
+        copy.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(info.addresses[0].url);
+            toast('참가 링크를 복사했어요.');
+          } catch {
+            toast('아래 참가 링크를 복사해 주세요.');
+          }
+        };
+      }
+    } else {
+      identity = await joinSession();
+      info = await (await fetch('/api/info')).json();
+      socket = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/live');
+    }
     info.maps.forEach((map) => {
       stages[map.id].title = map.title;
     });
     refreshMaps();
     el<HTMLSelectElement>('address').replaceChildren(...info.addresses.map((a, i) => new Option(a.name, String(i))));
     setAddress();
-    socket = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host + '/live');
     socket.onopen = () => {
       retry = 0;
       connection(true, '실시간 연결됨');
     };
-    socket.onmessage = (event) => {
+    socket.onmessage = (event: { data: string }) => {
       const incoming = JSON.parse(event.data) as ServerMessage;
       if (incoming.type === 'scene') {
         const first = !scene,
@@ -474,7 +532,11 @@ async function connect() {
       }
     };
     socket.onclose = () => {
-      connection(false, '연결이 끊겼어요 · 재접속 중');
+      const roomEnded = browserRoomMode && identity.role === 'host';
+      connection(
+        false,
+        roomEnded ? '방 연결이 끊겼어요. 멀티플레이에서 다시 열어 주세요.' : '연결이 끊겼어요 · 재접속 중'
+      );
       view.onBoost(false);
       for (const wait of pending.values()) {
         clearTimeout(wait.timer);
@@ -482,7 +544,7 @@ async function connect() {
       }
       pending.clear();
       frame = undefined;
-      setTimeout(connect, Math.min(5000, 500 * 2 ** retry++));
+      if (!roomEnded) setTimeout(connect, Math.min(5000, 500 * 2 ** retry++));
     };
     socket.onerror = () => socket?.close();
   } catch (error) {

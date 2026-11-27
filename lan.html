@@ -8,7 +8,7 @@
 </head>
 <body data-role="viewer">
   <main id="game-view">
-    <header class="topbar"><div class="brand"><i></i> 바울 핀볼 <span>PAUL PINBALL</span></div><div class="top-actions"><span id="status" role="status">게임 준비 중</span><button type="button" id="editor-open" data-host hidden>맵 만들기 <span>↗</span></button></div></header>
+    <header class="topbar"><div class="brand"><i></i> 바울 핀볼 <span>PAUL PINBALL</span></div><div class="top-actions"><a id="room-exit" href="?rooms=1" hidden>방 나가기</a><span id="status" role="status">게임 준비 중</span><button type="button" id="editor-open" data-host hidden>맵 만들기 <span>↗</span></button></div></header>
     <div class="race-layout">
       <div class="view-controls"><div class="zoom-controls" role="group" aria-label="화면 배율"><button type="button" id="zoom-out" aria-label="축소" title="축소">−</button><button type="button" id="zoom-reset" aria-label="기본 배율로 돌아가기" title="기본 배율로 돌아가기 · 마우스 휠로 확대·축소">100%</button><button type="button" id="zoom-in" aria-label="확대" title="확대">＋</button></div><button type="button" id="follow" title="구슬 따라가기">◎ 따라가기</button><label data-host hidden>배속 <select id="speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label><button type="button" id="pause" data-host hidden disabled>일시정지</button></div>
       <div class="play-area"><canvas id="game" tabindex="-1" aria-label="구슬 경주 화면. 왼쪽 미니맵 위에 마우스를 올리면 해당 위치를 따라갑니다. 마우스 휠로 확대하거나 축소할 수 있습니다."></canvas>
@@ -38,8 +38,20 @@
     </section>
       </div></div>
     </div>
-    <footer><span id="map-caption"></span><span id="focus-status" role="status" class="sr-only"></span><span class="lan-connection"><span id="connection">연결 중</span><details data-host hidden><summary>관람 주소</summary><label for="address">접속할 네트워크</label><select id="address"></select><a id="join-url" target="_blank" rel="noopener" aria-label="선택한 관람 주소 열기"></a><p>같은 네트워크에서 접속 · 입장 코드 없음 · 표시된 스프링 조작 가능</p></details></span><a href="https://github.com/lazygyu/roulette" target="_blank" rel="noopener noreferrer">Original by lazygyu · MIT</a><a href="./licenses.html" target="_blank" rel="noopener noreferrer">오픈소스 라이선스</a></footer>
+    <footer><span id="map-caption"></span><span id="focus-status" role="status" class="sr-only"></span><span class="lan-connection"><span id="connection">연결 중</span><details data-host hidden><summary id="share-label">관람 주소</summary><label id="address-label" for="address">접속할 네트워크</label><select id="address"></select><a id="join-url" target="_blank" rel="noopener" aria-label="참가 주소 열기"></a><p id="share-help">같은 네트워크에서 접속 · 입장 코드 없음 · 표시된 스프링 조작 가능</p><code id="share-code" aria-label="방 코드" hidden></code><button id="share-copy" type="button" hidden>참가 링크 복사</button></details></span><a href="https://github.com/lazygyu/roulette" target="_blank" rel="noopener noreferrer">Original by lazygyu · MIT</a><a href="./licenses.html" target="_blank" rel="noopener noreferrer">오픈소스 라이선스</a></footer>
   </main>
+  <dialog id="room-lobby" aria-labelledby="room-title">
+    <h1 id="room-title">멀티플레이</h1>
+    <p>같은 Wi-Fi나 유선 네트워크에서 함께 플레이하세요. 방을 만든 사람이 방장이 됩니다.</p>
+    <button id="room-create" class="primary" type="button">방 만들기</button>
+    <form id="room-join">
+      <label for="room-code">방 코드</label>
+      <input id="room-code" type="text" maxlength="32" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="방장이 공유한 코드" required />
+      <button type="submit">방 참가</button>
+    </form>
+    <p id="room-error" role="status"></p>
+    <button id="room-back" type="button">← 맵 목록</button>
+  </dialog>
   <dialog id="participant-guide" aria-labelledby="participant-guide-title" aria-describedby="participant-guide-description">
     <div class="guide-demo" aria-hidden="true">
       <header class="guide-demo-header"><strong>바울 핀볼 · 함께 보기</strong><span>조작 미리보기</span></header>

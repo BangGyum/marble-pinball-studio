@@ -8,5 +8,5 @@
     "outDir": ".lan-build",
     "rootDir": "src"
   },
-  "include": ["src/race.ts", "src/lan/protocol.ts"]
+  "include": ["src/race.ts", "src/lan/protocol.ts", "src/lan/room-core.ts"]
 }

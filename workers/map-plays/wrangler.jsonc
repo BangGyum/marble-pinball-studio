@@ -8,10 +8,17 @@
     "SITE_ORIGIN": "https://banggyum.github.io"
   },
   "durable_objects": {
-    "bindings": [{ "name": "MAP_PLAYS", "class_name": "MapPlays" }]
+    "bindings": [
+      { "name": "MAP_PLAYS", "class_name": "MapPlays" },
+      { "name": "LAN_ROOMS", "class_name": "LanRoom" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MapPlays"] }],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["MapPlays"] },
+    { "tag": "v2", "new_sqlite_classes": ["LanRoom"] }
+  ],
   "ratelimits": [
-    { "name": "PLAY_RATE", "namespace_id": "43187", "simple": { "limit": 5, "period": 60 } }
+    { "name": "PLAY_RATE", "namespace_id": "43187", "simple": { "limit": 5, "period": 60 } },
+    { "name": "ROOM_RATE", "namespace_id": "43190", "simple": { "limit": 40, "period": 60 } }
   ]
 }

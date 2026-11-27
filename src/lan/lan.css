@@ -49,6 +49,46 @@
   color: var(--accent);
   overflow-wrap: anywhere;
 }
+#share-code {
+  display: block;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+#share-copy {
+  margin-top: 10px;
+}
+#room-lobby {
+  width: min(400px, calc(100% - 32px));
+  padding: 22px;
+}
+#room-lobby[open],
+#room-join {
+  display: grid;
+  gap: 10px;
+}
+#room-lobby h1,
+#room-lobby p {
+  margin: 0;
+}
+#room-lobby p {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+#room-lobby #room-error {
+  color: #ffc388;
+}
+#room-error:empty {
+  display: none;
+}
+#room-join {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+#room-exit {
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
 body[data-role="viewer"] #game-view {
   min-height: 360px;
 }

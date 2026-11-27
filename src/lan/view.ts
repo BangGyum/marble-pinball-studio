@@ -368,6 +368,8 @@ export class LanView {
     this.onBoost(false);
     this.placementDrag = undefined;
     this.manual = { ...(this.manual ?? this.camera) };
+    this.updateSpringView(this.manual, this.viewScale());
+    this.renderDirty = true;
     this.onPlacementChange();
   }
   cancelSpringPlacement(closeOverview = false) {
@@ -396,6 +398,13 @@ export class LanView {
         y: (event.clientY - rect.top - t.y) / t.scale,
       }
     );
+  }
+  private updateSpringView(center: { x: number; y: number }, scale: number) {
+    this.springView = {
+      x: this.width * 0.56 - center.x * scale,
+      y: this.height * 0.43 - center.y * scale,
+      scale,
+    };
   }
   setDolphins(settings: DolphinSettings) {
     if (this.state !== 'ready' || !this.scene || !this.canControl) return;
@@ -746,7 +755,7 @@ export class LanView {
       this.cameraMoving ||= Math.abs(target.x - this.camera.x) + Math.abs(target.y - this.camera.y) > 0.01;
     }
     const cam = this.manual ?? this.camera;
-    this.springView = { x: w * 0.56 - cam.x * scale, y: h * 0.43 - cam.y * scale, scale };
+    this.updateSpringView(cam, scale);
     const view = {
       left: cam.x - (w * 0.56) / scale,
       right: cam.x + (w * 0.44) / scale,

@@ -476,6 +476,11 @@ const placed = [],
 interactive.onPlaceSpring = (value) => placed.push(value);
 interactive.onUseSpring = () => used.push(true);
 interactive.beginSpringPlacement();
+assert.equal(
+  interactive.springView.scale,
+  interactive.viewScale(),
+  'placement clicks use the new scale before repaint'
+);
 interactive.draw(1000);
 const springPointer = (x, y, pointerType = 'mouse') => ({
   ...pointer,

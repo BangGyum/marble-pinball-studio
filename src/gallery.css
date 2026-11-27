@@ -5,6 +5,16 @@
 .gallery-topbar {
   background: #0c1117;
 }
+.room-entry {
+  color: var(--accent);
+  font-size: 0.875rem;
+  font-weight: 650;
+  padding: 8px;
+  white-space: nowrap;
+}
+.room-entry:hover {
+  text-decoration: underline;
+}
 #gallery-create {
   border-color: #365a52;
   color: #b7fff1;

@@ -1,5 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { mapPlayKeys } from '../../src/data/map-play-keys.ts';
+import { routeRoom } from './rooms.mjs';
+export { LanRoom } from './rooms.mjs';
 
 const validMaps = new Set(Object.values(mapPlayKeys));
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -8,6 +10,7 @@ const DAY = 86_400_000;
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/rooms/')) return routeRoom(request, env, url);
     if (url.pathname !== '/plays') return new Response(null, { status: 404 });
 
     const origin = request.headers.get('Origin');

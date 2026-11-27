@@ -3,30 +3,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { randomBytes, randomUUID } = require('node:crypto');
-const { WebSocketServer, WebSocket } = require('ws');
+const { WebSocketServer } = require('ws');
 // This Box2D build loads local WASM through Node's fs path, not global fetch.
 Reflect.deleteProperty(globalThis, 'fetch');
-const { Race } = require('../.lan-build/race.js');
-const { stages, visibleBuiltins, DEFAULT_MAP_INDEX } = require('../.lan-build/data/maps.js');
-const { parseNames, winningRange, validateStage } = require('../.lan-build/model.js');
-const { LAN_PORT, MAX_LAN_MESSAGE_BYTES, encodeScene } = require('../.lan-build/lan/protocol.js');
-const { validateDolphins } = require('../.lan-build/dolphin.js');
-const { personalSpringEntity, validatePersonalSpring, springHasExpired } = require('../.lan-build/personal-spring.js');
+const { visibleBuiltins } = require('../.lan-build/data/maps.js');
+const { LAN_PORT, MAX_LAN_MESSAGE_BYTES } = require('../.lan-build/lan/protocol.js');
+const { createRaceRoom } = require('../.lan-build/lan/room-core.js');
 const MAX_LAN_BUFFERED_BYTES = 2 * MAX_LAN_MESSAGE_BYTES;
-/** @typedef {import('../src/lan/protocol').Settings} Settings */
-/** @typedef {import('../src/lan/protocol').Scene} Scene */
-/** @typedef {import('../src/lan/protocol').Frame} Frame */
-/** @typedef {import('../src/lan/protocol').Command} Command */
-/** @typedef {import('../src/lan/protocol').CommandResult} CommandResult */
-/** @typedef {{ token: string, role: 'host' | 'viewer', name: string, touched: number, results: Map<string, CommandResult> }} Session */
-/** @typedef {import('../src/types/map-entity').MapEntityState} MapEntityState */
+/** @typedef {import('../src/lan/room-core').RoomSession & { token: string; touched: number }} Session */
 const loopback = (ip) => ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(ip);
-const round = (n) => Math.round(n * 1000) / 1000;
-const allowedKeys = (value, keys) =>
-  value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).every((key) => keys.includes(key));
-const requireThat = (condition, message) => {
-  if (!condition) throw new Error(message);
-};
 function readParticipantName(value) {
   if (typeof value !== 'string') return '';
   try {
@@ -37,33 +22,18 @@ function readParticipantName(value) {
 }
 
 async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNow = () => performance.now() } = {}) {
-  const race = new Race();
-  await race.physics.init();
-  /** @type {Settings} */
-  let settings = { names: '', mapId: DEFAULT_MAP_INDEX, order: 'desc', picks: 2 };
-  /** @type {string} */
-  let raceId;
-  /** @type {Scene} */
-  let scene;
-  let sceneMessage;
-  let revision = 0,
-    seq = 0;
-  /** @type {Set<number>} */
-  const launcherGuides = new Set();
-  let guidesSentAt = -1;
-  let accumulator = 0,
-    lastTick = simulationNow();
-  let speed = 1,
-    boostUntil = 0;
-  /** @type {Session | null} */
-  let boostOwner = null;
+  const room = await createRaceRoom(
+    simulationNow,
+    (task) => {
+      const immediate = setImmediate(task);
+      return () => clearImmediate(immediate);
+    },
+    randomUUID
+  );
+  const { race, advance } = room;
   /** @type {Map<string, Session>} */
   const sessions = new Map();
-  /** @type {Map<Session, import('../src/personal-spring').PlacedSpring>} */
-  const personalSprings = new Map();
-  /** @type {Map<import('../src/types/map-entity').EntityBoxShape, import('../src/personal-spring').PlacedSpring>} */
-  const activeSprings = new Map();
-  /** @type {Map<import('ws').WebSocket, { session: Session, alive: boolean, count: number, window: number }>} */
+  /** @type {Map<import('ws').WebSocket, { session: Session; alive: boolean }>} */
   const clients = new Map();
   const attempts = new Map();
   const publicDir = path.resolve(__dirname, '../.lan-dist');
@@ -112,279 +82,8 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(value));
   };
-  /** @param {import('ws').WebSocket} ws @param {import('../src/lan/protocol').ServerMessage | string} value */
-  const send = (ws, value) => {
-    if (ws.readyState !== WebSocket.OPEN) return;
-    if (ws.bufferedAmount > MAX_LAN_BUFFERED_BYTES) return ws.terminate();
-    ws.send(typeof value === 'string' ? value : JSON.stringify(value));
-  };
   /** @param {Session} session @returns {import('../src/lan/protocol').Identity} */
   const identity = (session) => ({ type: 'identity', role: session.role, name: session.name });
-  function mapEntities() {
-    // Personal bodies are appended, so filtering them preserves map device indices.
-    const entities = race.physics.getEntities();
-    return activeSprings.size
-      ? entities.filter(({ shape }) => shape.type !== 'box' || !activeSprings.has(shape))
-      : entities;
-  }
-  const currentSprings = () =>
-    [...personalSprings.values()].filter(
-      (spring) =>
-        spring.activatedAt === undefined || (race.state !== 'finished' && !springHasExpired(spring, race.elapsed))
-    );
-  /** @returns {import('../src/lan/protocol').SpringLayout} */
-  const springLayout = () => ({
-    type: 'spring-layout',
-    raceId,
-    springs: currentSprings(),
-  });
-  let springLayoutDirty = false;
-  let springStrokePending = false;
-  /** @type {NodeJS.Immediate | undefined} */
-  let springBroadcast;
-  function makeScene(entities = mapEntities()) {
-    const fixed = new Set(
-      (race.stage.entities ?? []).filter((e) => e.type === 'static' && (e.props.life ?? -1) <= 0).map((e) => e.shape)
-    );
-    scene = {
-      type: 'scene',
-      raceId,
-      revision: ++revision,
-      stage: race.stage,
-      settings: { ...settings },
-      entities,
-      fixed: entities.map((e) => fixed.has(e.shape)),
-      balls: race.balls.map(({ id, name, color }) => ({ id, name, color })),
-    };
-    sceneMessage = JSON.stringify(encodeScene(scene));
-    for (const ws of clients.keys()) send(ws, sceneMessage);
-  }
-  function prepare(preservePlacements = false) {
-    raceId = randomUUID();
-    accumulator = 0;
-    boostOwner = null;
-    if (!preservePlacements) personalSprings.clear();
-    springLayoutDirty = preservePlacements && personalSprings.size > 0;
-    springStrokePending = false;
-    activeSprings.clear();
-    launcherGuides.clear();
-    guidesSentAt = -1;
-    race.prepare(settings.stage ?? stages[settings.mapId], parseNames(settings.names), settings.dolphins);
-    makeScene();
-  }
-  function playbackRate() {
-    return speed * (boostOwner && performance.now() < boostUntil ? 2 : 1) * race.finishSlowdown();
-  }
-  /** @param {MapEntityState[]} entities */
-  function syncScene(entities) {
-    if (entities.length !== scene.entities.length) makeScene(entities);
-  }
-  /** @returns {Frame} */
-  function frame(entities = mapEntities()) {
-    syncScene(entities);
-    /** @type {NonNullable<Frame['positions']>} */
-    const positions = entities.flatMap((e, i) =>
-      e.x !== scene.entities[i].x || e.y !== scene.entities[i].y ? [[i, round(e.x), round(e.y)]] : []
-    );
-    /** @type {NonNullable<Frame['mantaCaptures']>} */
-    const mantaCaptures = race.balls.flatMap((b) =>
-      !b.rank && b.mantaCaughtAt !== undefined ? [[b.id, b.mantaCaughtAt]] : []
-    );
-    return {
-      type: 'frame',
-      raceId,
-      revision,
-      seq: ++seq,
-      time: performance.now(),
-      elapsed: race.elapsed,
-      state: race.state,
-      connected: clients.size,
-      speed,
-      playbackRate: playbackRate(),
-      balls: race.balls.map((b) => [b.id, round(b.x), round(b.y), round(b.angle), b.rank ?? 0]),
-      ...(mantaCaptures.length ? { mantaCaptures } : {}),
-      ...(race.stage.exitBridge ? { bridgeIds: race.balls.filter((b) => b.onBridge).map((b) => b.id) } : {}),
-      ...(launcherGuides.size ? { launcherGuides: [...launcherGuides] } : {}),
-      ...(race.finishReason === 'stalled' ? { stalled: true } : {}),
-      angles: entities.map((e) => round(e.angle)),
-      ...(positions.length ? { positions } : {}),
-      winners: race.winners.map((b) => b.id),
-    };
-  }
-  function advance() {
-    if (guidesSentAt === race.elapsed) launcherGuides.clear();
-    race.advance();
-    if (springStrokePending) {
-      springStrokePending = false;
-      springBroadcast ??= setImmediate(broadcast);
-    }
-    for (const id of race.physics.getLauncherGuideIds()) launcherGuides.add(id);
-    for (const [shape, spring] of activeSprings) {
-      if (springHasExpired(spring, race.elapsed) || race.state === 'finished') {
-        race.physics.removeSpring(shape);
-        activeSprings.delete(shape);
-      }
-    }
-  }
-  function broadcast() {
-    if (springBroadcast) {
-      clearImmediate(springBroadcast);
-      springBroadcast = undefined;
-    }
-    if (springLayoutDirty) {
-      const layout = JSON.stringify(springLayout());
-      for (const ws of clients.keys()) send(ws, layout);
-      springLayoutDirty = false;
-    }
-    const entities = mapEntities();
-    const snapshot = frame(entities),
-      hasSprings = entities.some((e) => e.shape.type === 'box' && e.shape.spring);
-    guidesSentAt = race.elapsed;
-    for (const [ws, client] of clients)
-      if (ws.bufferedAmount < 256 * 1024)
-        send(ws, {
-          ...snapshot,
-          ...(hasSprings ? { springs: race.springStatuses(client.session, entities) } : {}),
-          personalSpring: personalSpringStatus(client.session),
-        });
-    return race.state === 'running' && (hasSprings || activeSprings.size > 0);
-  }
-  /** @param {Session} session @returns {NonNullable<Frame['personalSpring']>} */
-  function personalSpringStatus(session) {
-    const spring = personalSprings.get(session);
-    return spring
-      ? { state: spring.activatedAt === undefined ? 'placed' : 'used', id: spring.id }
-      : { state: 'available' };
-  }
-  /** @param {Session} session @param {Command} msg */
-  function execute(session, msg) {
-    requireThat(
-      typeof msg.raceId === 'string' && msg.raceId === raceId,
-      '경기가 바뀌었어요. 최신 화면에서 다시 시도해 주세요.'
-    );
-    /** @satisfies {{ [Type in Command['type']]: (keyof (Command & { type: Type }))[] }} */
-    const keys = {
-      configure: ['settings', 'shuffle'],
-      start: [],
-      pause: [],
-      reset: [],
-      speed: ['value'],
-      boost: ['active'],
-      spring: ['index', 'revision'],
-      'place-spring': ['x', 'y', 'direction'],
-      'use-spring': [],
-    };
-    requireThat(
-      Object.hasOwn(keys, msg.type) && allowedKeys(msg, ['type', 'requestId', 'raceId', ...keys[msg.type]]),
-      '허용되지 않은 요청입니다.'
-    );
-    if (msg.type === 'place-spring') {
-      requireThat(race.state !== 'finished', '다음 경기가 준비되면 배치할 수 있어요.');
-      requireThat(!personalSprings.has(session), '이번 경기의 스프링은 이미 배치했어요.');
-      validatePersonalSpring(race.stage, msg, currentSprings());
-      personalSprings.set(session, {
-        id: randomUUID(),
-        x: msg.x,
-        y: msg.y,
-        direction: msg.direction,
-        ownerName: session.name,
-        placedAt: race.elapsed,
-      });
-      springLayoutDirty = true;
-      return;
-    }
-    if (msg.type === 'use-spring') {
-      requireThat(race.state === 'running', '경기가 진행 중일 때 발동할 수 있어요.');
-      const spring = personalSprings.get(session);
-      if (!spring || spring.activatedAt !== undefined) throw new Error('배치한 스프링이 없거나 이미 사용했어요.');
-      const entity = personalSpringEntity(race.stage, spring);
-      race.physics.createEntities([entity]);
-      const index = race.physics.getEntities().findIndex((entry) => entry.shape === entity.shape);
-      if (!race.activateSpring(index, session)) {
-        race.physics.removeSpring(entity.shape);
-        throw new Error('스프링을 발동하지 못했어요. 다시 시도해 주세요.');
-      }
-      spring.activatedAt = race.elapsed;
-      activeSprings.set(entity.shape, spring);
-      springLayoutDirty = true;
-      springStrokePending = true;
-      return;
-    }
-    if (msg.type === 'spring') {
-      // A contact may have removed an obstacle since the last scheduled snapshot.
-      syncScene(mapEntities());
-      requireThat(
-        Number.isInteger(msg.revision) && msg.revision === revision,
-        '맵 장치가 바뀌었어요. 최신 화면에서 스프링을 다시 선택해 주세요.'
-      );
-      requireThat(
-        Number.isInteger(msg.index) &&
-          msg.index >= 0 &&
-          msg.index < scene.entities.length &&
-          race.activateSpring(msg.index, session),
-        '작동 가능한 스프링을 선택하고 쿨타임과 복귀가 끝난 후 다시 눌러 주세요.'
-      );
-      return;
-    }
-    requireThat(session.role === 'host', '관람자는 경기를 조작할 수 없습니다.');
-    if (msg.type === 'configure') {
-      requireThat(race.state !== 'running' && race.state !== 'paused', '진행 중인 경기는 먼저 다시 준비해 주세요.');
-      const s = msg.settings;
-      requireThat(
-        allowedKeys(s, ['names', 'mapId', 'order', 'picks', 'stage', 'dolphins']) &&
-          (msg.shuffle === undefined || msg.shuffle === true) &&
-          typeof s.names === 'string' &&
-          s.names.length <= 15000 &&
-          Number.isInteger(s.mapId) &&
-          !!stages[s.mapId],
-        '경기 설정이 올바르지 않습니다.'
-      );
-      const names = parseNames(s.names);
-      if (names.length) winningRange(s.order, names.length, s.picks);
-      else requireThat(['asc', 'desc'].includes(s.order) && s.picks === 0, '경기 설정이 올바르지 않습니다.');
-      const stage = s.stage !== undefined ? validateStage(s.stage) : stages[s.mapId];
-      const dolphins = s.dolphins === undefined ? {} : { dolphins: validateDolphins(s.dolphins, stage) };
-      const next = { ...s, ...dolphins, ...(s.stage !== undefined ? { stage } : {}) };
-      const sameReadyMap =
-        race.state === 'ready' &&
-        next.mapId === settings.mapId &&
-        JSON.stringify(next.stage) === JSON.stringify(settings.stage);
-      const preserveReadyRace =
-        sameReadyMap &&
-        !msg.shuffle &&
-        next.names === settings.names &&
-        (next.order !== settings.order ||
-          next.picks !== settings.picks ||
-          JSON.stringify(next.dolphins) !== JSON.stringify(settings.dolphins));
-      settings = next;
-      if (preserveReadyRace) {
-        race.dolphins = validateDolphins(settings.dolphins, race.stage);
-        makeScene();
-      } else prepare(msg.shuffle === true && sameReadyMap);
-    } else if (msg.type === 'start') {
-      requireThat(race.state === 'ready', '다시 준비한 뒤 시작해 주세요.');
-      race.startRace(winningRange(settings.order, race.balls.length, settings.picks), settings.order);
-      accumulator = 0;
-    } else if (msg.type === 'pause') {
-      requireThat(race.state === 'running' || race.state === 'paused', '진행 중인 경기가 없습니다.');
-      race.pause();
-      accumulator = 0;
-      boostOwner = null;
-    } else if (msg.type === 'reset') {
-      prepare();
-    } else if (msg.type === 'speed') {
-      requireThat([0.5, 1, 2, 4].includes(msg.value), '지원하지 않는 배속입니다.');
-      speed = msg.value;
-    } else if (msg.type === 'boost') {
-      requireThat(typeof msg.active === 'boolean', '가속 요청이 올바르지 않습니다.');
-      if (msg.active) {
-        requireThat(race.state === 'running', '경기 중에만 가속할 수 있습니다.');
-        boostOwner = session;
-        boostUntil = performance.now() + 1500;
-      } else if (boostOwner === session) boostOwner = null;
-    }
-  }
-  prepare();
   const server = http.createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -465,7 +164,7 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       return;
     }
     wss.handleUpgrade(req, socket, head, (ws) => {
-      const client = { session, alive: true, count: 0, window: Date.now() };
+      const client = { session, alive: true };
       clients.set(ws, client);
       ws.on('error', () => ws.terminate());
       ws.on('pong', () => {
@@ -474,94 +173,26 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
       });
       ws.on('close', () => {
         clients.delete(ws);
-        if (boostOwner === session) boostOwner = null;
+        room.disconnect(ws);
       });
       ws.on('message', (data, binary) => {
-        if (Date.now() - client.window > 1000) {
-          client.window = Date.now();
-          client.count = 0;
-        }
-        if (binary || ++client.count > 30) return ws.close(1008, 'Too many requests');
-        let msg;
-        try {
-          msg = JSON.parse(data.toString());
-        } catch {
-          return ws.close(1008, 'Invalid JSON');
-        }
-        if (!msg || typeof msg.requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(msg.requestId))
-          return ws.close(1008, 'Invalid request ID');
-        const prior = session.results.get(msg.requestId);
-        if (prior) return send(ws, prior);
-        /** @type {CommandResult} */
-        let result;
-        try {
-          execute(session, msg);
-          result = { type: 'result', requestId: msg.requestId, ok: true };
-        } catch (error) {
-          result = {
-            type: 'result',
-            requestId: msg.requestId,
-            ok: false,
-            error: error instanceof Error ? error.message : String(error),
-          };
-        }
-        session.results.set(msg.requestId, result);
-        if (session.results.size > 64)
-          session.results.delete(/** @type {string} */ (session.results.keys().next().value));
-        send(ws, result);
-        // Acknowledge each input now, then share one authoritative update for this batch.
-        if (msg.type === 'spring' || msg.type === 'place-spring' || msg.type === 'use-spring')
-          springBroadcast ??= setImmediate(broadcast);
-        else broadcast();
+        if (binary) return ws.close(1008, 'Too many requests');
+        room.receive(ws, data.toString());
       });
-      const entities = mapEntities(),
-        snapshot = frame(entities);
-      send(ws, sceneMessage);
-      send(ws, springLayout());
-      send(ws, {
-        ...snapshot,
-        springs: race.springStatuses(session, entities),
-        personalSpring: personalSpringStatus(session),
-      });
-      send(ws, identity(session));
+      room.connect(ws, session);
     });
   });
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, host, () => resolve(undefined));
-  });
-  actualPort = /** @type {import('node:net').AddressInfo} */ (server.address()).port;
-  const timer = setInterval(() => {
-    const tickStarted = performance.now(),
-      now = simulationNow(),
-      delta = Math.min((now - lastTick) / 1000, 0.1);
-    lastTick = now;
-    if (race.state !== 'running') {
-      accumulator = 0;
-      return;
-    }
-    const rate = playbackRate();
-    accumulator += delta * rate;
-    let steps = 0;
-    while (
-      accumulator >= 1 / 60 &&
-      race.state === 'running' &&
-      steps < Math.max(6, Math.ceil(rate * 2)) &&
-      performance.now() - tickStarted < 12
-    ) {
-      advance();
-      accumulator -= 1 / 60;
-      steps++;
-    }
-    // Keep collision steps fixed; shed overdue wall time instead of starving connections.
-    if (accumulator >= 1 / 60) accumulator %= 1 / 60;
-  }, 8);
-  // Shorten the interval only in live races with interactive springs.
-  function sendSnapshot() {
-    const springRace = broadcast();
-    snapshots = setTimeout(sendSnapshot, springRace ? 25 : 50);
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, host, () => resolve(undefined));
+    });
+  } catch (error) {
+    room.close();
+    wss.close();
+    throw error;
   }
-  let snapshots = setTimeout(sendSnapshot, 50);
+  actualPort = /** @type {import('node:net').AddressInfo} */ (server.address()).port;
   const heartbeat = setInterval(() => {
     for (const [ws, client] of clients) {
       if (!client.alive || ws.bufferedAmount > MAX_LAN_BUFFERED_BYTES) {
@@ -579,14 +210,10 @@ async function createLanServer({ port = LAN_PORT, host = '0.0.0.0', simulationNo
     advance,
     info,
     async close() {
-      if (springBroadcast) clearImmediate(springBroadcast);
-      clearInterval(timer);
-      clearTimeout(snapshots);
       clearInterval(heartbeat);
-      for (const ws of clients.keys()) ws.terminate();
+      room.close();
       wss.close();
       await new Promise((resolve) => server.close(resolve));
-      race.physics.dispose();
     },
   };
 }
