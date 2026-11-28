@@ -215,6 +215,7 @@ const ctx = Object.fromEntries(
     'fillText',
     'strokeText',
     'rect',
+    'roundRect',
     'clip',
     'strokeRect',
   ].map((key) => [key, noop])
@@ -398,8 +399,12 @@ global.window = {
     windowListeners.push({ name, callback, capture: options === true || !!options?.capture });
   },
 };
+let placementFocus;
 const interactiveCanvas = {
   ...canvas,
+  focus: (options) => {
+    placementFocus = options;
+  },
   getBoundingClientRect: () => ({ left: 10, top: 20, width: 1000, height: 600 }),
   addEventListener: (name, callback) => {
     pointerHandlers[name] = callback;
@@ -519,7 +524,9 @@ const tapSpring = (point) => {
   pointerHandlers.pointerdown(point);
   pointerHandlers.pointerup(point);
 };
+placementFocus = undefined;
 tapSpring(springPointer(13, 75, 'touch'));
+assert.deepEqual(placementFocus, { preventScroll: true }, 'placing after zoom returns keyboard focus to the game');
 assert.deepEqual(interactive.springPlacement.origin, { x: 13, y: 75 });
 pointerHandlers.pointerdown({ ...springPointer(16, 75, 'touch'), isPrimary: false });
 assert.equal(placed.length, 0, 'a second finger cannot accidentally confirm the placement');
@@ -1028,7 +1035,11 @@ console.log('PASS pinch zoom preserves the draft in either finger release order'
 
 async function checkPlacementRetry() {
   const commandSource = clientSource.statements.find((node) => node.name?.getText(clientSource) === 'personalCommand');
-  const errors = [];
+  const warning = {};
+  global.document.getElementById = (id) => {
+    assert.equal(id, 'toast');
+    return warning;
+  };
   let attempts = 0;
   const submit = vm.runInNewContext(
     ts.transpileModule(commandSource.getText(clientSource) + '\npersonalCommand;', {
@@ -1038,9 +1049,9 @@ async function checkPlacementRetry() {
       view: interactive,
       updatePersonalSpring() {},
       message: (error) => error.message,
-      toast: (error) => errors.push(error),
       async command() {
-        if (++attempts === 1) throw new Error('overlap');
+        if (++attempts === 1) throw new Error('응답을 확인하지 못했어요.');
+        if (attempts === 2) throw new Error('다른 스프링의 배치 위치 또는 발동 범위와 겹쳐요.');
       },
     }
   );
@@ -1052,19 +1063,23 @@ async function checkPlacementRetry() {
   };
   tapSpring(stationaryCursor);
   await response;
-  assert.deepEqual(errors, ['overlap']);
-  assert.equal(interactive.springPending, undefined);
+  assert.equal(warning.textContent, '응답을 확인하지 못했어요.');
   assert.deepEqual(interactive.springPlacement.origin, origin);
+  tapSpring(stationaryCursor);
+  await response;
+  assert.match(warning.textContent, /겹쳐요.*다른 위치/);
+  assert.equal(interactive.springPending, undefined);
+  assert.equal(interactive.springPlacement.active, true);
+  assert.equal(interactive.springPlacement.origin, undefined);
   assert.deepEqual(interactive.manual, center);
-  interactive.beginSpringPlacement();
   interactive.draw(4500);
   tapSpring(springPointer(13, 71));
   tapSpring(springPointer(13, 69));
   await response;
-  assert.equal(attempts, 2);
+  assert.equal(attempts, 3);
   assert.equal(interactive.springPending.state, 'placed', 'ACK alone does not unlock a second placement');
   tapSpring(springPointer(13, 69));
-  assert.equal(attempts, 2);
+  assert.equal(attempts, 3);
   console.log('PASS rejected placement preserves the camera and retries once from a new location');
 }
 checkPlacementRetry().catch((error) => {

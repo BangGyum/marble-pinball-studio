@@ -174,8 +174,12 @@
   width: 3px;
   height: 51px;
   background: currentColor;
+}
+.guide-spring-assembly {
+  position: absolute;
+  inset: 0;
   transform: rotate(28deg);
-  transform-origin: bottom center;
+  transform-origin: 50% calc(100% - 5.5px);
 }
 .guide-spring-direction::after {
   content: "";
@@ -189,29 +193,48 @@
   rotate: 45deg;
 }
 .guide-spring-base,
-.guide-coil {
+.guide-bellows,
+.guide-spring-face {
   position: absolute;
   left: 50%;
   translate: -50%;
 }
 .guide-spring-base {
   bottom: 2px;
-  width: 60px;
+  width: 44px;
   height: 7px;
-  border: 1px solid currentColor;
-  border-radius: 3px;
-  background: var(--panel);
+  border-radius: 4px;
+  background: #25484d;
 }
-.guide-coil {
+.guide-bellows {
   bottom: 7px;
-  width: 42px;
-  height: 26px;
+  width: 34px;
+  height: 18px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(to bottom, #84dec9 0 2px, #25484d 2px 6px);
   transform-origin: bottom;
+}
+.guide-spring-face {
+  bottom: 24px;
+  width: 60px;
+  height: 12px;
+  border: 2px solid #25484d;
+  border-radius: 6px;
+  background: #e3eddf;
+}
+.guide-spring-face::after {
+  content: "";
+  display: block;
+  margin: 2px auto;
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: #668a7b;
 }
 .guide-launch-ball {
   position: absolute;
-  left: 39px;
-  bottom: 35px;
+  left: calc(50% - 6px);
+  bottom: 36px;
   background: currentColor;
 }
 .guide-demo-key {

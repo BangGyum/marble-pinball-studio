@@ -100,6 +100,35 @@ const { drawPlacedSprings } = require('../src/lan/spring-placement.ts');
   console.log('PASS eight LAN springs share artwork through the exact return stroke and expiry');
 }
 
+{
+  const layout = ['own', 'peer'].map((id, i) => ({ id, ownerName: id, x: 5 + i * 5, y: 8, direction: -Math.PI / 2 }));
+  const positions = (springs, elapsed, pressed) => {
+    calls.length = 0;
+    drawPlacedSprings(
+      ctx,
+      springs,
+      'own',
+      42,
+      elapsed,
+      false,
+      { left: 0, right: 20, top: 0, bottom: 20 },
+      1,
+      undefined,
+      pressed
+    );
+    return calls.filter(([method]) => method === 'translate').map(([, , y]) => y);
+  };
+  const rest = positions(layout, 1, false);
+  const press = positions(layout, 1, true);
+  assert.ok(press[0] < rest[0] && press[0] > rest[0] - 0.3);
+  assert.equal(press[1], rest[1], 'an unconfirmed press only moves the owner sprite');
+  assert.deepEqual(positions(layout, 1, false), rest, 'a rejected press returns to rest');
+  const confirmed = [{ ...layout[0], activatedAt: 1 }, layout[1]];
+  assert.deepEqual(positions(confirmed, 1, true), press, 'acknowledgement does not rewind the initial movement');
+  assert.ok(positions(confirmed, 1 + 1 / 60, false)[0] < press[0], 'the authoritative first step takes over');
+  console.log('PASS local spring press, rollback, and handoff to authoritative motion');
+}
+
 // Starting a goal-area map zooms out; a sharper ready bitmap is still valid.
 {
   const originalPerformance = global.performance;

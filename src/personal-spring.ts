@@ -8,6 +8,12 @@ const HALF_WIDTH = 0.9;
 const HALF_HEIGHT = 0.18;
 const BASE_LENGTH = 0.7;
 const STROKE = 1.5;
+const PERSONAL_OVERLAP = '다른 스프링의 배치 위치 또는 발동 범위와 겹쳐요.';
+const MAP_OVERLAP = '맵 스프링의 발동 범위와 겹쳐요.';
+
+export function isSpringOverlapMessage(reason: string) {
+  return reason === PERSONAL_OVERLAP || reason === MAP_OVERLAP;
+}
 
 export const PERSONAL_SPRING_DURATION = 0.65;
 export function springHasExpired(spring: PlacedSpring, elapsed: number) {
@@ -28,7 +34,7 @@ export function personalSpringShape(direction: number): EntityBoxShape {
     width: HALF_WIDTH,
     height: HALF_HEIGHT,
     rotation: direction + Math.PI / 2,
-    color: '#ffcf7c',
+    color: '#84dec9',
     spring: { distance: STROKE, direction },
   };
 }
@@ -110,7 +116,7 @@ export function validatePersonalSpring(
   const layer = personalSpringEntity(stage, placement).shape.collisionLayer ?? 1;
   const bounds = sweptBounds(placement);
   if (others.some((other) => springCollisionLayer(stage, other) === layer && intersects(bounds, sweptBounds(other))))
-    throw new Error('다른 스프링의 배치 위치 또는 발동 범위와 겹쳐요.');
+    throw new Error(PERSONAL_OVERLAP);
   for (const { position, shape } of stage.entities ?? []) {
     if (shape.type !== 'box' || !shape.spring || (shape.collisionLayer ?? 1) !== layer) continue;
     const { direction, distance } = shape.spring,
@@ -125,6 +131,6 @@ export function validatePersonalSpring(
         across: Math.abs(Math.sin(angle)) * shape.width + Math.abs(Math.cos(angle)) * shape.height,
       })
     )
-      throw new Error('맵 스프링의 발동 범위와 겹쳐요.');
+      throw new Error(MAP_OVERLAP);
   }
 }

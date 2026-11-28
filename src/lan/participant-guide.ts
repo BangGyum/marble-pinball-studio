@@ -62,9 +62,11 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
   const target = find('.guide-target');
   const status = find('.guide-demo-status');
   const spring = find('.guide-spring');
+  const assembly = find('.guide-spring-assembly');
   const direction = find('.guide-spring-direction');
   const base = find('.guide-spring-base');
-  const coil = find('.guide-coil');
+  const bellows = find('.guide-bellows');
+  const face = find('.guide-spring-face');
   const launchBall = find('.guide-launch-ball');
   const place = find('.guide-place');
   const key = find('.guide-demo-key');
@@ -206,8 +208,8 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
     const start = anchor(board, 0.75, 0.28);
     const button = anchor(place, 0.68);
     const origin = anchor(base);
-    const aimLeft = anchor(spring, 0.24, 0.2);
-    const aimRight = anchor(spring, 0.77, 0.19);
+    const aimLeft = anchor(spring, 0.11, 0.24);
+    const aimRight = anchor(spring, 0.89, 0.24);
     movePointer(5450, [
       [0, start, 0],
       [180, start],
@@ -224,20 +226,25 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
     ]);
     status.textContent = '스프링 배치 버튼 누르기';
     spring.style.visibility = 'hidden';
+    animate(assembly, 5450, [
+      { transform: 'rotate(-28deg)', offset: 0 },
+      { transform: 'rotate(-28deg)', offset: 0.508, easing: 'ease-in-out' },
+      { transform: 'rotate(28deg)', offset: 0.591 },
+      { transform: 'rotate(28deg)', offset: 1 },
+    ]);
     animate(direction, 5450, [
-      { opacity: 0, transform: 'rotate(-28deg)', offset: 0 },
-      { opacity: 0, transform: 'rotate(-28deg)', offset: 0.447 },
-      { opacity: 1, transform: 'rotate(-28deg)', offset: 0.508, easing: 'ease-in-out' },
-      { opacity: 1, transform: 'rotate(28deg)', offset: 0.591 },
-      { opacity: 1, transform: 'rotate(28deg)', offset: 1 },
+      { opacity: 0, offset: 0 },
+      { opacity: 0, offset: 0.447 },
+      { opacity: 1, offset: 0.508 },
+      { opacity: 1, offset: 1 },
     ]);
     animate(launchBall, 5450, [
       { opacity: 0, offset: 0 },
       { opacity: 0, offset: 0.591 },
       { opacity: 1, transform: 'none', offset: 0.64 },
       { opacity: 1, transform: 'none', offset: 0.738, easing: 'ease-out' },
-      { opacity: 1, transform: 'translate(53px, -68px)', offset: 0.92 },
-      { opacity: 1, transform: 'translate(62px, -59px)', offset: 1 },
+      { opacity: 1, transform: 'translateY(-86px)', offset: 0.92 },
+      { opacity: 1, transform: 'translate(12px, -81px)', offset: 1 },
     ]);
     at(850, () => {
       clickAt(button);
@@ -260,7 +267,12 @@ export function createParticipantGuide(dialog: HTMLDialogElement) {
       place.textContent = '사용 완료';
       status.textContent = '스프링 발동';
       animate(keycap, 300, [{ transform: 'none' }, { transform: 'translateY(2px) scale(.9)' }, { transform: 'none' }]);
-      animate(coil, 550, [{ transform: 'none' }, { transform: 'scaleY(1.58)', offset: 0.24 }, { transform: 'none' }]);
+      animate(bellows, 550, [{ transform: 'none' }, { transform: 'scaleY(2)', offset: 0.24 }, { transform: 'none' }]);
+      animate(face, 550, [
+        { transform: 'none' },
+        { transform: 'translateY(-18px)', offset: 0.24 },
+        { transform: 'none' },
+      ]);
     });
   }
 

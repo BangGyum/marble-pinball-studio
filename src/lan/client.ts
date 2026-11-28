@@ -286,7 +286,8 @@ async function personalCommand(input: Extract<InputCommand, { type: 'place-sprin
   } catch (error) {
     if (view.springPending === pending) {
       view.springPending = undefined;
-      toast(message(error));
+      if (input.type === 'place-spring') view.showPlacementError(message(error));
+      else toast(message(error));
       updatePersonalSpring();
     }
   }
@@ -642,8 +643,12 @@ el('follow').addEventListener('click', () => {
   view.follow(true);
   selectBall(null);
 });
-rankingList.addEventListener('click', (event) => {
-  if (event.detail > 0 && event.target instanceof Element && event.target.closest('li[role="button"]'))
+document.addEventListener('click', (event) => {
+  if (
+    event.detail > 0 &&
+    event.target instanceof Element &&
+    event.target.closest('#ranking-list li[role="button"], #ranking-toggle, .zoom-controls button, #follow, #pause')
+  )
     view.canvas.focus({ preventScroll: true });
 });
 document.addEventListener('pointerdown', (event) => {

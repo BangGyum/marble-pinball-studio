@@ -78,10 +78,10 @@ export class PersonalSpringPlacement {
     shape.spring!.personal = origin;
     ctx.save();
     ctx.globalAlpha = 0.65;
-    shape.color = valid ? '#ffcf7c' : '#ff777d';
+    if (!valid) shape.color = '#ff777d';
     drawEntities(ctx, [{ x: origin.x, y: origin.y, angle: 0, shape, life: -1 }], scale);
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = sceneColor(valid ? '#ffcf7c' : '#ff777d');
+    ctx.strokeStyle = sceneColor(shape.color!);
     ctx.lineWidth = 2 / scale;
     ctx.setLineDash([5 / scale, 4 / scale]);
     ctx.beginPath();
@@ -101,12 +101,14 @@ export function drawPlacedSprings(
   finished: boolean,
   view: ViewBounds,
   dpr = 1,
-  deck?: { stage: StageDef; layer: 1 | 2 }
+  deck?: { stage: StageDef; layer: 1 | 2 },
+  showOwnPress = false
 ) {
   let painting = false;
   for (const spring of springs) {
+    const pressed = showOwnPress && spring.id === ownId && !finished;
     if (
-      elapsed < (spring.placedAt ?? 0) ||
+      (!pressed && elapsed < (spring.placedAt ?? 0)) ||
       springHasExpired(spring, elapsed) ||
       (finished && spring.activatedAt !== undefined) ||
       spring.x < view.left - 3 ||
@@ -126,8 +128,10 @@ export function drawPlacedSprings(
       ctx.strokeStyle = sceneColor('#111821');
       painting = true;
     }
-    const active = spring.activatedAt !== undefined && elapsed >= spring.activatedAt,
-      offset = active ? springShape.spring!.distance * personalSpringExtension(elapsed - spring.activatedAt!) : 0,
+    // Show a small initial movement on input. The room owns the full stroke and marble impacts.
+    const age = spring.activatedAt === undefined ? 0 : elapsed - spring.activatedAt;
+    const active = pressed || (spring.activatedAt !== undefined && age >= 0),
+      offset = springShape.spring!.distance * personalSpringExtension(Math.max(pressed ? 1 / 240 : 0, age)),
       sin = Math.sin(spring.direction),
       x = spring.x + Math.cos(spring.direction) * offset,
       y = spring.y + sin * offset;

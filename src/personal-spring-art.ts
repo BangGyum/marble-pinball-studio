@@ -26,9 +26,8 @@ export function drawPersonalSpring(
     const sample = Math.round(extension * 4) / 4;
     const bottom = Math.ceil((sample + 0.73) * density);
     if (height < 0.4 && half * 2 <= 1024 && half * 2 * (top + bottom) <= 750_000) {
-      const styleScale = scale < 16 ? 12 : scale < 24 ? 20 : Math.max(24, 2 ** Math.round(Math.log2(scale)));
       const alpha = ctx.globalAlpha;
-      const key = `${getSceneTheme()}/${accent}/${width}/${height}/${styleScale}/${density}/${sample}/${alpha}`;
+      const key = `${getSceneTheme()}/${accent}/${width}/${height}/${density}/${sample}/${alpha}`;
       let sprite = sprites.get(key);
       if (!sprite) {
         const area = half * 2 * (top + bottom);
@@ -42,7 +41,7 @@ export function drawPersonalSpring(
         const art = sprite.getContext('2d')!;
         art.setTransform(density, 0, 0, density, half, top);
         art.globalAlpha = alpha;
-        paintSpring(art, width, height, sample, styleScale, accent);
+        paintSpring(art, width, height, sample, accent);
         sprites.set(key, sprite);
         cachedPixels += area;
       }
@@ -53,10 +52,10 @@ export function drawPersonalSpring(
       if (Math.abs(delta) < 0.00001) {
         ctx.drawImage(sprite, left, -top / density, spriteWidth, sprite.height / density);
       } else {
-        // Keep the contact face and anchor rigid. Only stretch the winding between them.
+        // Keep the contact face and anchor rigid. Only stretch the bellows between them.
         const faceEnd = top + Math.ceil((height + 0.025) * density);
         const footStart = top + Math.floor((sample + 0.53) * density);
-        const winding = footStart - faceEnd,
+        const bellows = footStart - faceEnd,
           foot = sprite.height - footStart;
         ctx.drawImage(sprite, 0, 0, sprite.width, faceEnd, left, -top / density, spriteWidth, faceEnd / density);
         ctx.drawImage(
@@ -64,11 +63,11 @@ export function drawPersonalSpring(
           0,
           faceEnd,
           sprite.width,
-          winding,
+          bellows,
           left,
           (faceEnd - top) / density,
           spriteWidth,
-          winding / density + delta
+          bellows / density + delta
         );
         ctx.drawImage(
           sprite,
@@ -86,72 +85,31 @@ export function drawPersonalSpring(
       return;
     }
   }
-  paintSpring(ctx, width, height, extension, scale, accent);
+  paintSpring(ctx, width, height, extension, accent);
 }
 
-function paintSpring(ctx: Context, width: number, height: number, extension: number, scale: number, accent: string) {
+function paintSpring(ctx: Context, width: number, height: number, extension: number, accent: string) {
+  const beige = getSceneTheme() === 'beige';
+  const rubber = beige ? '#4d5140' : '#25484d';
+  const foldColor = sceneColor(accent);
   const foot = extension + 0.57;
-  const turns = scale < 16 ? 2 : 3;
-  const pitch = (foot - height) / turns;
-  const steel = sceneColor('#80a8b3');
-  ctx.fillStyle = sceneColor('#34515f');
-  ctx.fillRect(-0.09, height, 0.18, foot - height);
-  ctx.lineCap = 'round';
-  ctx.lineWidth = Math.min(0.085, 0.038 + 0.52 / scale);
-  // Receding and forward halves of the winding meet at each turn.
-  ctx.strokeStyle = sceneColor('#426471');
-  ctx.beginPath();
-  for (let i = 0; i < turns; i++) {
-    const y = height + i * pitch;
-    ctx.moveTo(-0.39, y);
-    ctx.quadraticCurveTo(-0.49, y + pitch * 0.26, 0.39, y + pitch * 0.5);
+  const foldStart = height - 0.03;
+  const pitch = (foot - foldStart) / 3;
+
+  function pad(x: number, y: number, w: number, h: number, radius: number, color: string) {
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, radius);
+    ctx.fillStyle = color;
+    ctx.fill();
   }
-  ctx.stroke();
-  ctx.strokeStyle = steel;
-  ctx.beginPath();
-  for (let i = 0; i < turns; i++) {
-    const y = height + (i + 0.5) * pitch;
-    ctx.moveTo(0.39, y);
-    ctx.quadraticCurveTo(0.49, y + pitch * 0.26, -0.39, y + pitch * 0.5);
+
+  for (let i = 0; i < 3; i++) {
+    const y = foldStart + i * pitch;
+    pad(-0.48, y, 0.96, pitch + 0.014, 0.08, rubber);
+    pad(-0.51, y + 0.012, 1.02, Math.min(0.1, pitch * 0.6), 0.045, foldColor);
   }
-  ctx.stroke();
-  ctx.fillStyle = sceneColor('#395563');
-  ctx.fillRect(-0.65, foot - 0.04, 1.3, 0.15);
-  ctx.fillStyle = steel;
-  ctx.fillRect(-0.59, foot - 0.04, 1.18, 0.047);
-  const bevel = Math.min(0.12, width * 0.18, height * 0.7);
-  ctx.beginPath();
-  ctx.moveTo(-width + bevel, -height);
-  ctx.lineTo(width - bevel, -height);
-  ctx.lineTo(width, -height + bevel);
-  ctx.lineTo(width, height - bevel);
-  ctx.lineTo(width - bevel, height);
-  ctx.lineTo(-width + bevel, height);
-  ctx.lineTo(-width, height - bevel);
-  ctx.lineTo(-width, -height + bevel);
-  ctx.closePath();
-  ctx.fillStyle = sceneColor('#243844');
-  ctx.fill();
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = steel;
-  ctx.lineWidth = Math.min(0.06, 0.026 + 0.4 / scale);
-  ctx.stroke();
-  ctx.fillStyle = sceneColor(accent);
-  ctx.fillRect(-width + bevel, -height, 2 * (width - bevel), height * 0.37);
-  // The inset chevron points toward the striking edge even when the spring is idle.
-  ctx.strokeStyle = ctx.fillStyle;
-  ctx.lineWidth = Math.min(0.08, 0.045 + 0.55 / scale);
-  ctx.beginPath();
-  ctx.moveTo(-width * 0.24, height * 0.53);
-  ctx.lineTo(0, -height * 0.33);
-  ctx.lineTo(width * 0.24, height * 0.53);
-  ctx.stroke();
-  if (scale >= 24) {
-    ctx.fillStyle = steel;
-    for (const side of [-1, 1]) {
-      ctx.beginPath();
-      ctx.arc(side * width * 0.76, height * 0.2, 0.034, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
+  pad(-0.66, foot - 0.025, 1.32, 0.145, 0.07, rubber);
+  pad(-width, -height, width * 2, height * 2, height * 0.89, rubber);
+  pad(-width * 0.96, -height * 0.89, width * 1.92, height * 1.42, height * 0.66, beige ? '#f2ead6' : '#e3eddf');
+  pad(-width * 0.21, -height * 0.6, width * 0.42, height * 0.27, height * 0.14, beige ? '#8b946c' : '#668a7b');
 }

@@ -24,7 +24,7 @@ import { SeaAnimalRenderer as DolphinRenderer } from '../sea-animal-render';
 import type { AnimalKind } from '../sea-animals';
 import { DolphinDrag } from '../dolphin-drag';
 import { PersonalSpringPlacement, drawPlacedSprings } from './spring-placement';
-import { springHasExpired, type PlacedSpring, type SpringPlacement } from '../personal-spring';
+import { isSpringOverlapMessage, springHasExpired, type PlacedSpring, type SpringPlacement } from '../personal-spring';
 
 export class LanView {
   private focusedId: number | null = null;
@@ -179,6 +179,7 @@ export class LanView {
         }
         if (event.isPrimary === false || (event.button !== 0 && event.pointerType !== 'touch')) return;
         event.preventDefault();
+        canvas.focus({ preventScroll: true });
         const center = this.manual ?? this.camera;
         this.placementDrag = {
           id: event.pointerId,
@@ -284,7 +285,7 @@ export class LanView {
           this.onPlaceSpring(placement);
         } else this.onPlacementChange();
       } catch (error) {
-        toast(error instanceof Error ? error.message : String(error));
+        this.showPlacementError(error instanceof Error ? error.message : String(error));
       }
       this.renderDirty = true;
     });
@@ -356,6 +357,12 @@ export class LanView {
   }
   racing() {
     return this.scene ? racingByProgress(this.scene.stage, this.balls) : [];
+  }
+  showPlacementError(reason: string) {
+    if (this.springPlacement.active && isSpringOverlapMessage(reason)) {
+      this.beginSpringPlacement();
+      toast(reason + ' 다른 위치를 눌러 주세요.');
+    } else toast(reason);
   }
   beginSpringPlacement() {
     if (!this.scene || !this.springConnected || this.personalSpring?.state !== 'available' || this.state === 'finished')
@@ -804,6 +811,10 @@ export class LanView {
       }
     }
     drawWind(ctx, scene.stage.windZones ?? [], elapsed, scale);
+    const showOwnPress =
+      this.springConnected &&
+      this.state === 'running' &&
+      (this.springPending?.state === 'used' || this.firstSpringStroke !== undefined);
     if (scene.stage.exitBridge) {
       drawPlacedSprings(
         ctx,
@@ -817,7 +828,8 @@ export class LanView {
         {
           stage: scene.stage,
           layer: 1,
-        }
+        },
+        showOwnPress
       );
       this.springPlacement?.draw(ctx, scale, this.placedSprings, this.springElapsed, 1);
     }
@@ -842,7 +854,8 @@ export class LanView {
       shown.state === 'finished',
       view,
       dpr,
-      scene.stage.exitBridge ? { stage: scene.stage, layer: 2 } : undefined
+      scene.stage.exitBridge ? { stage: scene.stage, layer: 2 } : undefined,
+      showOwnPress
     );
     this.springPlacement?.draw(
       ctx,
